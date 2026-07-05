@@ -23,6 +23,7 @@ import { useStats } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { NEXT_STATUS } from '@/lib/status'
 
 interface CreativeItem {
   page: string
@@ -104,7 +105,23 @@ export function Sidebar() {
                 <span className="flex-1 truncate">
                   {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
                 </span>
-                <StatusBadge status={ch.status} t={t} />
+                <StatusBadge
+                  status={ch.status}
+                  t={t}
+                  onCycle={() => {
+                    const next = NEXT_STATUS[ch.status] || 'writing'
+                    useChapterStore
+                      .getState()
+                      .updateChapter(currentProject!, ch.num, { status: next })
+                      .catch(() => {})
+                    // Update local state immediately for UI responsiveness
+                    ch.status = next
+                    useChapterStore
+                      .getState()
+                      .loadChapters(currentProject!)
+                      .catch(() => {})
+                  }}
+                />
               </div>
             ))}
             {/* Per-volume new chapter button */}
@@ -220,18 +237,33 @@ export function Sidebar() {
   )
 }
 
-function StatusBadge({ status, t: translate }: { status: string; t: (path: string) => string }) {
+function StatusBadge({
+  status,
+  t: translate,
+  onCycle,
+}: {
+  status: string
+  t: (path: string) => string
+  onCycle?: () => void
+}) {
   const colorMap: Record<string, { bg: string; text: string; label: string; dot?: boolean }> = {
     accepted: { bg: 'var(--success-soft)', text: 'var(--success)', label: translate('status.accepted') },
     review: { bg: 'var(--warning-soft)', text: 'var(--warning)', label: translate('status.review'), dot: true },
     writing: { bg: 'var(--info-soft)', text: 'var(--info)', label: translate('status.writing'), dot: true },
-    pending: { bg: 'var(--canvas-pop)', text: 'var(--ink-mute)', label: translate('status.pending') },
+    pending: { bg: 'var(--pending-soft)', text: 'var(--pending)', label: translate('status.pending') },
   }
   const c = colorMap[status] || colorMap.pending
   return (
     <span
-      className="text-[10px] font-medium px-[7px] py-[1px] rounded-full font-sans shrink-0 inline-flex items-center gap-1"
+      className={`text-[10px] font-medium px-[7px] py-[1px] rounded-full font-sans shrink-0 inline-flex items-center gap-1 ${onCycle ? 'cursor-pointer hover:brightness-110' : ''}`}
       style={{ background: c.bg, color: c.text }}
+      onClick={(e) => {
+        if (onCycle) {
+          e.stopPropagation()
+          onCycle()
+        }
+      }}
+      title={onCycle ? `切换为 ${translate('status.' + NEXT_STATUS[status] || 'writing')}` : undefined}
     >
       {status === 'accepted' && <Check className="w-2.5 h-2.5" />}
       {c.dot && (

@@ -25,14 +25,20 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_chapter',
-      description: '创建新章节。新建后会自动分配编号。',
+      description: '创建新章节。新建后会自动按卷内顺序分配编号。如果需要跨卷续接编号（如第三卷从第9章开始），请传入 chapter_num 参数。',
       parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: '章节标题' },
+          chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动按卷内顺序编号；传入则使用指定编号，适合跨卷续接场景' },
           outline: { type: 'string', description: '章节大纲（可选）' },
-          content: { type: 'string', description: '章节正文（可选，可以先创建空章节再写入）' },
+          content: { type: 'string', description: '章节正文（可选）' },
           volume_id: { type: 'number', description: '所属卷ID，默认为1' },
+          cognitive_frame: { type: 'string', description: '叙事维度 — 认知框架（可选）' },
+          emotional_anchor: { type: 'string', description: '叙事维度 — 情感锚点（可选）' },
+          world_texture: { type: 'string', description: '叙事维度 — 世界质感（可选）' },
+          concrete_mystery: { type: 'string', description: '叙事维度 — 悬念设置（可选）' },
+          interpersonal_tension: { type: 'string', description: '叙事维度 — 人际张力（可选）' },
         },
         required: ['title'],
       },
@@ -51,7 +57,12 @@ const TOOLS = [
           content: { type: 'string', description: '正文内容（可选）' },
           outline: { type: 'string', description: '大纲（可选）' },
           status: { type: 'string', enum: ['pending', 'writing', 'review', 'accepted'], description: '状态（可选）' },
-          summary: { type: 'string', description: '摘要（可选）' },
+          summary: { type: 'string', description: '章节摘要（可选）' },
+          cognitive_frame: { type: 'string', description: '叙事维度 — 认知框架：角色的认知变化（可选）' },
+          emotional_anchor: { type: 'string', description: '叙事维度 — 情感锚点：章节的情感基调（可选）' },
+          world_texture: { type: 'string', description: '叙事维度 — 世界质感：场景氛围与细节（可选）' },
+          concrete_mystery: { type: 'string', description: '叙事维度 — 悬念设置：本章要埋下或推进的谜团（可选）' },
+          interpersonal_tension: { type: 'string', description: '叙事维度 — 人际张力：角色间的冲突与张力（可选）' },
         },
         required: ['chapter_num'],
       },
@@ -357,19 +368,220 @@ const TOOLS = [
       },
     },
   },
-];
+  // ═══ Science ═══
+  {
+    type: 'function',
+    function: {
+      name: 'list_science',
+      description: '列出小说的所有科幻设定条目，按标签（已知/外推/假设）分组。',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_science_entry',
+      description: '创建一条科幻设定条目。',
+      parameters: {
+        type: 'object',
+        properties: {
+          label: { type: 'string', enum: ['known', 'extrapolation', 'hypothesis'], description: '分类：已知/外推/假设' },
+          name: { type: 'string', description: '条目名称' },
+          description: { type: 'string', description: '详细描述' },
+          references: { type: 'string', description: '参考文献（可选）' },
+        },
+        required: ['label', 'name', 'description'],
+      },
+    },
+  },
 
-// ─── Tool executor ───
+  // ═══ Update tools ═══
+  {
+    type: 'function',
+    function: {
+      name: 'update_world_entry',
+      description: '更新已有世界观设定条目的内容。只传需要修改的字段。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '条目ID' },
+          category: { type: 'string', description: '类别（可选）' },
+          name: { type: 'string', description: '条目名称（可选）' },
+          description: { type: 'string', description: '详细描述（可选）' },
+          tags: { type: 'string', description: '标签（可选）' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_relation',
+      description: '更新角色关系。只传需要修改的字段。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '关系ID' },
+          relation_type: { type: 'string', description: '关系类型，如：朋友、敌人、恋人等（可选）' },
+          description: { type: 'string', description: '关系描述（可选）' },
+          intensity: { type: 'number', description: '关系强度 1-5（可选）' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_memory',
+      description: '更新创作记忆。只传需要修改的字段。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '记忆ID' },
+          category: { type: 'string', enum: ['character', 'location', 'item', 'event', 'promise', 'other'], description: '类别（可选）' },
+          content: { type: 'string', description: '记忆内容（可选）' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_timeline_event',
+      description: '更新时间线事件。只传需要修改的字段。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '事件ID' },
+          year: { type: 'string', description: '时间（如"2048年"）（可选）' },
+          title: { type: 'string', description: '事件标题（可选）' },
+          description: { type: 'string', description: '事件描述（可选）' },
+          importance: { type: 'number', description: '重要性 1-5（可选）' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+
+  // ═══ Delete tools ═══
+  {
+    type: 'function',
+    function: {
+      name: 'delete_science_entry',
+      description: '删除指定科幻设定条目。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: '条目ID' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_character',
+      description: '删除指定角色。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { name: { type: 'string', description: '角色姓名' } },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_world_entry',
+      description: '删除指定世界观条目。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: '条目ID' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_foreshadow',
+      description: '删除指定伏笔。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { title: { type: 'string', description: '伏笔标题' } },
+        required: ['title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_relation',
+      description: '删除指定角色关系。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: '关系ID' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_memory',
+      description: '删除指定创作记忆。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: '记忆ID' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_timeline_event',
+      description: '删除指定时间线事件。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: '事件ID' } },
+        required: ['id'],
+      },
+    },
+  },
+];
 const { v4: uuidv4 } = require('uuid');
 
 function executeTool(projectName, toolName, args) {
   const db = require('./db');
   const pdb = db.getProjectDb(projectName);
 
+  // ─── Shared helpers ───
+  function updateById(id, table, fields, allowed, addUpdatedAt) {
+    const updates = []; const params = [];
+    for (const key of allowed) {
+      if (fields[key] !== undefined) { updates.push(`${key} = ?`); params.push(fields[key]); }
+    }
+    if (updates.length === 0) return { error: '没有要更新的字段' };
+    if (addUpdatedAt) updates.push("updated_at = datetime('now')");
+    params.push(id);
+    const info = pdb.prepare(`UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    if (info.changes === 0) return { error: `条目 ${id} 不存在` };
+    return { updated: true, id };
+  }
+
+  function deleteById(id, table, idField, entityName) {
+    const info = pdb.prepare(`DELETE FROM ${table} WHERE ${idField} = ?`).run(id);
+    if (info.changes === 0) return { error: `${entityName} ${id} 不存在` };
+    return { deleted: true, [idField]: id };
+  }
+
   switch (toolName) {
     // ── Chapters ──
     case 'list_chapters': {
-      const rows = pdb.prepare('SELECT num, title, status, word_count, outline, summary, created_at, updated_at FROM chapters ORDER BY num').all();
+      const rows = pdb.prepare('SELECT num, title, status, word_count, outline, summary, volume_id, created_at, updated_at FROM chapters ORDER BY num').all();
       return rows;
     }
     case 'get_chapter': {
@@ -379,10 +591,18 @@ function executeTool(projectName, toolName, args) {
     }
     case 'create_chapter': {
       const volId = args.volume_id || 1;
-      const max = pdb.prepare('SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?').get(volId);
-      const num = (max?.mx || 0) + 1;
-      pdb.prepare("INSERT INTO chapters (volume_id, num, title, outline, content, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))")
-        .run(volId, num, args.title, args.outline || '', args.content || '');
+      let num;
+      if (args.chapter_num !== undefined) {
+        num = args.chapter_num;
+      } else {
+        const max = pdb.prepare('SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?').get(volId);
+        num = (max?.mx || 0) + 1;
+      }
+      pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
+        .run(volId, num, args.title, args.outline || '', args.content || '',
+          args.cognitive_frame || '', args.emotional_anchor || '', args.world_texture || '',
+          args.concrete_mystery || '', args.interpersonal_tension || '');
       return { created: true, chapter_num: num, title: args.title };
     }
     case 'update_chapter': {
@@ -558,7 +778,11 @@ function executeTool(projectName, toolName, args) {
 
     // ── Volumes ──
     case 'list_volumes': {
-      return pdb.prepare('SELECT * FROM volumes ORDER BY sort_order').all();
+      const vols = pdb.prepare('SELECT * FROM volumes ORDER BY sort_order').all();
+      for (const v of vols) {
+        v.chapters = pdb.prepare('SELECT num, title, status, word_count, outline, summary FROM chapters WHERE volume_id = ? ORDER BY num').all(v.id);
+      }
+      return vols;
     }
     case 'create_volume': {
       const max = pdb.prepare('SELECT COALESCE(MAX(sort_order), 0) as mx FROM volumes').get();
@@ -583,6 +807,64 @@ function executeTool(projectName, toolName, args) {
       pdb.prepare('DELETE FROM chapters WHERE volume_id = ?').run(args.volume_id);
       pdb.prepare('DELETE FROM volumes WHERE id = ?').run(args.volume_id);
       return { deleted: true, volume_id: args.volume_id };
+    }
+
+    // ── Science ──
+    case 'list_science': {
+      return pdb.prepare('SELECT * FROM science_entries ORDER BY label, name').all();
+    }
+    case 'create_science_entry': {
+      const id = uuidv4();
+      pdb.prepare('INSERT INTO science_entries (id, label, name, description, references) VALUES (?, ?, ?, ?, ?)')
+        .run(id, args.label, args.name, args.description, args.references || '');
+      return { created: true, id, label: args.label, name: args.name };
+    }
+
+    // ── World update/delete ──
+    case 'update_world_entry': {
+      return updateById(args.id, 'world_entries', args, ['category', 'name', 'description', 'tags'], true);
+    }
+    case 'delete_world_entry': {
+      return deleteById(args.id, 'world_entries', 'id', '条目');
+    }
+
+    // ── Relations update/delete ──
+    case 'update_relation': {
+      return updateById(args.id, 'character_relations', args, ['relation_type', 'description', 'intensity'], false);
+    }
+    case 'delete_relation': {
+      return deleteById(args.id, 'character_relations', 'id', '关系');
+    }
+
+    // ── Memories update/delete ──
+    case 'update_memory': {
+      return updateById(args.id, 'memories', args, ['category', 'content'], false);
+    }
+    case 'delete_memory': {
+      return deleteById(args.id, 'memories', 'id', '记忆');
+    }
+
+    // ── Timeline update/delete ──
+    case 'update_timeline_event': {
+      return updateById(args.id, 'timeline_events', args, ['year', 'title', 'description', 'importance'], false);
+    }
+    case 'delete_timeline_event': {
+      return deleteById(args.id, 'timeline_events', 'id', '事件');
+    }
+
+    // ── Science delete ──
+    case 'delete_science_entry': {
+      return deleteById(args.id, 'science_entries', 'id', '条目');
+    }
+
+    // ── Character delete ──
+    case 'delete_character': {
+      return deleteById(args.name, 'characters', 'name', '角色');
+    }
+
+    // ── Foreshadow delete ──
+    case 'delete_foreshadow': {
+      return deleteById(args.title, 'foreshadows', 'title', '伏笔');
     }
 
     default:

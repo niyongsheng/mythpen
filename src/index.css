@@ -35,6 +35,8 @@
   --error-soft: #3a1a1a;
   --info: #6090c0;
   --info-soft: #1a2a3a;
+  --pending: #8a8880;
+  --pending-soft: #26262b;
 
   /* Typography */
   --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, serif;
@@ -81,6 +83,11 @@ html[data-theme="light"] {
   --hairline: #d5cfc3;
   --hairline-light: #c8c2b6;
   --ink: #2a2824;
+  --success-soft: rgba(76, 175, 125, 0.15);
+  --warning-soft: rgba(212, 160, 64, 0.15);
+  --info-soft: rgba(96, 144, 192, 0.15);
+  --pending: #55524c;
+  --pending-soft: #d5cfc3;
   --ink-hover: #1a1814;
   --ink-secondary: #55524c;
   --ink-tertiary: #8a867e;

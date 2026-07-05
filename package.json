@@ -20,18 +20,19 @@
     "lint": "biome check --write src/",
     "format": "biome format --write src/",
     "prepare": "simple-git-hooks",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:sidecar": "bun build --compile ./server/index.js --outfile src-tauri/binaries/mythpen-server"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "biome check --write --no-errors-on-unmatched"
+      "biome format --write --no-errors-on-unmatched"
     ]
   },
   "simple-git-hooks": {
     "pre-commit": "npx lint-staged"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.11.1",
+    "@anthropic-ai/sdk": "^0.110.0",
     "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",

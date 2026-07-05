@@ -62,32 +62,6 @@ export function SettingsDrawer() {
     useEditorStore.getState().setFontFamily(family)
   }
 
-  const handleApiProviderChange = (provider: string) => {
-    // 1. Save current API key to current provider's slot before switching
-    const curProvider = detectProvider(settings.apiBaseUrl)
-    const curApiKey = settings.apiKey
-    if (curProvider === 'deepseek') updateSetting('apiKeyDeepseek', curApiKey)
-    else if (curProvider === 'anthropic') updateSetting('apiKeyAnthropic', curApiKey)
-    else if (curProvider === 'openai') updateSetting('apiKeyOpenai', curApiKey)
-
-    // 2. Update base URL, model, and restore target provider's API key
-    if (provider === 'deepseek') {
-      updateSetting('apiBaseUrl', 'https://api.deepseek.com/v1')
-      updateSetting('apiModel', 'deepseek-chat')
-      updateSetting('apiKey', useSettingsStore.getState().settings.apiKeyDeepseek || '')
-    } else if (provider === 'anthropic') {
-      updateSetting('apiBaseUrl', 'https://api.anthropic.com')
-      updateSetting('apiModel', 'claude-sonnet-5-20250715')
-      updateSetting('apiKey', useSettingsStore.getState().settings.apiKeyAnthropic || '')
-    } else if (provider === 'openai') {
-      updateSetting('apiBaseUrl', 'https://api.openai.com/v1')
-      updateSetting('apiModel', 'gpt-4o')
-      updateSetting('apiKey', useSettingsStore.getState().settings.apiKeyOpenai || '')
-    }
-    // For 'custom': leave current apiBaseUrl/apiKey as-is so the user can type freely
-    // ProviderModelSelect handles auto-correction of model if current model doesn't match
-  }
-
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-[200]" onClick={closeSettings} />
@@ -244,33 +218,24 @@ export function SettingsDrawer() {
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
               <Bot className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.aiService')}
             </div>
-            <SettingRow label={t('settings.apiProvider')} desc={t('settings.apiBaseUrlDesc')}>
-              <select
-                className="h-[30px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)]"
-                value={
-                  settings.apiBaseUrl.includes('deepseek')
-                    ? 'deepseek'
-                    : settings.apiBaseUrl.includes('openai')
-                      ? 'openai'
-                      : settings.apiBaseUrl === 'https://api.anthropic.com'
-                        ? 'anthropic'
-                        : 'custom'
-                }
-                onChange={(e) => handleApiProviderChange(e.target.value)}
-              >
-                <option value="deepseek">DeepSeek</option>
-                <option value="anthropic">Anthropic Claude</option>
-                <option value="openai">OpenAI Compatible</option>
-                <option value="custom">{t('settings.apiBaseUrl')}</option>
-              </select>
-            </SettingRow>
             <SettingRow label={t('settings.apiBaseUrl')}>
               <input
                 type="url"
                 className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
                 value={settings.apiBaseUrl}
                 onChange={(e) => updateSetting('apiBaseUrl', e.target.value)}
+                placeholder="https://api.deepseek.com/v1"
               />
+            </SettingRow>
+            <SettingRow label="接口类型" desc="OpenAI 格式或 Anthropic 格式">
+              <select
+                className="h-[30px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)] w-[120px]"
+                value={settings.apiType}
+                onChange={(e) => updateSetting('apiType', e.target.value as 'openai' | 'claude')}
+              >
+                <option value="openai">OpenAI</option>
+                <option value="claude">Anthropic</option>
+              </select>
             </SettingRow>
             <SettingRow label="API Key">
               <div className="flex gap-1 items-center">
@@ -278,15 +243,7 @@ export function SettingsDrawer() {
                   type={showApiKey ? 'text' : 'password'}
                   className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[180px]"
                   value={settings.apiKey}
-                  onChange={(e) => {
-                    const newKey = e.target.value
-                    updateSetting('apiKey', newKey)
-                    // Sync to per-provider slot so it's remembered when switching back
-                    const prov = detectProvider(settings.apiBaseUrl)
-                    if (prov === 'deepseek') updateSetting('apiKeyDeepseek', newKey)
-                    else if (prov === 'anthropic') updateSetting('apiKeyAnthropic', newKey)
-                    else if (prov === 'openai') updateSetting('apiKeyOpenai', newKey)
-                  }}
+                  onChange={(e) => updateSetting('apiKey', e.target.value)}
                 />
                 <button
                   className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] border-none bg-none text-[var(--ink-tertiary)] cursor-pointer hover:text-[var(--ink)] transition-colors shrink-0"
@@ -297,11 +254,17 @@ export function SettingsDrawer() {
                 </button>
               </div>
             </SettingRow>
-            <ProviderModelSelect
-              apiBaseUrl={settings.apiBaseUrl}
-              apiModel={settings.apiModel}
-              onChange={(m) => updateSetting('apiModel', m)}
-            />
+            <SettingRow label="模型">
+              <div className="flex gap-1.5 items-center">
+                <input
+                  type="text"
+                  className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
+                  value={settings.apiModel}
+                  onChange={(e) => updateSetting('apiModel', e.target.value)}
+                  placeholder="deepseek-chat"
+                />
+              </div>
+            </SettingRow>
             <div className="pt-2.5 flex items-center gap-2.5">
               <button
                 className="h-[30px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-50"
@@ -394,95 +357,6 @@ export function SettingsDrawer() {
         </div>
       </div>
     </>
-  )
-}
-
-// ─── Provider-linked model selector ───
-const PROVIDER_MODELS: Record<string, { label: string; options: { value: string; label: string }[] }> = {
-  deepseek: {
-    label: 'DeepSeek',
-    options: [
-      { value: 'deepseek-v4-flash', label: 'DeepSeek v4 Flash' },
-      { value: 'deepseek-v4-pro', label: 'DeepSeek v4 Pro' },
-    ],
-  },
-  anthropic: {
-    label: 'Anthropic Claude',
-    options: [
-      { value: 'claude-sonnet-5-20250715', label: 'Claude Sonnet 5' },
-      { value: 'claude-opus-4-8-20250715', label: 'Claude Opus 4.8' },
-      { value: 'claude-haiku-4-5-20250715', label: 'Claude Haiku 4.5' },
-      { value: 'claude-fable-5', label: 'Claude Fable 5' },
-    ],
-  },
-  openai: {
-    label: 'OpenAI Compatible',
-    options: [
-      { value: 'gpt-4o', label: 'GPT-4o' },
-      { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-      { value: 'o3-mini', label: 'o3 Mini' },
-    ],
-  },
-}
-
-function detectProvider(apiBaseUrl: string): string {
-  if (apiBaseUrl.includes('deepseek')) return 'deepseek'
-  if (apiBaseUrl.includes('openai')) return 'openai'
-  if (apiBaseUrl.includes('anthropic')) return 'anthropic'
-  return 'custom'
-}
-
-function ProviderModelSelect({
-  apiBaseUrl,
-  apiModel,
-  onChange,
-}: {
-  apiBaseUrl: string
-  apiModel: string
-  onChange: (m: string) => void
-}) {
-  const provider = detectProvider(apiBaseUrl)
-  const models = PROVIDER_MODELS[provider]
-
-  if (provider === 'custom') {
-    return (
-      <SettingRow label="模型">
-        <div className="flex gap-1.5 items-center">
-          <input
-            type="text"
-            className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[160px]"
-            value={apiModel}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        </div>
-      </SettingRow>
-    )
-  }
-
-  // Ensure current model is within the provider's model list; fallback to first option
-  const validValues = models.options.map((o) => o.value)
-  const currentValue = validValues.includes(apiModel) ? apiModel : models.options[0].value
-  if (currentValue !== apiModel) {
-    // schedule the correction; do it async to avoid render-side effects
-    queueMicrotask(() => onChange(currentValue))
-  }
-
-  return (
-    <SettingRow label="模型">
-      <div className="flex gap-1.5 items-center">
-        <select
-          className="h-[30px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)] w-[160px]"
-          value={currentValue}
-          onChange={(e) => onChange(e.target.value)}
-        >
-          {models.options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    </SettingRow>
   )
 }
 

@@ -28,7 +28,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   isRunning: false,
   loading: false,
 
-  setTask: (task) => set((s) => ({ task: { ...s.task, ...task } })),
+  setTask: (task) =>
+    set((s) => ({
+      task: { ...s.task, ...task },
+      isRunning:
+        task.status === 'running' ? true : task.status === 'completed' || task.status === 'error' ? false : s.isRunning,
+    })),
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 
   loadMessages: async (project) => {
@@ -48,9 +53,10 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     try {
       const sessions = await chatApi.listSessions(project)
       set({ sessions })
-      // Auto-select first session if none selected
+      // Auto-select first session if none selected, then load messages
       if (!get().currentSessionId && sessions.length > 0) {
         set({ currentSessionId: sessions[0].id })
+        get().loadMessages(project)
       }
     } catch {
       set({ sessions: [] })

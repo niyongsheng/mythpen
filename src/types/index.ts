@@ -155,6 +155,9 @@ export interface TimelineEvent {
   importance: number
 }
 
+// ─── Workflow ───
+export type WorkflowPhase = 'idea' | 'setting' | 'outline' | 'writing' | 'review' | 'consistency' | 'export'
+
 // ─── Agent ───
 export interface AgentTask {
   taskName: string
@@ -169,7 +172,7 @@ export interface ChatMessage {
   id: string
   role: 'user' | 'ai' | 'system'
   content: string
-  toolCalls?: string[]
+  toolCalls?: { id: string; name: string; arguments: any; status?: string; result?: any }[]
 }
 
 // ─── Settings ───
@@ -180,6 +183,7 @@ export interface AppSettings {
   apiKeyOpenai: string
   apiBaseUrl: string
   apiModel: string
+  apiType: 'openai' | 'claude'
   uiLanguage: 'zh' | 'en'
   theme: 'dark' | 'light'
   editorFontSize: number

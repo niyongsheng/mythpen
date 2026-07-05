@@ -11,6 +11,20 @@ function project(name) {
   return name;
 }
 
+// ─── Shared helpers ───
+function updateRecord(projectName, table, id, body, allowedFields, addUpdatedAt) {
+  const fields = []; const params = [];
+  const data = body || {};
+  for (const key of allowedFields) {
+    if (data[key] !== undefined) { fields.push(`${key} = ?`); params.push(data[key]); }
+  }
+  if (fields.length === 0) return null;
+  if (addUpdatedAt) fields.push("updated_at = datetime('now')");
+  params.push(id);
+  const changes = db.projectExecute(projectName, `UPDATE ${table} SET ${fields.join(', ')} WHERE id = ?`, params);
+  return changes;
+}
+
 // ═══════════════════════════════════════════
 // PROJECTS
 // ═══════════════════════════════════════════
@@ -55,7 +69,7 @@ router.post('/projects', (req, res) => {
   // Create new project DB
   const pdb = db.openProjectDb(filePath);
   const metaInsert = pdb.prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)');
-  const meta = { name, description: '', mode, language, version: '1', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), word_count: '0', author_name: '佚名' };
+  const meta = { name, description: '', mode, language, version: '1', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), word_count: '0', author_name: '佚名', workflow_phase: 'idea' };
   for (const [k, v] of Object.entries(meta)) metaInsert.run(k, v);
 
   // Default volume
@@ -155,15 +169,26 @@ router.put('/:project/chapters/:num', (req, res) => {
 });
 
 router.post('/:project/chapters', (req, res) => {
-  const { title, volume_id = 1, outline = '', status = 'pending' } = req.body || {};
-  const maxNum = db.projectGet(project(req.params.project), 'SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?', [volume_id]);
-  const num = (maxNum?.mx || 0) + 1;
+  const { title, volume_id = 1, outline = '', status = 'pending', chapter_num } = req.body || {};
+  let num;
+  if (chapter_num !== undefined) {
+    num = chapter_num;
+  } else {
+    const maxNum = db.projectGet(project(req.params.project), 'SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?', [volume_id]);
+    num = (maxNum?.mx || 0) + 1;
+  }
   db.projectExecute(project(req.params.project),
     'INSERT INTO chapters (volume_id, num, title, outline, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))',
     [volume_id, num, title, outline, status]
   );
   const created = db.projectGet(project(req.params.project), 'SELECT * FROM chapters WHERE num = ?', [num]);
   res.status(201).json(created);
+});
+
+router.delete('/:project/chapters/:num', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM chapters WHERE num = ?', [parseInt(req.params.num)]);
+  if (changes === 0) return res.status(404).json({ error: { message: `章节 ${req.params.num} 不存在` } });
+  res.json({ success: true, deleted_num: parseInt(req.params.num) });
 });
 
 router.get('/:project/volumes', (req, res) => {
@@ -174,6 +199,30 @@ router.get('/:project/volumes', (req, res) => {
     );
   }
   res.json(rows);
+});
+
+router.post('/:project/volumes', (req, res) => {
+  const { title, summary = '' } = req.body || {};
+  const pdb = db.getProjectDb(project(req.params.project));
+  const max = pdb.prepare('SELECT COALESCE(MAX(sort_order), 0) as mx FROM volumes').get();
+  const sortOrder = (max?.mx || 0) + 1;
+  const result = pdb.prepare("INSERT INTO volumes (sort_order, title, summary, created_at) VALUES (?, ?, ?, datetime('now'))").run(sortOrder, title, summary);
+  res.status(201).json({ id: result.lastInsertRowid, title });
+});
+
+router.put('/:project/volumes/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'volumes', req.params.id, req.body, ['title', 'summary'], false);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '卷不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/volumes/:id', (req, res) => {
+  const { id } = req.params;
+  db.projectExecute(project(req.params.project), 'DELETE FROM chapters WHERE volume_id = ?', [id]);
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM volumes WHERE id = ?', [id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '卷不存在' } });
+  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════
@@ -222,6 +271,12 @@ router.put('/:project/characters/:id', (req, res) => {
   res.json({ success: true });
 });
 
+router.delete('/:project/characters/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM characters WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '角色不存在' } });
+  res.json({ success: true });
+});
+
 // ═══════════════════════════════════════════
 // WORLD ENTRIES
 // ═══════════════════════════════════════════
@@ -241,6 +296,19 @@ router.post('/:project/world', (req, res) => {
   res.status(201).json({ id, name });
 });
 
+router.put('/:project/world/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'world_entries', req.params.id, req.body, ['category', 'name', 'description', 'tags'], true);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '条目不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/world/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM world_entries WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '条目不存在' } });
+  res.json({ success: true });
+});
+
 // ═══════════════════════════════════════════
 // SCIENCE ENTRIES
 // ═══════════════════════════════════════════
@@ -258,6 +326,12 @@ router.post('/:project/science', (req, res) => {
     [id, label, name, description, references]
   );
   res.status(201).json({ id, name });
+});
+
+router.delete('/:project/science/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM science_entries WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '条目不存在' } });
+  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════
@@ -303,6 +377,19 @@ router.post('/:project/relations', (req, res) => {
   res.status(201).json({ id });
 });
 
+router.put('/:project/relations/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'character_relations', req.params.id, req.body, ['relation_type', 'description', 'intensity'], false);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '关系不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/relations/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM character_relations WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '关系不存在' } });
+  res.json({ success: true });
+});
+
 // ═══════════════════════════════════════════
 // MEMORIES
 // ═══════════════════════════════════════════
@@ -322,6 +409,19 @@ router.post('/:project/memories', (req, res) => {
   res.status(201).json({ id });
 });
 
+router.put('/:project/memories/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'memories', req.params.id, req.body, ['category', 'content'], false);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '记忆不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/memories/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM memories WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '记忆不存在' } });
+  res.json({ success: true });
+});
+
 // ═══════════════════════════════════════════
 // TIMELINE
 // ═══════════════════════════════════════════
@@ -339,6 +439,19 @@ router.post('/:project/timeline', (req, res) => {
     [id, year, title, description, importance]
   );
   res.status(201).json({ id, title });
+});
+
+router.put('/:project/timeline/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'timeline_events', req.params.id, req.body, ['year', 'title', 'description', 'importance'], false);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '事件不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/timeline/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM timeline_events WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '事件不存在' } });
+  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════
@@ -379,6 +492,29 @@ router.get('/:project/meta', (req, res) => {
   for (const r of rows) meta[r.key] = r.value;
   meta.genres = db.projectQuery(project(req.params.project), 'SELECT genre FROM project_genres').map(g => g.genre);
   res.json(meta);
+});
+
+// ═══════════════════════════════════════════
+// WORKFLOW PHASE
+// ═══════════════════════════════════════════
+
+router.get('/:project/workflow/phase', (req, res) => {
+  const row = db.projectGet(project(req.params.project),
+    "SELECT value FROM project_meta WHERE key = 'workflow_phase'"
+  );
+  res.json({ phase: row?.value || 'idea' });
+});
+
+router.put('/:project/workflow/phase', (req, res) => {
+  const { phase } = req.body || {};
+  const valid = ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export'];
+  if (!phase || !valid.includes(phase)) {
+    return res.status(400).json({ error: { message: `Invalid phase. Must be one of: ${valid.join(', ')}` } });
+  }
+  db.projectExecute(project(req.params.project),
+    "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('workflow_phase', ?)", [phase]
+  );
+  res.json({ success: true, phase });
 });
 
 // ═══════════════════════════════════════════

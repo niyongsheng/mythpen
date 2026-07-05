@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { chaptersApi, projectsApi } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import type { WorkflowPhase } from '@/types'
 
 interface ProjectSummary {
   id: string
@@ -21,12 +22,16 @@ interface ProjectState {
   showProjectList: boolean
   loading: boolean
   error: string | null
+  workflowPhase: WorkflowPhase
   setCurrentProject: (name: string | null) => void
   toggleProjectList: () => void
   showProjectListFn: () => void
   hideProjectList: () => void
   loadProjects: () => Promise<void>
+  loadPhase: (project: string) => Promise<void>
+  setPhase: (project: string, phase: WorkflowPhase) => Promise<void>
   createProject: (name: string, opts?: { mode?: string; language?: string; genres?: string[] }) => Promise<void>
+  deleteProject: (name: string) => Promise<void>
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -35,6 +40,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   showProjectList: false,
   loading: false,
   error: null,
+  workflowPhase: 'idea',
 
   setCurrentProject: (name) => {
     localStorage.setItem('mythpen-current-project', name || '')
@@ -53,8 +59,31 @@ export const useProjectStore = create<ProjectState>((set) => ({
       const saved = localStorage.getItem('mythpen-current-project')
       const currentProject = projects.find((p) => p.name === saved) ? saved : projects[0]?.name || null
       set({ projects, currentProject, loading: false })
+      // Load phase for the current project
+      if (currentProject) {
+        const { phase } = await projectsApi.getPhase(currentProject)
+        set({ workflowPhase: phase as WorkflowPhase })
+      }
     } catch (err) {
-      set({ error: err.message, loading: false })
+      set({ error: (err as any).message, loading: false })
+    }
+  },
+
+  loadPhase: async (project) => {
+    try {
+      const { phase } = await projectsApi.getPhase(project)
+      set({ workflowPhase: phase as WorkflowPhase })
+    } catch {
+      /* ignore */
+    }
+  },
+
+  setPhase: async (project, phase) => {
+    try {
+      await projectsApi.setPhase(project, phase)
+      set({ workflowPhase: phase })
+    } catch {
+      /* ignore */
     }
   },
 
@@ -70,7 +99,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
       // 3. Reload project list & set current
       await useProjectStore.getState().loadProjects()
-      set({ currentProject: name, showProjectList: false, loading: false })
+      set({ currentProject: name, showProjectList: false, loading: false, workflowPhase: 'idea' })
 
       // 4. Load chapters into sidebar & navigate to Writing page
       await useChapterStore.getState().loadChapters(name)
@@ -80,4 +109,23 @@ export const useProjectStore = create<ProjectState>((set) => ({
       throw err
     }
   },
+
+  deleteProject: async (name) => {
+    set({ loading: true, error: null })
+    try {
+      await projectsApi.delete(name)
+      await useProjectStore.getState().loadProjects()
+      // If the deleted project was current, clear or pick another
+      const state = useProjectStore.getState()
+      if (state.currentProject === name) {
+        const next = state.projects[0]?.name || null
+        state.setCurrentProject(next)
+      }
+      set({ loading: false })
+    } catch (err) {
+      set({ error: (err as any).message || '删除失败', loading: false })
+    }
+  },
 }))
+
+export { type ProjectSummary, type ProjectState }

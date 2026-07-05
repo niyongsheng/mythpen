@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const apiRoutes = require('./routes/api');
 const { TOOLS, executeTool } = require('./tools');
+const { createAIAdapter } = require('./ai-adapter');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -31,26 +32,25 @@ app.use('/api', apiRoutes);
 // ═══════════════════════════════════════════
 
 function getAiConfig() {
+  const DEFAULTS = {
+    apiBaseUrl: 'https://api.deepseek.com/v1',
+    apiKey: process.env.DEEPSEEK_KEY || '',
+    apiModel: 'deepseek-chat',
+    apiType: '',
+  };
   try {
     const db = require('./db');
     const rows = db.dbQuery('SELECT key, value FROM app_settings');
     const map = {};
     for (const r of rows) map[r.key] = r.value;
-    const baseUrl = map.api_base_url || 'https://api.deepseek.com/v1';
     return {
-      apiBaseUrl: baseUrl,
-      chatUrl: baseUrl.replace(/\/?$/, '') + (baseUrl.endsWith('/chat/completions') ? '' : '/chat/completions'),
-      apiKey: map.api_key || process.env.DEEPSEEK_KEY || '',
-      apiModel: map.api_model || 'deepseek-chat',
+      apiBaseUrl: map.api_base_url || DEFAULTS.apiBaseUrl,
+      apiKey: map.api_key || DEFAULTS.apiKey,
+      apiModel: map.api_model || DEFAULTS.apiModel,
+      apiType: map.api_type || DEFAULTS.apiType,
     };
   } catch (e) {
-    const baseUrl = 'https://api.deepseek.com/v1';
-    return {
-      apiBaseUrl: baseUrl,
-      chatUrl: baseUrl + '/chat/completions',
-      apiKey: process.env.DEEPSEEK_KEY || '',
-      apiModel: 'deepseek-chat',
-    };
+    return { ...DEFAULTS };
   }
 }
 
@@ -88,6 +88,55 @@ ${foreshadows.map(f => `  [${f.priority}] ${f.title}：${f.description || ''}`).
   return `你是一位专业的小说创作助手，帮助作者完成从选题到完稿的全流程。
 
 ${context}
+
+[章节写作工作流]
+写一章的标准流程如下。每一步使用对应工具完成，不要跳过：
+
+第一步 · 了解项目
+  使用 list_characters、list_foreshadows、list_volumes 等工具了解当前项目的角色、伏笔、章节结构。
+
+第二步 · 阅读大纲
+  使用 get_chapter 阅读当前章节的大纲（outline 字段）和前文内容，理解这段要写什么。
+  ⚠️ 如果该章节没有大纲（outline 为空），则不能直接写正文。
+  先执行【写大纲】步骤，用 update_chapter 的 outline 参数填入大纲，然后再继续。
+
+第三步 · 创作
+  根据大纲和前文，使用 update_chapter 的 content 参数写入正文，同时将章节 status 设为 writing。
+  ⚠️ 严格遵守大纲范围：大纲写到哪里，内容就写到哪里。不能超越大纲进度、不能提前推进到大纲未涉及的情节。
+  注意：
+  - 与上一章结尾无缝衔接
+  - 推动主线或支线情节
+  - 所有角色行为符合其性格设定
+  - 字数 500-2000 字，根据大纲复杂度调整
+
+第四步 · 润色
+  重新读取已写内容，检查语言流畅度、用词准确性、节奏感。使用 update_chapter 更新润色后的版本。
+
+第五步 · 审稿
+  对照约束规则检查：
+  - □ 是否使用目标语言
+  - □ 所有角色行为符合设定
+  - □ 没有提前泄露未发生的剧情
+  - □ 伏笔铺设合理
+  - □ 与前文没有矛盾
+  发现问题则用 update_chapter 修正。
+
+第六步 · 定稿
+  用 update_chapter 将章节状态设为 review，表示本回合工作完成。作者审阅后可手动改为 accepted。
+
+[章节状态说明]
+章节状态流转：pending(待办) → writing(写作中) → review(审阅中) → accepted(已完成)
+- 开始写内容时设为 writing
+- 写完审阅后设为 review
+- 最终由作者确认为 accepted
+
+[章节编号说明]
+使用 create_chapter 新建章节时需要注意编号方式（用 list_volumes 查看已有章节来判断）：
+- 方式一：跨卷连续编号。各卷章节编号全局延续，例如卷 1 第 1-8 章、卷 2 第 9-16 章、卷 3 第 17 章起。
+  此时使用 create_chapter 时需传入 chapter_num 参数明确指定编号，因为默认是按卷内独立排序。
+- 方式二：分卷独立编号。每卷都从第 1 章开始，例如卷 1 和卷 3 都有"第 1 章"。
+  此时不传 chapter_num，create_chapter 会自动按卷内顺序分配编号。
+- 判断方法：用 list_volumes 列出各卷下的章节 title/num，观察已有的编号规律来判断作者使用的是哪种方式。
 
 [约束规则]
 - 严格遵循目标语言（中文）写作，不要混入其他语言
@@ -134,17 +183,41 @@ ${foreshadows.map(f => `  [${f.priority}] ${f.title}：${f.description || ''}`).
     context = `项目: ${projectName}\n`;
   }
 
-  return `你是一位熟悉这部小说的 AI 助手，帮助作者讨论创作思路、分析设定和回答各种问题。
+  return `你是一位全能的小说创作助手，既能与作者讨论创作思路，也能直接执行项目管理和创作任务。
 
 ## 当前小说信息
 
 ${context}
 
-## 你的角色
-- 与用户自由对话，讨论小说的任何方面：情节发展、角色塑造、世界设定等
-- 根据用户的问题提供建议、分析和灵感
-- 除非用户明确要求，否则不要直接续写小说内容
-- 回复自然、有用、有见地`;
+## 你的能力
+
+### 📝 创作能力
+- **续写章节**：读取前文和大纲，用 update_chapter 写入正文，保持风格一致
+- **润色修改**：用 update_chapter 优化已有内容的语言、节奏和表现力
+- **重写章节**：用 update_chapter 的 content 参数完全覆盖重写指定章节
+- **生成大纲**：为章节编写大纲（update_chapter 的 outline 参数）
+- **角色对话**：模拟角色对话帮助作者打磨台词
+- **新建章节**：用 create_chapter 创建新章节（注意编号方式：不传 chapter_num 则自动按卷内顺序编号；如需跨卷续接编号则传入 chapter_num 参数指定编号）
+
+### 📋 管理能力
+- **角色管理**：使用 create_character 创建新角色、update_character 更新设定
+- **世界观管理**：使用 create_world_entry 添加世界观条目、update_world_entry 修改
+- **伏笔管理**：使用 create_foreshadow 埋设伏笔、update_foreshadow 推进状态
+- **时间线管理**：使用 create_timeline_event 记录、update_timeline_event 修改
+- **关系管理**：使用 create_relation 建立、update_relation 修改角色关系
+- **记忆管理**：使用 create_memory 记录、update_memory 修改创作记忆
+- **科幻设定**：使用 create_science_entry 添加科幻设定
+
+### 📊 项目进度
+- 使用 list_volumes / list_chapters 查看章节结构和进度
+- 使用 get_stats 了解项目整体情况（字数、章节数、角色数等）
+- 主动提醒作者各阶段的进度和待办事项
+
+## 行为原则
+- 与用户自由对话，理解需求后再执行操作
+- 创作类任务遵循「先读大纲→再创作→再检查」的流程
+- 管理类任务直接调用对应工具完成，完成后告知结果
+- 回复自然、有用、有见地，根据上下文判断用户想要讨论还是执行`;
 }
 
 // ─── AI Chat Completion (non-streaming) ───
@@ -156,44 +229,26 @@ app.post('/api/ai/chat', async (req, res) => {
     }
 
     const aiConfig = getAiConfig();
+    const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     const systemPrompt = buildSystemPrompt(project);
-    const body = {
-      model: aiConfig.apiModel,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      temperature,
-      max_tokens: 4096,
-      stream: false,
-    };
 
-    const response = await fetch(aiConfig.chatUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${aiConfig.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('AI API error:', response.status, errText);
-      return res.status(response.status).json({ error: `API Error: ${response.status}` });
-    }
-
-    const data = await response.json();
+    const result = await adapter.complete(systemPrompt, messages, null, temperature);
 
     // Record token usage
-    if (data.usage) {
+    if (result.usage.inputTokens || result.usage.outputTokens) {
       try {
         const db = require('./db');
         db.projectExecute(project,
           'INSERT INTO token_usage (task_name, input_tokens, output_tokens, model) VALUES (?, ?, ?, ?)',
-          ['chat', data.usage.prompt_tokens || 0, data.usage.completion_tokens || 0, aiConfig.apiModel]
+          ['chat', result.usage.inputTokens, result.usage.outputTokens, aiConfig.apiModel]
         );
       } catch(e) {}
     }
 
-    res.json(data);
+    res.json({
+      choices: [{ message: { content: result.content, role: 'assistant' } }],
+      usage: { prompt_tokens: result.usage.inputTokens, completion_tokens: result.usage.outputTokens },
+    });
   } catch (err) {
     console.error('AI chat error:', err);
     res.status(500).json({ error: err.message });
@@ -209,6 +264,7 @@ app.post('/api/ai/chat/stream', async (req, res) => {
     }
 
     const aiConfig = getAiConfig();
+    const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     let systemPrompt = mode === 'chat' ? buildChatPrompt(project) : buildSystemPrompt(project);
 
     // Append tool usage instruction
@@ -220,11 +276,7 @@ app.post('/api/ai/chat/stream', async (req, res) => {
     res.setHeader('X-Accel-Buffering', 'no');
     res.write(':ok\n\n');
 
-    const conversation = [
-      { role: 'system', content: systemPrompt },
-      ...messages,
-    ];
-
+    const conversation = [...messages]; // system is passed separately to adapter
     let fullContent = '';
     let inputTokens = 0;
     let outputTokens = 0;
@@ -233,79 +285,67 @@ app.post('/api/ai/chat/stream', async (req, res) => {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       console.log(`[AI Stream] Round ${round}, messages: ${conversation.length}`);
 
-      const body = {
-        model: aiConfig.apiModel,
-        messages: conversation,
-        tools: TOOLS,
-        temperature,
-        max_tokens: 4096,
-        stream: false, // Always non-streaming for reliable tool-call detection
-      };
-
-      const response = await fetch(aiConfig.chatUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error('[AI Stream] API error:', response.status, errText.slice(0, 500));
-        res.write(`event: error\ndata: ${JSON.stringify({ error: `API Error: ${response.status}`, detail: errText.slice(0, 200) })}\n\n`);
+      let result;
+      try {
+        result = await adapter.complete(systemPrompt, conversation, TOOLS, temperature);
+      } catch (err) {
+        if (err.status) {
+          res.write(`event: error\ndata: ${JSON.stringify({ error: `API Error: ${err.status}`, detail: err.detail })}\n\n`);
+        } else {
+          res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+        }
         res.end();
         return;
       }
 
-      const data = await response.json();
-      const choice = data.choices?.[0];
-      const msg = choice?.message;
-
-      if (data.usage) {
-        inputTokens += data.usage.prompt_tokens || 0;
-        outputTokens += data.usage.completion_tokens || 0;
-      }
+      inputTokens += result.usage.inputTokens;
+      outputTokens += result.usage.outputTokens;
 
       console.log(`[AI Stream] Round ${round} result:`, {
-        hasContent: !!msg?.content,
-        contentLen: msg?.content?.length || 0,
-        hasToolCalls: !!(msg?.tool_calls && msg.tool_calls.length > 0),
-        toolCallNames: msg?.tool_calls?.map(tc => tc.function.name) || [],
-        finishReason: choice?.finish_reason,
+        hasContent: !!result.content,
+        contentLen: result.content?.length || 0,
+        hasToolCalls: result.toolCalls.length > 0,
+        toolCallNames: result.toolCalls.map(tc => tc.name) || [],
       });
 
-      if (msg?.tool_calls && msg.tool_calls.length > 0) {
+      if (result.toolCalls.length > 0) {
         // Add assistant message with tool calls to conversation
-        conversation.push({ role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls });
+        conversation.push({
+          role: 'assistant',
+          content: result.content,
+          tool_calls: result.toolCalls.map(tc => ({
+            id: tc.id,
+            type: 'function',
+            function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+          })),
+        });
 
         // Execute each tool
-        for (const tc of msg.tool_calls) {
-          let args;
-          try { args = JSON.parse(tc.function.arguments); } catch(e) { args = {}; }
-
+        for (const tc of result.toolCalls) {
           // Notify frontend: tool call started
-          res.write(`event: tool_call\ndata: ${JSON.stringify({ id: tc.id, name: tc.function.name, arguments: args })}\n\n`);
+          res.write(`event: tool_call\ndata: ${JSON.stringify({ id: tc.id, name: tc.name, arguments: tc.args })}\n\n`);
 
           // Execute tool against project database
-          let result;
+          let toolResult;
           try {
-            result = executeTool(project, tc.function.name, args);
+            toolResult = executeTool(project, tc.name, tc.args);
           } catch(e) {
-            result = { error: e.message };
+            toolResult = { error: e.message };
           }
 
-          console.log(`[AI Stream] Tool ${tc.function.name}:`, JSON.stringify(result).slice(0, 200));
+          console.log(`[AI Stream] Tool ${tc.name}:`, JSON.stringify(toolResult).slice(0, 200));
 
           // Notify frontend: tool result
-          res.write(`event: tool_result\ndata: ${JSON.stringify({ id: tc.id, name: tc.function.name, result })}\n\n`);
+          res.write(`event: tool_result\ndata: ${JSON.stringify({ id: tc.id, name: tc.name, result: toolResult })}\n\n`);
 
-          // Add tool result to conversation for next round
-          conversation.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+          // Add tool result to conversation for next round (OpenAI format — adapter handles conversion)
+          conversation.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(toolResult) });
         }
         // Continue loop
-      } else if (msg?.content) {
+      } else if (result.content) {
         // Got text without tool calls — send as content
-        fullContent = msg.content;
-        res.write(`event: content_chunk\ndata: ${JSON.stringify({ text: msg.content, position: msg.content.length })}\n\n`);
+        fullContent = result.content;
+        res.write(`event: content_chunk\ndata: ${JSON.stringify({ text: result.content, position: result.content.length })}\n\n`);
         break;
       } else {
         console.log('[AI Stream] No content and no tool calls — ending');
@@ -348,10 +388,8 @@ app.post('/api/ai/continue', async (req, res) => {
       { role: 'user', content: `请续写以下小说的第${chapterNum}章「${chapter?.title || '未知'}」。保持${style}氛围，延续已有的文风和叙事视角。\n\n## 当前内容\n\n${chapter?.content?.slice(-1500) || '（新章节开头）'}\n\n## 用户额外要求\n${context || '请自然续写，保持文学质感。'}\n\n请直接开始续写，不要加任何前缀说明。` }
     ];
 
-    // Reuse the streaming endpoint logic
-    req.body = { messages, project, temperature: 0.85 };
-    // Forward to stream handler
     const aiConfig = getAiConfig();
+    const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     const systemPrompt = buildSystemPrompt(project);
 
     res.setHeader('Content-Type', 'text/event-stream');
@@ -361,54 +399,26 @@ app.post('/api/ai/continue', async (req, res) => {
     // Flush headers immediately so browser sees SSE connection is live
     res.write(':ok\n\n');
 
-    const body = {
-      model: aiConfig.apiModel,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      temperature: 0.85,
-      max_tokens: 4096,
-      stream: true,
-    };
+    let fullContent = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
 
-    const response = await fetch(aiConfig.chatUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${aiConfig.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      res.write(`event: error\ndata: ${JSON.stringify({ error: `API Error: ${response.status}` })}\n\n`);
+    try {
+      for await (const event of adapter.stream(systemPrompt, messages, 0.85)) {
+        if (event.type === 'chunk') {
+          fullContent += event.text;
+          res.write(`event: content_chunk\ndata: ${JSON.stringify({ text: event.text, position: fullContent.length })}\n\n`);
+        }
+        if (event.type === 'usage') {
+          inputTokens = event.inputTokens || 0;
+          outputTokens = event.outputTokens || 0;
+        }
+      }
+    } catch (err) {
+      console.error('Continue stream error:', err);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
       res.end();
       return;
-    }
-
-    let fullContent = '';
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(data);
-          const delta = parsed.choices?.[0]?.delta;
-          if (delta?.content) {
-            fullContent += delta.content;
-            res.write(`event: content_chunk\ndata: ${JSON.stringify({ text: delta.content, position: fullContent.length })}\n\n`);
-          }
-        } catch(e) {}
-      }
     }
 
     // Save to chapter
@@ -423,6 +433,14 @@ app.post('/api/ai/continue', async (req, res) => {
         );
       } catch(e) { console.error('Save error:', e); }
     }
+
+    // Record token usage
+    try {
+      db.projectExecute(project,
+        'INSERT INTO token_usage (task_name, input_tokens, output_tokens, model) VALUES (?, ?, ?, ?)',
+        ['continue', inputTokens, outputTokens, aiConfig.apiModel]
+      );
+    } catch(e) {}
 
     res.write(`event: task_end\ndata: ${JSON.stringify({ success: true, content: fullContent })}\n\n`);
     res.end();
@@ -454,6 +472,6 @@ app.listen(PORT, () => {
   console.log(`  ─────────────────────`);
   console.log(`  Local:   http://localhost:${PORT}`);
   console.log(`  Health:  http://localhost:${PORT}/api/health`);
-  console.log(`  AI:      ${cfg.apiModel} @ ${cfg.chatUrl}`);
+  console.log(`  AI:      ${cfg.apiModel} @ ${cfg.apiBaseUrl}`);
   console.log(`\n  Ready.\n`);
 });

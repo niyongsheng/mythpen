@@ -2,22 +2,24 @@
 
 # Mythpen
 
-**AI 辅助小说创作桌面应用** — 管理角色、世界观、章节、伏笔、时间线等创作要素，集成 AI 辅助写作。
+AI-assisted novel writing desktop app — manage characters, world-building, chapters, foreshadowing, timelines, with integrated AI writing assistant.
 
-## 快速开始
+## Quick Start
 
 ```bash
-pnpm install        # 安装依赖
-pnpm dev:all        # 浏览器开发（前端 + 后端）
-pnpm tauri dev      # 桌面开发模式
-pnpm tauri build    # 构建桌面安装包
+pnpm install        # Install dependencies
+pnpm dev:all        # Start in browser (frontend + backend + seed data)
+pnpm tauri dev      # Desktop development mode
+pnpm tauri build    # Build desktop installer (.dmg/.msi/.AppImage)
 ```
 
-## 技术栈
+## Tech Stack
 
-前端 React 19 + TypeScript + Vite 8 + Tailwind CSS 4 + Zustand
-桌面 Tauri v2 (Rust)，数据库 SQLite（rusqlite），AI 兼容 OpenAI/DeepSeek/Anthropic
+**Frontend**: React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 4 + Zustand  
+**Desktop**: Tauri v2 (Rust shell, no business logic)  
+**Backend**: Express 5 + better-sqlite3  
+**AI**: OpenAI-compatible (DeepSeek) + Anthropic Claude via adapter
 
-## 许可证
+## License
 
-MIT
+[MIT](./LICENSE)

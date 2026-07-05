@@ -11,25 +11,95 @@ import {
   List,
   PenLine,
   Users,
+  ArrowRight,
 } from 'lucide-react'
 import { useT } from '@/hooks/useT'
 import { useStats } from '@/lib/useProjectData'
+import { useProjectName } from '@/lib/useProjectData'
+import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { chaptersApi, charactersApi, worldApi } from '@/lib/api'
+import { useCallback, useEffect, useState } from 'react'
+import type { WorkflowPhase } from '@/types'
 
-const PHASES = [
-  { key: 'phaseIdea', state: 'done', num: '✓' },
-  { key: 'phaseSetting', state: 'done', num: '✓' },
-  { key: 'phaseOutline', state: 'done', num: '✓' },
-  { key: 'phaseWriting', state: 'active', num: '4' },
-  { key: 'phaseReview', state: 'pending', num: '5' },
-  { key: 'phaseConsistency', state: 'pending', num: '6' },
-  { key: 'phaseExport', state: 'pending', num: '7' },
-]
+const PHASE_ORDER: WorkflowPhase[] = ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export']
+
+const PHASE_LABELS: Record<WorkflowPhase, { key: string; num: string }> = {
+  idea: { key: 'phaseIdea', num: '1' },
+  setting: { key: 'phaseSetting', num: '2' },
+  outline: { key: 'phaseOutline', num: '3' },
+  writing: { key: 'phaseWriting', num: '4' },
+  review: { key: 'phaseReview', num: '5' },
+  consistency: { key: 'phaseConsistency', num: '6' },
+  export: { key: 'phaseExport', num: '7' },
+}
 
 export function Dashboard() {
   const { setActivePage } = useSidebarStore()
   const { data: stats, loading } = useStats()
   const { t } = useT()
+  const project = useProjectName()
+  const workflowPhase = useProjectStore((s) => s.workflowPhase)
+  const setPhase = useProjectStore((s) => s.setPhase)
+  const loadPhase = useProjectStore((s) => s.loadPhase)
+  const [advancing, setAdvancing] = useState(false)
+
+  // Load phase on mount
+  useEffect(() => {
+    if (project) loadPhase(project)
+  }, [project])
+
+  const currentIdx = PHASE_ORDER.indexOf(workflowPhase)
+
+  const canAdvance = useCallback(async (): Promise<WorkflowPhase | null> => {
+    if (!project) return null
+    const idx = PHASE_ORDER.indexOf(workflowPhase)
+    const next = PHASE_ORDER[idx + 1]
+    if (!next) return null
+
+    try {
+      if (workflowPhase === 'setting') {
+        // Auto-detect: has characters or world entries
+        const [chars, worlds] = await Promise.all([charactersApi.list(project), worldApi.list(project)])
+        if (chars.length === 0 && worlds.length === 0) return null
+      }
+      if (workflowPhase === 'outline') {
+        // Auto-detect: all chapters have at least an outline
+        const chapters = await chaptersApi.list(project)
+        if (chapters.length === 0 || chapters.some((ch: any) => !ch.outline)) return null
+      }
+      if (workflowPhase === 'writing') {
+        // Auto-detect: at least one chapter has content
+        const chapters = await chaptersApi.list(project)
+        if (chapters.every((ch: any) => !ch.content || ch.word_count === 0)) return null
+      }
+      if (workflowPhase === 'review') {
+        // Auto-detect: all chapters are accepted
+        const chapters = await chaptersApi.list(project)
+        if (chapters.length === 0 || chapters.some((ch: any) => ch.status !== 'accepted')) return null
+      }
+      if (workflowPhase === 'consistency') {
+        // Auto-detect: basic checks pass (no overdue foreshadows)
+        // For now, allow manual advancement
+      }
+      return next
+    } catch {
+      return null
+    }
+  }, [project, workflowPhase])
+
+  const handleAdvance = async () => {
+    if (!project || advancing) return
+    setAdvancing(true)
+    try {
+      const next = await canAdvance()
+      if (next) {
+        await setPhase(project, next)
+      }
+    } finally {
+      setAdvancing(false)
+    }
+  }
 
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
@@ -72,10 +142,17 @@ export function Dashboard() {
       </div>
 
       <div className="flex items-center gap-1 px-6 h-[54px] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] shrink-0 overflow-x-auto">
-        {PHASES.map((p, i) => (
-          <span key={p.key} className="inline-flex items-center">
-            <PhaseStep state={p.state} label={t(`pages.${p.key}`)} num={p.num} />
-            {i < PHASES.length - 1 && <PhaseConnector done={p.state === 'done'} />}
+        {PHASE_ORDER.map((phase, i) => (
+          <span key={phase} className="inline-flex items-center">
+            <PhaseStep
+              state={i < currentIdx ? 'done' : i === currentIdx ? 'active' : 'pending'}
+              label={t(`pages.${PHASE_LABELS[phase].key}`)}
+              num={PHASE_LABELS[phase].num}
+              active={i === currentIdx}
+              onAdvance={i === currentIdx && currentIdx < PHASE_ORDER.length - 1 ? handleAdvance : undefined}
+              advancing={advancing}
+            />
+            {i < PHASE_ORDER.length - 1 && <PhaseConnector done={i < currentIdx} />}
           </span>
         ))}
         <div className="ml-auto text-[11px] text-[var(--ink-mute)] font-mono">
@@ -167,10 +244,24 @@ export function Dashboard() {
   )
 }
 
-function PhaseStep({ state, label, num }: { state: string; label: string; num: string }) {
+function PhaseStep({
+  state,
+  label,
+  num,
+  active,
+  onAdvance,
+  advancing,
+}: {
+  state: string
+  label: string
+  num: string
+  active?: boolean
+  onAdvance?: () => void
+  advancing?: boolean
+}) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[12px] whitespace-nowrap px-2 py-1 rounded-[var(--radius-sm)] cursor-default
+      className={`inline-flex items-center gap-1.5 text-[12px] whitespace-nowrap px-2 py-1 rounded-[var(--radius-sm)]
       ${state === 'active' ? 'text-[var(--ink)] font-medium' : state === 'done' ? 'text-[var(--ink-tertiary)]' : 'text-[var(--ink-mute)]'}`}
     >
       <span
@@ -186,6 +277,19 @@ function PhaseStep({ state, label, num }: { state: string; label: string; num: s
         {state === 'done' ? <Check className="w-3 h-3" /> : num}
       </span>
       {label}
+      {active && onAdvance && (
+        <button
+          className="ml-1 w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[var(--accent-gold)] text-[var(--canvas)] hover:brightness-110 transition-all cursor-pointer border-none"
+          onClick={(e) => {
+            e.stopPropagation()
+            onAdvance()
+          }}
+          disabled={advancing}
+          title="进入下一阶段"
+        >
+          <ArrowRight className="w-3 h-3" />
+        </button>
+      )}
     </span>
   )
 }

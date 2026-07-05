@@ -1,10 +1,29 @@
 import { useT } from '@/hooks/useT'
 import { useChapterStore } from '@/stores/useChapterStore'
+import { useProjectName } from '@/lib/useProjectData'
+import { NEXT_STATUS } from '@/lib/status'
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: 'var(--pending)',
+  writing: 'var(--info)',
+  review: 'var(--warning)',
+  accepted: 'var(--success)',
+}
 
 export function EditorStatusbar() {
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const saveStatus = useChapterStore((s) => s.saveStatus)
+  const updateChapter = useChapterStore((s) => s.updateChapter)
+  const loadChapters = useChapterStore((s) => s.loadChapters)
+  const project = useProjectName()
   const { t } = useT()
+
+  const handleCycleStatus = () => {
+    if (!currentChapter || !project) return
+    const next = NEXT_STATUS[currentChapter.status] || 'writing'
+    updateChapter(project, currentChapter.num, { status: next }).catch(() => {})
+    loadChapters(project).catch(() => {})
+  }
 
   if (!currentChapter) {
     return (
@@ -22,7 +41,15 @@ export function EditorStatusbar() {
       <span>
         {(currentChapter.wordCount || 0).toLocaleString()} {t('editor.words')}
       </span>
-      <span>{t(`status.${currentChapter.status}`)}</span>
+      <button
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] border-none bg-none cursor-pointer hover:bg-[var(--canvas-card)] transition-colors font-mono text-[12px]"
+        style={{ color: STATUS_COLORS[currentChapter.status] || 'var(--ink-tertiary)' }}
+        onClick={handleCycleStatus}
+        title={`切换为 ${t('status.' + NEXT_STATUS[currentChapter.status] || 'writing')}`}
+      >
+        {t(`status.${currentChapter.status}`)}
+        <span className="text-[10px] opacity-60">↻</span>
+      </button>
       <span>·</span>
       <span>L1 C1</span>
       <div className="ml-auto flex items-center gap-3">

@@ -1,10 +1,12 @@
-import { Lightbulb, MessageSquare, Plus, SendHorizonal, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Lightbulb, Loader, MessageSquare, Plus, SendHorizonal, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { aiApi, chatApi } from '@/lib/api'
 import { useProjectName } from '@/lib/useProjectData'
 import { useAgentStore } from '@/stores/useAgentStore'
 import { useChapterStore } from '@/stores/useChapterStore'
+import { useToast } from '@/hooks/useToast'
+import { ToastContainer } from '@/components/ToastContainer'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
@@ -45,6 +47,7 @@ export function AIPanel() {
   const [mode, setMode] = useState<'writing' | 'chat'>('chat')
   const [toolCalls, setToolCalls] = useState<any[]>([])
   const toolCallsRef = useRef<any[]>([])
+  const { toasts, show: showToast } = useToast()
 
   // Resize handle drag logic
   const handleResizeMouseDown = useCallback(
@@ -118,7 +121,6 @@ export function AIPanel() {
     loadSessions(project).then(() => {
       sessionsLoadedRef.current = true
     })
-    loadMessages(project)
   }, [project])
 
   // Auto-create a session if none exists
@@ -129,6 +131,21 @@ export function AIPanel() {
     const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
     createSession(project, `对话 ${ts}`)
   }, [sessions, currentSessionId])
+
+  // Tool type detection for colored indicators
+  const getToolType = (name: string): 'read' | 'create' | 'update' | 'delete' => {
+    if (name.startsWith('list_') || name.startsWith('get_')) return 'read'
+    if (name.startsWith('create_')) return 'create'
+    if (name.startsWith('update_')) return 'update'
+    if (name.startsWith('delete_')) return 'delete'
+    return 'read'
+  }
+  const toolTypeColor: Record<string, string> = {
+    read: 'var(--info)',
+    create: 'var(--success)',
+    update: 'var(--warning)',
+    delete: 'var(--error)',
+  }
 
   // Format tool arguments for compact display
   const formatToolArgs = (args: any) => {
@@ -178,6 +195,9 @@ export function AIPanel() {
     addMessage({ id: nextMsgId(), role: 'user', content: userMsg })
     saveMsg({ role: 'user', content: userMsg }).catch(() => {})
     setInput('')
+    // Force DOM clear
+    const el = document.getElementById('ai-chat-input') as HTMLTextAreaElement | null
+    if (el) el.value = ''
 
     const ch = currentChapter
     const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户指令：${userMsg}\n\n请直接续写小说内容，不要加前缀说明。`
@@ -193,6 +213,7 @@ export function AIPanel() {
       },
       async (data: any) => {
         setTask({ status: 'completed' })
+        showToast('续写完成', 'success', 5000)
         const aiMsg = { role: 'ai' as const, content: `续写完成，共生成约${data.content?.length || 0}字` }
         addMessage({ id: nextMsgId(), ...aiMsg })
         saveMsg(aiMsg).catch(() => {})
@@ -203,6 +224,7 @@ export function AIPanel() {
       },
       (err: any) => {
         setTask({ status: 'error' })
+        showToast('续写出错', 'error')
         const errMsg = { role: 'ai' as const, content: `错误: ${err.error || err}` }
         addMessage({ id: nextMsgId(), ...errMsg })
         saveMsg(errMsg).catch(() => {})
@@ -213,6 +235,7 @@ export function AIPanel() {
 
   const handleSend = () => {
     if (!project || runningRef.current || !input.trim()) return
+    if (loading) return // wait for messages to finish loading
     runningRef.current = true
     const userMsg = input.trim()
     const isChat = mode === 'chat'
@@ -225,6 +248,9 @@ export function AIPanel() {
     addMessage({ id: nextMsgId(), role: 'user', content: userMsg })
     saveMsg({ role: 'user', content: userMsg }).catch(() => {})
     setInput('')
+    // Force DOM clear — React 19 batch 处理后 onInput 事件可能恢复旧值
+    const el = document.getElementById('ai-chat-input') as HTMLTextAreaElement | null
+    if (el) el.value = ''
 
     const ch = currentChapter
 
@@ -235,10 +261,16 @@ export function AIPanel() {
       const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户提问：${userMsg}\n\n请基于小说设定和内容回答用户的问题。`
       // ── 自动压缩历史对话（基于 token 占用比例） ──
       const sett = useSettingsStore.getState().settings
-      let chatHistory = messages.map((msg) => ({
-        role: msg.role === 'ai' ? ('assistant' as const) : (msg.role as 'user' | 'system'),
-        content: msg.content,
-      }))
+      // Build conversation history from stored messages.
+      // Note: tool_calls patterns (assistant → tool result) are not persisted in full,
+      // so we only send text content. The AI retains context from its own previous responses.
+      let chatHistory: any[] = []
+      for (const msg of messages) {
+        chatHistory.push({
+          role: msg.role === 'ai' ? 'assistant' : (msg.role as 'user' | 'system'),
+          content: msg.content,
+        })
+      }
       if (sett.compressionEnabled && messages.length > 2) {
         // 估算 token：中文约 1.5 token/字，英文约 0.25 token/字符，取保守值 1 token/字符
         const estimateTokens = (text: string) => Math.ceil(text.length * 0.8)
@@ -256,6 +288,10 @@ export function AIPanel() {
               splitIdx = i + 1
               break
             }
+          }
+          // Guard: at least keep the last message (user's current input)
+          if (splitIdx === chatHistory.length && chatHistory.length > 0) {
+            splitIdx = chatHistory.length - 1
           }
           const toCompress = chatHistory.slice(0, splitIdx)
           const keep = chatHistory.slice(splitIdx)
@@ -310,6 +346,7 @@ export function AIPanel() {
           saveMsg(aiMsg).catch(() => {})
           const hadToolCalls = toolCallsRef.current.length > 0
           done()
+          showToast(fullText ? 'AI 回答完成' : '对话完成', 'success')
           if (fullText) generateAITitle(userMsg, fullText)
           if (hadToolCalls) {
             useChapterStore.getState().loadChapters(project!)
@@ -339,32 +376,63 @@ export function AIPanel() {
       )
     } else {
       // ── 创作模式 ──
-      const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户指令：${userMsg}\n\n请直接续写小说内容，不要加前缀说明。`
-      abortRef.current = aiApi.continueWriting(
-        ch?.num || 1,
-        context,
+      setToolCalls([])
+      toolCallsRef.current = []
+      const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户指令：${userMsg}\n\n请直接续写小说内容，使用 update_chapter 工具将内容保存到章节中。`
+      // Build chat history (same as chat mode for context continuity)
+      let chatHistory: any[] = []
+      for (const msg of messages) {
+        chatHistory.push({
+          role: msg.role === 'ai' ? 'assistant' : (msg.role as 'user' | 'system'),
+          content: msg.content,
+        })
+      }
+      abortRef.current = aiApi.chatStream(
+        [...chatHistory, { role: 'user', content: context }],
         project,
         (text: string) => {
           streamRef.current += text
           setStreamText(streamRef.current)
           setGenTokens((prev) => prev + 1)
         },
-        async (data: any) => {
+        async () => {
           setTask({ status: 'completed' })
-          const aiMsg = { role: 'ai' as const, content: `续写完成，共生成约${data.content?.length || 0}字` }
+          const fullText = streamRef.current
+          const aiMsg = {
+            role: 'ai' as const,
+            content: fullText || '创作完成',
+            toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
+          }
           addMessage({ id: nextMsgId(), ...aiMsg })
           saveMsg(aiMsg).catch(() => {})
-          const fullContent = streamRef.current
+          const hadToolCalls = toolCallsRef.current.length > 0
           done()
-          if (fullContent) generateAITitle(userMsg, fullContent)
-          if (ch?.num) await loadChapterContent(project, ch.num)
+          if (fullText) generateAITitle(userMsg, fullText)
+          // Reload chapter content if tool calls were made (content was saved to DB)
+          if (hadToolCalls && ch?.num) {
+            await loadChapterContent(project, ch.num)
+          }
         },
         (err: any) => {
           setTask({ status: 'error' })
+          showToast('AI 出错', 'error')
           const errMsg = { role: 'ai' as const, content: `错误: ${err.error || err}` }
           addMessage({ id: nextMsgId(), ...errMsg })
           saveMsg(errMsg).catch(() => {})
           done()
+        },
+        'writing',
+        (tc: any) => {
+          const updated = [...toolCallsRef.current, { ...tc, status: 'running' }]
+          toolCallsRef.current = updated
+          setToolCalls(updated)
+        },
+        (tr: any) => {
+          const updated = toolCallsRef.current.map((tc) =>
+            tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc,
+          )
+          toolCallsRef.current = updated
+          setToolCalls(updated)
         },
       )
     }
@@ -377,10 +445,10 @@ export function AIPanel() {
         className="absolute left-0 top-0 bottom-0 w-[4px] cursor-col-resize z-10 transition-colors hover:bg-[var(--accent-gold)] active:bg-[var(--accent-gold)]"
         onMouseDown={handleResizeMouseDown}
       />
-      {/* Chat messages */}
-      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+      {/* Fixed header area */}
+      <div className="shrink-0 px-4 pt-4 pb-2">
         {/* Header */}
-        <div className="px-4 pt-4 pb-3">
+        <div className="pb-3">
           <div className="flex items-center gap-1.5">
             <MessageSquare className="w-4 h-4" />
             <h3 className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase font-sans">
@@ -426,7 +494,7 @@ export function AIPanel() {
         </div>
 
         {/* Session selector */}
-        <div className="px-4 pb-2 flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           <select
             id="ai-session-select"
             name="ai-session-select"
@@ -445,7 +513,7 @@ export function AIPanel() {
             onClick={() => {
               const now = new Date()
               const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-              createSession(project, `对话 ${ts}`)
+              createSession(project, `新会话 ${ts}`)
             }}
             title="新建会话"
           >
@@ -461,7 +529,10 @@ export function AIPanel() {
             </button>
           )}
         </div>
+      </div>
 
+      {/* Scrollable messages area */}
+      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
         {/* Task runner */}
         {isRunning && (
           <div className="mx-4 mb-2.5 p-3 bg-[var(--accent-gold-soft-bg)] border border-[rgba(201,169,110,0.3)] rounded-lg">
@@ -515,7 +586,7 @@ export function AIPanel() {
         )}
 
         {/* Messages */}
-        <div className="px-4 pb-2">
+        <div className="px-4">
           {messages.length === 0 && !streamText && (
             <div className="text-[13px] text-[var(--ink-tertiary)] leading-[1.6] mb-2 p-3 rounded-lg bg-[var(--canvas-card)]">
               <Lightbulb className="w-3.5 h-3.5 inline-block mr-1" />
@@ -541,7 +612,10 @@ export function AIPanel() {
                           key={tc.id}
                           className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] bg-[var(--canvas-mid)]"
                         >
-                          <span className="w-[5px] h-[5px] rounded-full bg-[var(--success)] shrink-0" />
+                          <span
+                            className="w-[5px] h-[5px] rounded-full shrink-0"
+                            style={{ background: toolTypeColor[getToolType(tc.name)] || 'var(--info)' }}
+                          />
                           <span className="font-medium text-[var(--ink)]">{tc.name}</span>
                           <span className="text-[var(--ink-tertiary)] truncate">{formatToolArgs(tc.arguments)}</span>
                           {tc.result && !tc.result.error && <span className="ml-auto text-[var(--success)]">✓</span>}
@@ -570,12 +644,17 @@ export function AIPanel() {
                   <summary className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[12px] select-none hover:bg-[var(--canvas-elevated)] transition-colors">
                     <span
                       className={`w-[6px] h-[6px] rounded-full shrink-0 ${
-                        tc.status === 'running'
-                          ? 'bg-[var(--warning)] animate-pulse'
-                          : tc.result?.error
-                            ? 'bg-[var(--error)]'
-                            : 'bg-[var(--success)]'
+                        tc.status === 'running' ? 'animate-pulse' : ''
                       }`}
+                      style={{
+                        background:
+                          tc.status === 'running'
+                            ? toolTypeColor[getToolType(tc.name)] || 'var(--info)'
+                            : tc.result?.error
+                              ? 'var(--error)'
+                              : toolTypeColor[getToolType(tc.name)] || 'var(--info)',
+                        opacity: tc.status === 'running' ? 0.6 : 1,
+                      }}
                     />
                     <span className="font-medium text-[var(--ink)]">{tc.name}</span>
                     <span className="text-[var(--ink-tertiary)] truncate flex-1 min-w-0">
@@ -637,7 +716,7 @@ export function AIPanel() {
             onClick={handleSend}
             disabled={isRunning || !input.trim()}
           >
-            <SendHorizonal className="w-3.5 h-3.5" />
+            {isRunning ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <SendHorizonal className="w-3.5 h-3.5" />}
           </button>
         </div>
         <div className="text-[11px] text-[var(--ink-mute)] mt-1.5 pl-1 font-sans">
@@ -651,6 +730,7 @@ export function AIPanel() {
           换行
         </div>
       </div>
+      <ToastContainer toasts={toasts} />
     </aside>
   )
 }
