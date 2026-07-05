@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+/* ─── Design Tokens ─── */
+:root {
+  /* Surface */
+  --canvas: #0e0e10;
+  --canvas-soft: #161618;
+  --canvas-card: #1a1a1e;
+  --canvas-elevated: #202024;
+  --canvas-mid: #2a2a30;
+  --canvas-pop: #323238;
+  --hairline: #26262b;
+  --hairline-light: #2e2e35;
+
+  /* Text */
+  --ink: #f0eee6;
+  --ink-hover: #faf8f2;
+  --ink-secondary: #c8c6be;
+  --ink-tertiary: #8a8880;
+  --ink-mute: #5e5c56;
+
+  /* Accent */
+  --accent-gold: #c9a96e;
+  --accent-gold-soft: #e8d5a3;
+  --accent-gold-soft-bg: rgba(201, 169, 110, 0.15);
+  --accent-ember: #d4743c;
+  --accent-mist: #7a8ea8;
+
+  /* Semantic */
+  --success: #4caf7d;
+  --success-soft: #1a3a2a;
+  --warning: #d4a040;
+  --warning-soft: #3a2a10;
+  --error: #c84a4a;
+  --error-soft: #3a1a1a;
+  --info: #6090c0;
+  --info-soft: #1a2a3a;
+
+  /* Typography */
+  --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, serif;
+  --font-editor: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif;
+  --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+  /* Spacing & Sizing */
+  --sidebar-w: 260px;
+  --right-panel-w: 320px;
+  --titlebar-h: 38px;
+  --statusbar-h: 28px;
+  --toolbar-h: 40px;
+  --editor-max-w: 720px;
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+
+  /* Typography scale */
+  --label-sm: 11px;
+  --body-sm: 13px;
+  --body-md: 15px;
+  --editor-md: 17px;
+  --editor-lg: 19px;
+  --display-xs: 18px;
+  --display-sm: 22px;
+  --display-md: 28px;
+  --display-lg: 36px;
+}
+
+/* ─── Light Theme ─── */
+html[data-theme="light"] {
+  --canvas: #f5f0e8;
+  --canvas-soft: #ebe6dc;
+  --canvas-card: #e3ddd2;
+  --canvas-elevated: #dbd5ca;
+  --canvas-mid: #c8c2b6;
+  --canvas-pop: #b8b2a6;
+  --hairline: #d5cfc3;
+  --hairline-light: #c8c2b6;
+  --ink: #2a2824;
+  --ink-hover: #1a1814;
+  --ink-secondary: #55524c;
+  --ink-tertiary: #8a867e;
+  --ink-mute: #aba69e;
+  --accent-gold: #b8943e;
+  --accent-gold-soft: #d4b86a;
+  --accent-gold-soft-bg: rgba(184, 148, 62, 0.12);
+}
+
+/* ─── Global Reset ─── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+::selection {
+  background: rgba(201, 169, 110, 0.3);
+  color: var(--ink);
+}
+
+/* ─── Editor Styles ─── */
+.editor-body[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--ink-mute);
+  pointer-events: none;
+}
+.editor-body[data-placeholder]:focus::before {
+  content: attr(data-placeholder);
+  color: var(--ink-mute);
+  pointer-events: none;
+}
+.editor-body .dialogue {
+  border-left: 2px solid var(--accent-gold);
+  padding-left: 1em;
+  font-style: italic;
+  color: var(--ink-secondary);
+  margin: 0.5em 0;
+}
+.editor-body code {
+  background: var(--canvas-mid);
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+.editor-body pre {
+  background: var(--canvas-elevated);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 1em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.editor-body pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* ─── Custom scrollbar ─── */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--canvas-mid); border-radius: 9999px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── Tailwind-style utility layers ─── */
+@theme {
+  --color-canvas: var(--canvas);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-canvas-card: var(--canvas-card);
+  --color-canvas-elevated: var(--canvas-elevated);
+  --color-canvas-mid: var(--canvas-mid);
+  --color-canvas-pop: var(--canvas-pop);
+  --color-hairline: var(--hairline);
+  --color-hairline-light: var(--hairline-light);
+  --color-ink: var(--ink);
+  --color-ink-secondary: var(--ink-secondary);
+  --color-ink-tertiary: var(--ink-tertiary);
+  --color-ink-mute: var(--ink-mute);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-gold-soft: var(--accent-gold-soft);
+  --color-accent-ember: var(--accent-ember);
+  --color-accent-mist: var(--accent-mist);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --font-display: var(--font-display);
+  --font-editor: var(--font-editor);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-pill: var(--radius-pill);
+}

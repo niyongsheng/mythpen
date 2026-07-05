@@ -1,0 +1,25 @@
+[package]
+name = "mythpen"
+version = "0.1.0"
+description = "AI 辅助小说创作工具"
+authors = ["Nico"]
+license = "MIT"
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+tauri = { version = "2.11.3", features = [] }
+rusqlite = { version = "0.34", features = ["bundled"] }
+dirs = "6.0"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }

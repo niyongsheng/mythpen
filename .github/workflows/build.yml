@@ -1,0 +1,70 @@
+name: Build Mythpen
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install system deps
+        run: |
+          brew install librsvg
+          sudo apt-get update || true
+
+      - name: Build frontend & Tauri app
+        run: |
+          pnpm install
+          pnpm tauri build
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mythpen-macOS
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Build frontend & Tauri app
+        run: |
+          pnpm install
+          pnpm tauri build
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mythpen-Windows
+          path: src-tauri/target/release/bundle/msi/*.msi
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-dev libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Build
+        run: |
+          pnpm install
+          pnpm tauri build
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mythpen-Linux
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
