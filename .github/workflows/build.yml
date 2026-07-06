@@ -2,11 +2,7 @@ name: Build & Release
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
 
 jobs:
   build-mac-arm:
@@ -99,3 +95,34 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
           compression-level: 0
+
+  # ─── GitHub Release ───
+  release:
+    name: Create Release
+    needs: [build-mac-arm, build-win-x86]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mythpen ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            ## Mythpen ${{ github.ref_name }}
+
+            AI 辅助小说创作桌面端。
+
+            ### 安装
+
+            - **macOS (ARM)**：下载 `.dmg` 文件，打开并拖入 Applications 文件夹
+            - **Windows**：下载 `.msi` 或 `.exe` 文件运行
+          fail_on_unmatched_files: true
+          files: |
+            Mythpen-macOS-ARM/*.dmg
+            Mythpen-Windows-x86_64/*.msi
+            Mythpen-Windows-x86_64/*.exe

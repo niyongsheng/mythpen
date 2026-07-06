@@ -72,22 +72,14 @@ export function Sidebar() {
   // Load sidebar items when project is ready; retry once loaded (race guard)
   useEffect(() => {
     if (!projectLoading && currentProject && sidebarItems.length === 0) {
-      loadSidebarItems()
+      void loadSidebarItems()
     }
   }, [projectLoading, currentProject, sidebarItems.length, loadSidebarItems])
-
-  const allChapters = volumes.flatMap((v) => v.chapters)
-  const hasChapters = allChapters.length > 0
 
   const handleNewChapter = async (volumeId: number) => {
     if (!currentProject) return
     await createChapter(currentProject, '新章节', '', volumeId)
     setActivePage('page-writing')
-  }
-
-  const getNextChapterNum = (vol: (typeof volumes)[0]) => {
-    const nums = vol.chapters.map((c) => c.num)
-    return nums.length > 0 ? Math.max(...nums) + 1 : 1
   }
 
   const handleRefresh = () => {

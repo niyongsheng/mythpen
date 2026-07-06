@@ -1,8 +1,8 @@
 import { FlaskConical } from 'lucide-react'
 import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
-import { useT } from '@/hooks/useT'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { useT } from '@/hooks/useT'
 import { scienceApi } from '@/lib/api'
 import { useProjectName, useScienceEntries } from '@/lib/useProjectData'
 

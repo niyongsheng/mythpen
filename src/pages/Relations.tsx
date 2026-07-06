@@ -1,7 +1,7 @@
 import { HeartHandshake, Link2, Loader, Plus, RefreshCcw, Sparkles, Users } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
-import { useT } from '@/hooks/useT'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { useT } from '@/hooks/useT'
 import { aiApi, extractAIJsonArray, getAIResponseText, relationsApi } from '@/lib/api'
 import { useCharacters, useProjectName, useRelations } from '@/lib/useProjectData'
 
@@ -222,7 +222,7 @@ export function Relations() {
 
   const sortedByChapter = [...chars].sort((a, b) => (b.chapterCount || 0) - (a.chapterCount || 0))
   const relTypeCount = new Map<string, number>()
-  rels.forEach((r) => relTypeCount.set(r.relation_type, (relTypeCount.get(r.relation_type) || 0) + 1))
+  rels.forEach((r: any) => relTypeCount.set(r.relation_type, (relTypeCount.get(r.relation_type) || 0) + 1))
   const sortedRelTypes = [...relTypeCount.entries()].sort((a, b) => b[1] - a[1])
 
   return (

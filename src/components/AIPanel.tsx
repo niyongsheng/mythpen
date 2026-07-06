@@ -21,7 +21,6 @@ export function AIPanel() {
     currentSessionId,
     setTask,
     addMessage,
-    loadMessages,
     loadSessions,
     createSession,
     switchSession,
@@ -37,8 +36,8 @@ export function AIPanel() {
   const [taskName, setTaskName] = useState('')
   const [genTokens, setGenTokens] = useState(0)
   const [showConsistency, setShowConsistency] = useState(() => !localStorage.getItem('mythpen-hide-consistency'))
-  const abortRef = useRef(null)
-  const msgEndRef = useRef(null)
+  const abortRef = useRef<AbortController | null>(null)
+  const msgEndRef = useRef<HTMLDivElement | null>(null)
   const streamRef = useRef('')
   const runningRef = useRef(false)
   const msgIdCounter = useRef(0)
@@ -131,7 +130,7 @@ export function AIPanel() {
       if (!state.currentSessionId && state.sessions.length === 0) {
         const now = new Date()
         const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-        createSession(project, `对话 ${ts}`)
+        void createSession(project, `对话 ${ts}`)
       }
     })
   }, [project])
@@ -173,7 +172,7 @@ export function AIPanel() {
 
   const stopTask = () => {
     if (abortRef.current) {
-      abortRef.current()
+      abortRef.current?.abort()
       abortRef.current = null
     }
     cancelTask()
@@ -182,62 +181,6 @@ export function AIPanel() {
     setTaskName('')
     setToolCalls([])
     toolCallsRef.current = []
-  }
-
-  const handleContinue = () => {
-    if (!project || runningRef.current || !input.trim()) return
-    runningRef.current = true
-    const userMsg = input.trim()
-    setTaskName(t('ai.taskContinue'))
-    setTask({ status: 'running' })
-    setStreamText('')
-    setGenTokens(0)
-    streamRef.current = ''
-    setToolCalls([])
-    toolCallsRef.current = []
-
-    addMessage({ id: nextMsgId(), role: 'user', content: userMsg })
-    saveMsg({ role: 'user', content: userMsg }).catch(() => {})
-    setInput('')
-    // Force DOM clear
-    const el = document.getElementById('ai-chat-input') as HTMLTextAreaElement | null
-    if (el) el.value = ''
-
-    const ch = currentChapter
-    const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户指令：${userMsg}\n\n请直接续写小说内容，不要加前缀说明。`
-
-    abortRef.current = aiApi.continueWriting(
-      ch?.num || 1,
-      context,
-      project,
-      (text: string) => {
-        streamRef.current += text
-        setStreamText(streamRef.current)
-        setGenTokens((prev) => prev + 1)
-      },
-      async (data: any) => {
-        setTask({ status: 'completed' })
-        showToast(t('ai.continueComplete'), 'success', 5000)
-        const aiMsg = {
-          role: 'ai' as const,
-          content: t('ai.continueCompleteMessage', { words: data.content?.length || 0 }),
-        }
-        addMessage({ id: nextMsgId(), ...aiMsg })
-        saveMsg(aiMsg).catch(() => {})
-        const fullContent = streamRef.current
-        done()
-        generateAITitle(userMsg, fullContent || undefined)
-        if (ch?.num) await loadChapterContent(project, ch.num)
-      },
-      (err: any) => {
-        setTask({ status: 'error' })
-        showToast(t('ai.continueError'), 'error')
-        const errMsg = { role: 'ai' as const, content: `错误: ${err.error || err}` }
-        addMessage({ id: nextMsgId(), ...errMsg })
-        saveMsg(errMsg).catch(() => {})
-        done()
-      },
-    )
   }
 
   const handleSend = () => {
@@ -476,7 +419,7 @@ export function AIPanel() {
             onClick={() => {
               const now = new Date()
               const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-              createSession(project, `新会话 ${ts}`)
+              void createSession(project, `新会话 ${ts}`)
             }}
             title={t('ai.newSession')}
           >
@@ -720,7 +663,8 @@ export function AIPanel() {
               <button
                 className="h-[32px] px-4 rounded-lg bg-[var(--error)] text-white text-[13px] font-medium cursor-pointer border-none hover:brightness-110"
                 onClick={() => {
-                  deleteSession(project, currentSessionId)
+                  if (!currentSessionId) return
+                  void deleteSession(project, currentSessionId)
                   setConfirmDelete(false)
                 }}
               >

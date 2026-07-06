@@ -1,7 +1,7 @@
 import { Brain, Loader, Search, Sparkles, X } from 'lucide-react'
 import { useState } from 'react'
-import { useT } from '@/hooks/useT'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { useT } from '@/hooks/useT'
 import { aiApi, extractAIJsonArray, getAIResponseText, memoriesApi } from '@/lib/api'
 import { useMemories, useProjectName } from '@/lib/useProjectData'
 

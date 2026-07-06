@@ -1,17 +1,18 @@
 import { Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
-import { useT } from '@/hooks/useT'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { useT } from '@/hooks/useT'
 import { charactersApi } from '@/lib/api'
 import { useCharacters, useProjectName } from '@/lib/useProjectData'
+import type { Character } from '@/types'
 
 export function Characters() {
   const { t } = useT()
   const project = useProjectName()
   const { data: characters, loading, reload } = useCharacters()
   useDataRefresh('character', reload)
-  const [selected, setSelected] = useState(null)
+  const [selected, setSelected] = useState<Character | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function Characters() {
                     : rankChar(idx) === 'minor'
                       ? t('pages.roleMinor')
                       : t('pages.roleExtra')}
-                  {c.chapterCount > 0 && ` · ${c.chapterCount}章出场`}
+                  {(c.chapterCount ?? 0) > 0 && ` · ${c.chapterCount}章出场`}
                 </div>
               </div>
             </div>

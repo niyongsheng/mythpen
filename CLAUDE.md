@@ -82,24 +82,26 @@ event: task_end\ndata: {"success":true,...}
 
 每章有 5 个叙事维度字段：cognitive_frame / emotional_anchor / world_texture / concrete_mystery / interpersonal_tension
 
-## 关键文件
+## TypeScript 常见坑点
 
-| 路径 | 说明 |
-|---|---|
-| `server/index.js` | Express 入口，AI 路由 |
-| `server/tools.js` | 25+ AI 工具定义 + 执行器 |
-| `server/ai-adapter.js` | OpenAI / Claude 适配器 |
-| `server/routes/api.js` | 全部 REST API 路由 |
-| `server/db.js` | SQLite 数据库层 |
-| `server/test-tools.js` | 工具集成测试（40项） |
-| `src/components/AIPanel.tsx` | AI 聊天面板 |
-| `src/components/Sidebar.tsx` | 侧边栏 |
-| `src/components/EditorContent.tsx` | 富文本编辑器 |
-| `src/stores/useAgentStore.ts` | AI 聊天 store |
-| `src/stores/useProjectStore.ts` | 项目 store |
-| `src/stores/useSettingsStore.ts` | 设置 store |
-| `src/lib/api.ts` | API 客户端 |
-| `src/types/index.ts` | TypeScript 类型定义 |
-| `server/prompts/writing.js` | 写作模式提示词 |
-| `server/prompts/collab.js` | 共创模式提示词 |
-| `server/prompts/context.js` | 项目上下文构建 |
+| 问题 | 症状 | 正确做法 |
+|---|---|---|
+| `useRef(null)` 缺类型 | `abortRef.current` 一直为 `null`，赋 `AbortController` 报 TS2322 | `useRef<AbortController \| null>(null)` |
+| `useRef(null)` 缺类型 | `msgEndRef.current?.scrollIntoView()` 报 TS2339 'never' | `useRef<HTMLDivElement \| null>(null)` |
+| `useState(null)` 缺类型 | `selected.name` / `selected.id` 全部 TS2339 on `never` | `useState<Character \| null>(null)` |
+| 通用钩子缺泛型 | 下游 `data.xxx` 全部 `never` | `useApiData<T>(fetcher)` + `useStats(): { data: T \| null; ... }` |
+| `tsc --noEmit` 用根配置 | 漏掉大量文件层的类型错误 | 用 `tsc --project tsconfig.app.json --noEmit` 全量检查 |
+
+**规则**：见到 `on type 'never'` 的 TS 错误，90% 是 `useState(null)` 或 `useRef(null)` 没加类型参数。
+
+**类型检查命令**：
+```bash
+pnpm tsc --project tsconfig.app.json --noEmit   # 全量检查（推荐）
+pnpm typecheck                                    # 仅根 tsconfig（不完整）
+pnpm lint                                         # Biome 代码风格
+```
+
+**批量修 Tailwind v4 语法**：
+```bash
+pnpm biome check --write --unsafe src/
+```

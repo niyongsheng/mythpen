@@ -1,4 +1,4 @@
-import { Pen, Pencil } from 'lucide-react'
+import { Pen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { useChapterStore } from '@/stores/useChapterStore'
@@ -29,7 +29,7 @@ export function EditorContent() {
 
   const handleNewChapter = async () => {
     if (!currentProject) return
-    const created = await createChapter(currentProject, '新章节')
+    await createChapter(currentProject, '新章节')
     setActivePage('page-writing')
   }
 

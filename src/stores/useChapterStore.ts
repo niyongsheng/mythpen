@@ -64,7 +64,7 @@ export const useChapterStore = create<ChapterState>((set) => ({
         return
       }
 
-      const volumes = vols.map((v) => ({
+      const volumes = vols.map((v: any) => ({
         id: v.id,
         sortOrder: v.sort_order,
         title: v.title,
@@ -89,8 +89,8 @@ export const useChapterStore = create<ChapterState>((set) => ({
       let currentChapter = null
       for (const v of volumes) {
         currentChapter =
-          v.chapters.find((c) => c.content) ||
-          v.chapters.find((c) => c.status === 'writing' || c.status === 'pending') ||
+          v.chapters.find((c: any) => c.content) ||
+          v.chapters.find((c: any) => c.status === 'writing' || c.status === 'pending') ||
           v.chapters[0]
         if (currentChapter) break
       }
