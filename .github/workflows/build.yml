@@ -92,14 +92,71 @@ jobs:
         with:
           name: Mythpen-Windows-x86_64
           path: |
-            src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/nsis/*.exe
+          compression-level: 0
+
+  build-linux-x86:
+    name: Build (Linux x86_64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install system dependencies (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install bun (for sidecar)
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build sidecar (Express server)
+        run: |
+          bun build --compile ./server/index.js --outfile src-tauri/binaries/mythpen-server
+          mv src-tauri/binaries/mythpen-server src-tauri/binaries/mythpen-server-x86_64-unknown-linux-gnu
+
+      - name: Build Tauri app (deb)
+        run: pnpm tauri build --bundles deb,rpm
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mythpen-Linux-x86_64
+          path: src-tauri/target/release/bundle/
           compression-level: 0
 
   # ─── GitHub Release ───
   release:
     name: Create Release
-    needs: [build-mac-arm, build-win-x86]
+    needs: [build-mac-arm, build-win-x86, build-linux-x86]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -120,9 +177,11 @@ jobs:
             ### 安装
 
             - **macOS (ARM)**：下载 `.dmg` 文件，打开并拖入 Applications 文件夹
-            - **Windows**：下载 `.msi` 或 `.exe` 文件运行
+            - **Windows**：下载 `.exe` 文件运行
+            - **Linux**：下载 `.deb`（Debian/Ubuntu）或 `.rpm`（Fedora/CentOS）文件运行
           fail_on_unmatched_files: true
           files: |
             Mythpen-macOS-ARM/*.dmg
-            Mythpen-Windows-x86_64/*.msi
             Mythpen-Windows-x86_64/*.exe
+            Mythpen-Linux-x86_64/deb/*.deb
+            Mythpen-Linux-x86_64/rpm/*.rpm

@@ -1,0 +1,1923 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mythpen — AI 辅助小说创作</title>
+<meta name="description" content="Mythpen 是一款面向写作者的 AI 辅助小说创作桌面软件。本地优先，隐私安全，离线可用。">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1217 1024'%3E%3Cpath d='M1176.72159 613.147613c-109.293924 88.014948-267.639658 224.03805-408.35921 243.635582-90.508125-4.348565-176.841628-47.312383-268.799275-39.948814-161.418719-1.33356-285.207859 207.281581-448.77187 133.87781 161.998528-265.958213 542.874809-62.909235 728.529528-382.673688 22.090708-44.123436-22.090708-44.123436-29.396297-44.123436 100.422853-34.034766 435.262329-279.003907 294.368836-331.128702 0 0 191.336844-125.1227 88.304852-176.609705-88.304852-51.487005-331.128702 36.817847-331.128702 36.817848-28.990431-125.238661-394.153898 104.249589-390.037257 117.75913 0 0 0-44.123436-29.454278-29.454278-419.549516 264.856577-257.66695 559.167431-257.666949 559.167431S543.744522 178.001246 904.327501 111.787102C530.640847 259.986184 13.393579 942.942755 13.393579 942.942755s-9.624823 12.871751-11.828096 16.292622-1.391541 11.42223-1.39154 11.42223 4.05866 15.422909 12.002038 21.047053c161.244777 104.713436 304.167601-75.317139 452.540626-115.03403 241.316347-19.53955 289.034596 120.774135 537.192685-64.242795 80.651379-50.733254 155.330729-110.801427 209.078987-190.351169 19.945416-29.512259-7.885397-32.469283-34.266689-8.987033z' fill='%23c9a96e'/%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&family=Instrument+Serif:opsz@8&family=JetBrains+Mono&display=swap" rel="stylesheet">
+
+<style>
+/* ═══════════════ Design Tokens ═══════════════ */
+:root {
+  --canvas: #0e0e10;
+  --canvas-soft: #161618;
+  --canvas-card: #1a1a1e;
+  --canvas-elevated: #202024;
+  --canvas-mid: #2a2a30;
+  --canvas-pop: #323238;
+  --hairline: #26262b;
+  --hairline-light: #2e2e35;
+  --ink: #f0eee6;
+  --ink-hover: #faf8f2;
+  --ink-secondary: #c8c6be;
+  --ink-tertiary: #8a8880;
+  --ink-mute: #5e5c56;
+  --accent-gold: #c9a96e;
+  --accent-gold-soft: #e8d5a3;
+  --accent-ember: #d4743c;
+  --accent-mist: #7a8ea8;
+  --success: #4caf7d;
+  --success-soft: #1a3a2a;
+  --warning: #d4a040;
+  --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, serif;
+  --font-editor: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif;
+  --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+  --nav-h: 64px;
+}
+
+/* ═══════════════ Light Theme ═══════════════ */
+html[data-theme="light"] {
+  --canvas: #f5f0e8;
+  --canvas-soft: #ebe6dc;
+  --canvas-card: #e3ddd2;
+  --canvas-elevated: #dbd5ca;
+  --canvas-mid: #c8c2b6;
+  --canvas-pop: #b8b2a6;
+  --hairline: #d5cfc3;
+  --hairline-light: #c8c2b6;
+  --ink: #2a2824;
+  --ink-hover: #1a1814;
+  --ink-secondary: #55524c;
+  --ink-tertiary: #8a867e;
+  --ink-mute: #aba69e;
+  --accent-gold: #b8943e;
+  --accent-gold-soft: #d4b86a;
+  --success-soft: #d4edda;
+}
+
+/* ═══════════════ Reset ═══════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+::selection { background: rgba(201, 169, 110, 0.3); color: var(--ink); }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ═══════════════ Reduced Motion ═══════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+/* ═══════════════ Scrollbar ═══════════════ */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--canvas); }
+::-webkit-scrollbar-thumb { background: var(--canvas-mid); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--canvas-pop); }
+
+/* ═══════════════ Navbar ═══════════════ */
+.navbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--nav-h);
+  z-index: 100;
+  transition: background 0.3s, backdrop-filter 0.3s, box-shadow 0.3s;
+}
+.navbar.scrolled {
+  background: rgba(14, 14, 16, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 1px 0 var(--hairline);
+}
+html[data-theme="light"] .navbar.scrolled {
+  background: rgba(245, 240, 232, 0.85);
+}
+.nav-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.nav-logo svg { width: 28px; height: 28px; }
+.nav-logo span {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+.nav-links {
+  display: flex;
+  gap: 24px;
+  margin-right: auto;
+}
+.nav-links a {
+  font-size: 14px;
+  color: var(--ink-tertiary);
+  transition: color 0.15s;
+  padding: 4px 0;
+}
+.nav-links a:hover { color: var(--ink); }
+
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-tertiary);
+  font-size: 13px;
+  transition: background 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.icon-btn:hover { background: var(--canvas-card); color: var(--ink); }
+.icon-btn.lang-btn { width: auto; padding: 0 10px; font-size: 12px; font-weight: 500; letter-spacing: 0.03em; }
+.icon-btn.lang-btn:hover { color: var(--accent-gold); }
+.icon-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn.github-link svg { fill: currentColor; stroke: none; }
+
+/* Hamburger (mobile only) */
+.hamburger { display: none; }
+.hamburger svg { width: 22px; height: 22px; }
+
+/* Mobile Nav Overlay */
+.mobile-nav {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.mobile-nav.open { opacity: 1; pointer-events: auto; }
+.mobile-nav a {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--ink-secondary);
+  transition: color 0.15s;
+}
+.mobile-nav a:hover { color: var(--accent-gold); }
+
+/* ═══════════════ Container ═══════════════ */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ═══════════════ Sections ═══════════════ */
+.section {
+  padding: 100px 0;
+}
+.section-header {
+  text-align: center;
+  margin-bottom: 56px;
+}
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-gold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-top: 15px;
+}
+.section-title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.section-desc {
+  font-size: 16px;
+  color: var(--ink-tertiary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ═══════════════ Hero ═══════════════ */
+.hero {
+  min-height: calc(100vh - var(--nav-h));
+  display: flex;
+  align-items: center;
+  padding-top: var(--nav-h);
+  position: relative;
+  overflow: hidden;
+}
+.hero-inner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  align-items: center;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--accent-gold);
+  background: rgba(201, 169, 110, 0.1);
+  border: 1px solid rgba(201, 169, 110, 0.2);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  margin-bottom: 20px;
+  font-family: var(--font-mono);
+}
+.hero-badge-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+.hero-title {
+  font-family: var(--font-display);
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+.hero-title .gold { color: var(--accent-gold); }
+.hero-tagline {
+  font-size: 20px;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+  margin-bottom: 12px;
+  font-weight: 400;
+}
+.hero-desc {
+  font-size: 15px;
+  color: var(--ink-tertiary);
+  line-height: 1.7;
+  margin-bottom: 28px;
+  max-width: 480px;
+}
+.hero-subtitle {
+  display: flex;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+.hero-subtitle span { display: flex; align-items: center; gap: 6px; }
+.hero-subtitle .check {
+  width: 14px; height: 14px;
+  color: var(--success);
+  stroke-width: 2.5;
+}
+
+/* Download Buttons */
+.download-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  transition: all 0.2s;
+  cursor: pointer;
+  position: relative;
+}
+.btn-download svg { width: 20px; height: 20px; flex-shrink: 0; }
+.btn-download .btn-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.btn-download .btn-os { font-size: 13px; line-height: 1.3; }
+.btn-download .btn-arch { font-size: 10px; opacity: 0.65; font-weight: 400; }
+.btn-download-primary {
+  background: var(--accent-gold);
+  color: var(--canvas);
+}
+.btn-download-primary:hover {
+  background: var(--accent-gold-soft);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(201, 169, 110, 0.3);
+}
+.btn-download-secondary {
+  background: var(--canvas-elevated);
+  color: var(--ink);
+  border: 1px solid var(--hairline-light);
+}
+.btn-download-secondary:hover {
+  background: var(--canvas-mid);
+  transform: translateY(-2px);
+}
+
+/* Coming Soon badge */
+.btn-download[data-disabled] { opacity: 0.7; cursor: default; }
+.btn-download[data-disabled]:hover { transform: none; box-shadow: none; }
+.btn-download[data-disabled] .coming-soon {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-mute);
+  background: var(--canvas-pop);
+  padding: 0 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* Hero Mockup */
+.hero-mockup {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.mockup-frame {
+  width: 100%;
+  max-width: 520px;
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(201, 169, 110, 0.08);
+  position: relative;
+}
+html[data-theme="light"] .mockup-frame {
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04);
+}
+.mockup-titlebar {
+  height: 32px;
+  background: var(--canvas-card);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+}
+.mockup-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.mockup-dot:nth-child(1) { background: #ff5f57; }
+.mockup-dot:nth-child(2) { background: #febc2e; }
+.mockup-dot:nth-child(3) { background: #2bc840; }
+.mockup-dot-label {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.mockup-body {
+  display: flex;
+  height: 280px;
+}
+.mockup-sidebar {
+  width: 80px;
+  background: var(--canvas-soft);
+  border-right: 1px solid var(--hairline);
+  padding: 12px 8px;
+  flex-shrink: 0;
+}
+.mockup-sidebar-item {
+  height: 8px;
+  background: var(--canvas-mid);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+.mockup-sidebar-item.active {
+  background: var(--accent-gold);
+  width: 70%;
+}
+.mockup-sidebar-item:nth-child(3) { width: 60%; }
+.mockup-sidebar-item:nth-child(4) { width: 75%; }
+.mockup-sidebar-item:nth-child(5) { width: 50%; }
+.mockup-sidebar-item:nth-child(6) { width: 65%; }
+.mockup-editor {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mockup-line {
+  height: 10px;
+  background: var(--canvas-mid);
+  border-radius: 4px;
+  width: 100%;
+  animation: mockupFade 3s ease-in-out infinite alternate;
+}
+.mockup-line:nth-child(2) { width: 85%; animation-delay: 0.1s; }
+.mockup-line:nth-child(3) { width: 92%; animation-delay: 0.2s; }
+.mockup-line:nth-child(4) { width: 70%; animation-delay: 0.3s; }
+.mockup-line:nth-child(5) { width: 78%; animation-delay: 0.4s; }
+.mockup-line:nth-child(6) { width: 60%; animation-delay: 0.5s; }
+.mockup-line.gold {
+  background: var(--accent-gold-soft);
+  opacity: 0.6;
+}
+.mockup-line.gold + .ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 14px;
+  background: var(--accent-gold);
+  animation: blink 0.8s step-end infinite;
+  vertical-align: text-bottom;
+  margin-top: 2px;
+}
+@keyframes mockupFade {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.9; }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.mockup-right {
+  width: 80px;
+  background: var(--canvas-soft);
+  border-left: 1px solid var(--hairline);
+  padding: 12px 8px;
+  flex-shrink: 0;
+}
+.mockup-right-item {
+  height: 24px;
+  background: var(--canvas-card);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  border: 1px solid var(--hairline);
+}
+
+/* ═══════════════ Features ═══════════════ */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.feature-card {
+  background: var(--canvas-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  transition: all 0.3s ease;
+  cursor: default;
+}
+.feature-card:hover {
+  border-color: var(--hairline-light);
+  background: var(--canvas-elevated);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.feature-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: rgba(201, 169, 110, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.feature-icon svg { width: 22px; height: 22px; stroke: var(--accent-gold); fill: none; stroke-width: 1.8; }
+.feature-title-zh {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+.feature-title-en {
+  font-size: 12px;
+  color: var(--ink-mute);
+  font-weight: 400;
+  margin-bottom: 10px;
+  letter-spacing: 0.01em;
+}
+.feature-desc {
+  font-size: 14px;
+  color: var(--ink-tertiary);
+  line-height: 1.7;
+}
+
+/* ═══════════════ Preview / Carousel ═══════════════ */
+.preview-frame {
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline-light);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  max-width: 820px;
+  margin: 0 auto;
+  position: relative;
+}
+.preview-header {
+  height: 36px;
+  background: var(--canvas-card);
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
+}
+.preview-dot { width: 10px; height: 10px; border-radius: 50%; }
+.preview-dot:nth-child(1) { background: #ff5f57; }
+.preview-dot:nth-child(2) { background: #febc2e; }
+.preview-dot:nth-child(3) { background: #2bc840; }
+.preview-tabs {
+  display: flex;
+  gap: 0;
+  margin-left: 20px;
+  border-bottom: none;
+}
+.preview-tab {
+  font-size: 10px;
+  padding: 2px 10px;
+  color: var(--ink-mute);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.preview-tab.active { color: var(--ink); border-bottom-color: var(--accent-gold); }
+.preview-slides {
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+.preview-slide {
+  min-width: 100%;
+  display: flex;
+  padding: 24px 28px;
+  gap: 24px;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Slide variants */
+.preview-slide-editor .slide-left { flex: 1; }
+.preview-slide-editor .slide-right { width: 140px; flex-shrink: 0; }
+.slide-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.slide-content-text { font-family: var(--font-editor); font-size: 15px; line-height: 1.9; color: var(--ink); }
+.slide-content-text .dim { color: var(--ink-tertiary); }
+.slide-content-text .highlight { color: var(--accent-gold-soft); }
+.slide-panel { background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 14px; }
+.slide-panel-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; color: var(--ink-secondary); border-bottom: 1px solid var(--hairline); }
+.slide-panel-item:last-child { border-bottom: none; }
+.slide-panel-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.slide-panel-dot.gold { background: var(--accent-gold); }
+.slide-panel-dot.mist { background: var(--accent-mist); }
+.slide-panel-dot.ember { background: var(--accent-ember); }
+
+.preview-slide-char .char-grid { display: flex; gap: 12px; flex: 1; }
+.preview-slide-char .char-card { background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 16px; flex: 1; text-align: center; }
+.char-avatar { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.char-avatar.gold { background: var(--accent-gold); color: var(--canvas); }
+.char-avatar.mist { background: var(--accent-mist); color: var(--ink); }
+.char-avatar.mid { background: var(--canvas-mid); color: var(--ink-tertiary); }
+.char-name { font-size: 13px; color: var(--ink); font-weight: 500; }
+.char-role { font-size: 10px; color: var(--ink-mute); margin-top: 2px; }
+
+.preview-slide-world .world-items { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.world-item { background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
+.world-tag { font-size: 9px; padding: 1px 6px; border-radius: var(--radius-pill); background: var(--canvas-mid); color: var(--ink-tertiary); flex-shrink: 0; }
+.world-title { font-size: 13px; color: var(--ink); }
+.world-desc { font-size: 11px; color: var(--ink-tertiary); flex: 1; text-align: right; }
+
+.preview-slide-timeline .timeline-items { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.timeline-item { display: flex; gap: 12px; align-items: flex-start; }
+.timeline-year { font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold); width: 50px; flex-shrink: 0; text-align: right; }
+.timeline-bar { width: 2px; min-height: 28px; background: var(--hairline-light); flex-shrink: 0; }
+.timeline-content { font-size: 13px; color: var(--ink-secondary); }
+
+/* Carousel dots */
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 0 24px;
+}
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--canvas-mid);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+.carousel-dot.active { background: var(--accent-gold); width: 24px; border-radius: 4px; }
+.carousel-dot:hover { background: var(--canvas-pop); }
+
+/* ═══════════════ Platform ═══════════════ */
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.platform-card {
+  background: var(--canvas-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+.platform-card:hover {
+  border-color: var(--hairline-light);
+  background: var(--canvas-elevated);
+  transform: translateY(-3px);
+}
+.platform-icon {
+  margin-bottom: 16px;
+}
+.platform-icon svg { width: 40px; height: 40px; }
+.platform-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.platform-detail {
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  margin-bottom: 16px;
+}
+.platform-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--success-soft);
+  color: var(--success);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.platform-badge.pending {
+  background: rgba(201, 169, 110, 0.1);
+  color: var(--accent-gold);
+}
+
+/* ═══════════════ Workflow ═══════════════ */
+.workflow-steps {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  position: relative;
+  max-width: 800px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+.workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 80px;
+  position: relative;
+}
+.workflow-step-num {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--canvas-card);
+  border: 2px solid var(--hairline-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+}
+/* Marquee running-light pulse */
+.workflow-step-num::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: -1;
+}
+.workflow-step.active-glow .workflow-step-num {
+  background: var(--accent-gold);
+  color: var(--canvas);
+  border-color: var(--accent-gold);
+  transform: scale(1.08);
+}
+.workflow-step.active-glow .workflow-step-num::after {
+  opacity: 0.25;
+  transform: scale(1);
+  animation: glowPulse 1s ease-in-out infinite;
+}
+.workflow-step.dimmed .workflow-step-num {
+  opacity: 0.35;
+  filter: grayscale(0.6);
+}
+.workflow-step.dimmed-left .workflow-step-num {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: var(--success);
+  opacity: 0.6;
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+.workflow-step-label {
+  font-size: 12px;
+  color: var(--ink-mute);
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1.4;
+}
+.workflow-step-sub {
+  font-size: 10px;
+  color: var(--ink-mute);
+  opacity: 0.5;
+  margin-top: 2px;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  line-height: 1.3;
+  max-width: 100px;
+}
+.workflow-step.active-glow .workflow-step-sub { color: var(--accent-gold); opacity: 0.7; }
+.workflow-step.dimmed-left .workflow-step-sub { color: var(--ink-tertiary); opacity: 0.5; }
+.workflow-step.active-glow .workflow-step-label { color: var(--accent-gold); font-weight: 600; }
+.workflow-step.dimmed .workflow-step-label { color: var(--ink-mute); }
+.workflow-step.dimmed-left .workflow-step-label { color: var(--ink-tertiary); }
+.workflow-connector {
+  height: 2px;
+  flex: 1;
+  min-width: 20px;
+  background: var(--hairline-light);
+  margin-top: -28px;
+  align-self: flex-start;
+  transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s;
+}
+.workflow-connector.done { background: var(--accent-gold); opacity: 0.6; }
+
+/* ═══════════════ CTA ═══════════════ */
+.cta {
+  text-align: center;
+  padding: 80px 0;
+}
+.cta-title {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.cta-desc {
+  font-size: 16px;
+  color: var(--ink-tertiary);
+  max-width: 480px;
+  margin: 0 auto 32px;
+}
+.cta .download-buttons { justify-content: center; }
+.cta .btn-download { padding: 16px 32px; font-size: 15px; }
+.cta .btn-download svg { width: 24px; height: 24px; }
+
+/* ═══════════════ Footer ═══════════════ */
+.footer {
+  border-top: 1px solid var(--hairline);
+  padding: 48px 0 32px;
+}
+.footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+.footer-brand {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.footer-tagline {
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  margin-bottom: 16px;
+}
+.footer-copyright {
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.footer-links a {
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  transition: color 0.15s;
+}
+.footer-links a:hover { color: var(--ink); }
+.footer-tech {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding-top: 24px;
+  margin-top: 16px;
+  border-top: 1px solid var(--hairline);
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+.footer-tech span { display: inline-flex; align-items: center; gap: 4px; }
+.footer-tech .dot { color: var(--accent-gold); margin: 0 4px; }
+
+/* ═══════════════ Animations ═══════════════ */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes fadeInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes typewriterCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.typewriter-cursor::after {
+  content: '|';
+  display: inline;
+  color: var(--accent-gold);
+  animation: typewriterCursor 0.8s step-end infinite;
+  margin-left: 2px;
+  font-weight: 400;
+}
+.typewriter-done::after {
+  content: '';
+}
+.section-title.typewriter-target {
+  min-height: 1.25em;
+}
+
+.animate-on-scroll {
+  opacity: 0;
+}
+.animate-on-scroll.revealed {
+  animation: fadeInUp 0.7s ease forwards;
+}
+.animate-on-scroll.from-left.revealed {
+  animation: fadeInLeft 0.7s ease forwards;
+}
+.animate-on-scroll.from-right.revealed {
+  animation: fadeInRight 0.7s ease forwards;
+}
+.animate-on-scroll.scale-in.revealed {
+  animation: scaleIn 0.6s ease forwards;
+}
+
+.stagger-children > * {
+  opacity: 0;
+}
+.stagger-children.revealed > * {
+  animation: fadeInUp 0.6s ease forwards;
+}
+.stagger-children.revealed > *:nth-child(1) { animation-delay: 0s; }
+.stagger-children.revealed > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger-children.revealed > *:nth-child(3) { animation-delay: 0.16s; }
+.stagger-children.revealed > *:nth-child(4) { animation-delay: 0.24s; }
+.stagger-children.revealed > *:nth-child(5) { animation-delay: 0.32s; }
+.stagger-children.revealed > *:nth-child(6) { animation-delay: 0.40s; }
+
+/* ═══════════════ Responsive ═══════════════ */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .hero-title { font-size: 42px; }
+  .hero-inner { grid-template-columns: 1fr; gap: 40px; text-align: center; }
+  .hero-desc { margin: 0 auto 28px; }
+  .download-buttons { justify-content: center; }
+  .hero-subtitle { justify-content: center; }
+  .mockup-frame { max-width: 480px; margin: 0 auto; }
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .section-title { font-size: 30px; }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .hamburger { display: flex; }
+
+  .hero { min-height: auto; padding-top: var(--nav-h); }
+  .hero-title { font-size: 32px; }
+  .hero-tagline { font-size: 17px; }
+  .hero-desc { font-size: 14px; }
+  .hero-inner { padding: 24px 16px; }
+
+  .mockup-body { height: 200px; }
+  .mockup-sidebar { width: 60px; }
+  .mockup-right { display: none; }
+  .mockup-editor { padding: 14px 16px; }
+
+  .features-grid { grid-template-columns: 1fr; }
+  .feature-card { padding: 20px; }
+
+  .platform-grid { grid-template-columns: 1fr; gap: 12px; }
+
+  .section { padding: 60px 0; }
+  .section-title { font-size: 26px; }
+
+  .preview-slide { flex-direction: column; padding: 16px; }
+  .preview-slide-editor .slide-right { width: 100%; }
+  .preview-slide-char .char-grid { flex-direction: column; }
+
+  .workflow-steps { flex-direction: column; align-items: center; gap: 16px; }
+  .workflow-connector { display: none; }
+  .workflow-step { flex-direction: row; width: 100%; max-width: 300px; gap: 14px; }
+  .workflow-step-label { white-space: normal; }
+
+  .cta-title { font-size: 28px; }
+  .cta .download-buttons { flex-direction: column; align-items: center; }
+  .cta .btn-download { width: 100%; max-width: 300px; justify-content: center; }
+
+  .footer-inner { grid-template-columns: 1fr; text-align: center; }
+  .footer-links { align-items: center; }
+
+  .download-buttons { flex-direction: column; align-items: center; }
+  .btn-download { width: 100%; max-width: 300px; justify-content: center; }
+
+  .hero-subtitle { flex-direction: column; align-items: center; gap: 8px; }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .hero-title { font-size: 28px; }
+  .hero-badge { font-size: 10px; }
+  .btn-download { padding: 10px 18px; font-size: 13px; }
+  .btn-download svg { width: 18px; height: 18px; }
+  .mockup-body { height: 160px; }
+  .mockup-sidebar { width: 48px; padding: 8px 6px; }
+  .mockup-sidebar-item { height: 6px; margin-bottom: 8px; }
+  .mockup-line { height: 7px; }
+  .section-title { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ Navbar ═══════════════ -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">
+      <svg width="28" height="24" viewBox="0 0 1217 1024" fill="var(--accent-gold)" xmlns="http://www.w3.org/2000/svg">
+        <path d="M1176.72159 613.147613c-109.293924 88.014948-267.639658 224.03805-408.35921 243.635582-90.508125-4.348565-176.841628-47.312383-268.799275-39.948814-161.418719-1.33356-285.207859 207.281581-448.77187 133.87781 161.998528-265.958213 542.874809-62.909235 728.529528-382.673688 22.090708-44.123436-22.090708-44.123436-29.396297-44.123436 100.422853-34.034766 435.262329-279.003907 294.368836-331.128702 0 0 191.336844-125.1227 88.304852-176.609705-88.304852-51.487005-331.128702 36.817847-331.128702 36.817848-28.990431-125.238661-394.153898 104.249589-390.037257 117.75913 0 0 0-44.123436-29.454278-29.454278-419.549516 264.856577-257.66695 559.167431-257.666949 559.167431S543.744522 178.001246 904.327501 111.787102C530.640847 259.986184 13.393579 942.942755 13.393579 942.942755s-9.624823 12.871751-11.828096 16.292622-1.391541 11.42223-1.39154 11.42223 4.05866 15.422909 12.002038 21.047053c161.244777 104.713436 304.167601-75.317139 452.540626-115.03403 241.316347-19.53955 289.034596 120.774135 537.192685-64.242795 80.651379-50.733254 155.330729-110.801427 209.078987-190.351169 19.945416-29.512259-7.885397-32.469283-34.266689-8.987033z"/>
+      </svg>
+      <span>Mythpen</span>
+    </a>
+
+    <div class="nav-links" id="navLinks">
+      <a href="#features" data-i18n="nav.features">功能特性</a>
+      <a href="#preview" data-i18n="nav.preview">应用预览</a>
+      <a href="#download" data-i18n="nav.download">下载</a>
+    </div>
+
+    <div class="nav-actions">
+      <button class="icon-btn lang-btn" id="langToggle" onclick="toggleLang()" title="切换语言">中 / EN</button>
+      <button class="icon-btn" id="themeToggle" onclick="toggleTheme()" title="切换主题">
+        <svg id="sunIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <svg id="moonIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+      <a href="https://github.com/niyongsheng/mythpen" class="icon-btn github-link" target="_blank" rel="noopener" title="GitHub">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+      </a>
+      <button class="icon-btn hamburger" id="hamburgerBtn" onclick="toggleMobileMenu()" aria-label="菜单">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════ Mobile Nav Overlay ═══════════════ -->
+<div class="mobile-nav" id="mobileNav">
+  <a href="#features" data-i18n="nav.features" onclick="closeMobileMenu()">功能特性</a>
+  <a href="#preview" data-i18n="nav.preview" onclick="closeMobileMenu()">应用预览</a>
+  <a href="#download" data-i18n="nav.download" onclick="closeMobileMenu()">下载</a>
+  <a href="https://github.com/niyongsheng/mythpen" target="_blank" onclick="closeMobileMenu()">GitHub</a>
+</div>
+
+<!-- ═══════════════ Hero ═══════════════ -->
+<section class="hero" id="hero">
+  <div class="hero-inner">
+    <div class="hero-content animate-on-scroll from-left">
+      <div class="hero-badge">
+        <span class="hero-badge-dot"></span>
+        <span data-i18n="hero.badge">v0.0.2 · 本地数据</span>
+      </div>
+      <h1 class="hero-title">
+        <span class="gold">Mythpen</span>
+      </h1>
+      <p class="hero-tagline" data-i18n="hero.tagline">AI 辅助小说创作桌面软件</p>
+      <p class="hero-desc" data-i18n="hero.desc">Mythpen 是一款面向写作者的 AI 辅助创作工具。让 AI 成为你的协作伙伴，在角色管理、世界观构建、情节设计中提供智能支持。本地优先，隐私安全。</p>
+
+      <div class="download-buttons">
+        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          <span class="btn-label">
+            <span class="btn-os">macOS</span>
+            <span class="btn-arch">Apple Silicon & Intel</span>
+          </span>
+        </a>
+        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7.5v7.5H3V3zm0 10.5h7.5V21H3v-7.5zM13.5 3H21v7.5h-7.5V3zm0 10.5H21V21h-7.5v-7.5z"/></svg>
+          <span class="btn-label">
+            <span class="btn-os">Windows</span>
+            <span class="btn-arch">.msi & .exe</span>
+          </span>
+        </a>
+        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          <span class="btn-label">
+            <span class="btn-os">Linux</span>
+            <span class="btn-arch">.AppImage</span>
+          </span>
+        </a>
+      </div>
+
+      <div class="hero-subtitle">
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="hero.tagLocal">本地优先</span></span>
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="hero.tagPrivacy">隐私安全</span></span>
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg> <span data-i18n="hero.tagOffline">离线可用</span></span>
+      </div>
+    </div>
+
+    <div class="hero-mockup animate-on-scroll from-right">
+      <div class="mockup-frame">
+        <div class="mockup-titlebar">
+          <span class="mockup-dot"></span>
+          <span class="mockup-dot"></span>
+          <span class="mockup-dot"></span>
+          <span class="mockup-dot-label">mythpen</span>
+        </div>
+        <div class="mockup-body">
+          <div class="mockup-sidebar">
+            <div class="mockup-sidebar-item active"></div>
+            <div class="mockup-sidebar-item"></div>
+            <div class="mockup-sidebar-item"></div>
+            <div class="mockup-sidebar-item"></div>
+            <div class="mockup-sidebar-item"></div>
+            <div class="mockup-sidebar-item"></div>
+          </div>
+          <div class="mockup-editor">
+            <div class="mockup-line"></div>
+            <div class="mockup-line"></div>
+            <div class="mockup-line"></div>
+            <div class="mockup-line gold"></div>
+            <span class="ai-cursor"></span>
+            <div class="mockup-line" style="width:45%;"></div>
+            <div class="mockup-line" style="width:55%;"></div>
+          </div>
+          <div class="mockup-right">
+            <div class="mockup-right-item"></div>
+            <div class="mockup-right-item"></div>
+            <div class="mockup-right-item"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ Features ═══════════════ -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section-header animate-on-scroll">
+      <h2 class="section-title" id="featuresTitle" data-i18n="features.title">钱钟书 | 年轻时，总将创作冲动误解为创作才能</h2>
+      <p class="section-desc" data-i18n="features.desc">Mythpen 帮你把创作热情变成真正的作品</p>
+      <div class="section-label" data-i18n="features.label">核心功能</div>
+    </div>
+
+    <div class="features-grid stagger-children" id="featuresGrid">
+      <!-- 1. AI Writing -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+          </svg>
+        </div>
+        <h3 class="feature-title-zh" data-i18n="features.aiWriting.title">AI 辅助写作</h3>
+        <h4 class="feature-title-en">AI-Powered Writing</h4>
+        <p class="feature-desc" data-i18n="features.aiWriting.desc">与 AI 协作完成小说创作。流式生成、续写、共创，AI 以协作伙伴的方式参与，从不侵入你的创作空间。</p>
+      </div>
+
+      <!-- 2. Characters -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+        </div>
+        <h3 class="feature-title-zh" data-i18n="features.characters.title">角色管理</h3>
+        <h4 class="feature-title-en">Character Management</h4>
+        <p class="feature-desc" data-i18n="features.characters.desc">深入的角色设定与管理。管理姓名、外貌、性格、背景故事，以及角色间的复杂关系图谱。</p>
+      </div>
+
+      <!-- 3. World -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+          </svg>
+        </div>
+        <h3 class="feature-title-zh" data-i18n="features.world.title">世界观构建</h3>
+        <h4 class="feature-title-en">World Building</h4>
+        <p class="feature-desc" data-i18n="features.world.desc">构建丰富的世界观。设定规则、历史、地理、文化，让虚构世界真实可信。AI 辅助检视设定一致性。</p>
+      </div>
+
+      <!-- 4. Foreshadowing -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+        </div>
+        <h3 class="feature-title-zh" data-i18n="features.foreshadow.title">伏笔与情节</h3>
+        <h4 class="feature-title-en">Foreshadow & Plot</h4>
+        <p class="feature-desc" data-i18n="features.foreshadow.desc">追踪和管理故事中的伏笔。确保每个铺垫都有它的揭示，用看板视图管理伏笔状态，避免情节漏洞。</p>
+      </div>
+
+      <!-- 5. Timeline -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="16" y1="18" x2="16" y2="18"/>
+          </svg>
+        </div>
+        <h3 class="feature-title-zh" data-i18n="features.timeline.title">时间线管理</h3>
+        <h4 class="feature-title-en">Timeline</h4>
+        <p class="feature-desc" data-i18n="features.timeline.desc">可视化故事时间线。管理大事记、角色年龄、事件顺序，确保时间逻辑一致，再也不会出现时间线矛盾。</p>
+      </div>
+
+      <!-- 6. Consistency -->
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <h3 class="feature-title-zh" data-i18n="features.consistency.title">一致性检查</h3>
+        <h4 class="feature-title-en">Consistency Check</h4>
+        <p class="feature-desc" data-i18n="features.consistency.desc">AI 驱动的一致性检查。自动发现设定矛盾、角色偏差、时间逻辑问题，确保长篇创作的前后统一。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ Preview / Carousel ═══════════════ -->
+<section class="section" id="preview" style="background:var(--canvas-soft);">
+  <div class="container">
+    <div class="section-header animate-on-scroll">
+      <div class="section-label" data-i18n="preview.label">应用预览</div>
+      <h2 class="section-title" data-i18n="preview.title">沉浸式创作体验</h2>
+      <p class="section-desc" data-i18n="preview.desc">精心设计的编辑界面，让 AI 融入创作流程的每一步。</p>
+    </div>
+
+    <div class="preview-frame animate-on-scroll scale-in">
+      <div class="preview-header">
+        <span class="preview-dot"></span>
+        <span class="preview-dot"></span>
+        <span class="preview-dot"></span>
+        <div class="preview-tabs" id="previewTabs">
+          <span class="preview-tab active" onclick="goToSlide(0)">Editor</span>
+          <span class="preview-tab" onclick="goToSlide(1)">Characters</span>
+          <span class="preview-tab" onclick="goToSlide(2)">World</span>
+          <span class="preview-tab" onclick="goToSlide(3)">Timeline</span>
+        </div>
+      </div>
+      <div class="preview-slides" id="previewSlides">
+        <!-- Slide 0: Editor -->
+        <div class="preview-slide preview-slide-editor" style="transform: translateX(0);">
+          <div class="slide-left">
+            <div class="slide-label" data-i18n="preview.slide1.label">编辑区</div>
+            <div class="slide-content-text">
+              <p>她推开门的时候，雨已经停了。</p>
+              <p class="dim">屋檐还在滴水，一滴一滴落在青石板上，像是某种没有节奏的钟声。</p>
+              <p class="dim">空气里弥漫着雨后泥土的气息，混着一点若有若无的铁锈味。</p>
+              <p class="highlight">她走到他身后，屏幕上的波形图还在跳动。</p>
+              <p class="dim">三十二组实验，三十二组完全一致的结果——</p>
+              <span class="highlight" style="font-family:var(--font-sans);font-size:13px;">✨ AI 正在写入</span>
+            </div>
+          </div>
+          <div class="slide-right">
+            <div class="slide-label" data-i18n="preview.slide1.panel">AI 面板</div>
+            <div class="slide-panel">
+              <div class="slide-panel-item"><span class="slide-panel-dot gold"></span> 读取角色: 林晨</div>
+              <div class="slide-panel-item"><span class="slide-panel-dot gold"></span> 读取第2章大纲</div>
+              <div class="slide-panel-item"><span class="slide-panel-dot mist"></span> 续写完成 ✓</div>
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:var(--ink-mute);font-family:var(--font-mono);">
+              Tokens: 12.4k / 128k
+            </div>
+          </div>
+        </div>
+        <!-- Slide 1: Characters -->
+        <div class="preview-slide preview-slide-char" style="transform: translateX(0);">
+          <div style="flex:1;">
+            <div class="slide-label" data-i18n="preview.slide2.label">角色管理</div>
+            <div class="char-grid">
+              <div class="char-card">
+                <div class="char-avatar gold">林</div>
+                <div class="char-name">林晨</div>
+                <div class="char-role">28岁 · 主角 · 12章出场</div>
+              </div>
+              <div class="char-card">
+                <div class="char-avatar mist">陈</div>
+                <div class="char-name">陈教授</div>
+                <div class="char-role">55岁 · 配角 · 9章出场</div>
+              </div>
+              <div class="char-card">
+                <div class="char-avatar mist">李</div>
+                <div class="char-name">李薇</div>
+                <div class="char-role">26岁 · 配角 · 6章出场</div>
+              </div>
+              <div class="char-card">
+                <div class="char-avatar mid">王</div>
+                <div class="char-name">王队长</div>
+                <div class="char-role">42岁 · 客串 · 2章出场</div>
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--ink-tertiary);">
+              <span>👤 4 个角色</span>
+              <span>💞 6 条关系</span>
+            </div>
+          </div>
+        </div>
+        <!-- Slide 2: World -->
+        <div class="preview-slide preview-slide-world" style="transform: translateX(0);">
+          <div style="flex:1;">
+            <div class="slide-label" data-i18n="preview.slide3.label">世界观设定</div>
+            <div class="world-items">
+              <div class="world-item"><span class="world-tag">📍 地点</span><span class="world-title">量子物理研究所</span><span class="world-desc">城市西郊，建于2035年</span></div>
+              <div class="world-item"><span class="world-tag">🏛️ 组织</span><span class="world-title">国家量子科学研究中心</span><span class="world-desc">科技部直属机构</span></div>
+              <div class="world-item"><span class="world-tag">💡 概念</span><span class="world-title">量子纠缠通信</span><span class="world-desc">即时通信技术</span></div>
+              <div class="world-item"><span class="world-tag">🔬 科学</span><span class="world-title">量子态稳定技术</span><span class="world-desc">🔴 核心假设</span></div>
+              <div class="world-item"><span class="world-tag">📅 事件</span><span class="world-title">"静谧"实验事故</span><span class="world-desc">三年前全体失明17秒</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Slide 3: Timeline -->
+        <div class="preview-slide preview-slide-timeline" style="transform: translateX(0);">
+          <div style="flex:1;">
+            <div class="slide-label" data-i18n="preview.slide4.label">故事时间线</div>
+            <div class="timeline-items">
+              <div class="timeline-item"><span class="timeline-year">2032</span><span class="timeline-bar"></span><span class="timeline-content">量子态稳定技术首次验证</span></div>
+              <div class="timeline-item"><span class="timeline-year">2033</span><span class="timeline-bar"></span><span class="timeline-content" style="color:var(--accent-ember);">"静谧"实验事故 · 导师失踪</span></div>
+              <div class="timeline-item"><span class="timeline-year">2033.9</span><span class="timeline-bar"></span><span class="timeline-content">研究所封锁消息</span></div>
+              <div class="timeline-item"><span class="timeline-year">2036.3</span><span class="timeline-bar"></span><span class="timeline-content" style="color:var(--accent-gold);">林晨发现导师笔记 ← 故事开始</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="carousel-dots" id="carouselDots">
+      <button class="carousel-dot active" onclick="goToSlide(0)"></button>
+      <button class="carousel-dot" onclick="goToSlide(1)"></button>
+      <button class="carousel-dot" onclick="goToSlide(2)"></button>
+      <button class="carousel-dot" onclick="goToSlide(3)"></button>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ Cross-Platform ═══════════════ -->
+<section class="section" id="platform">
+  <div class="container">
+    <div class="section-header animate-on-scroll">
+      <div class="section-label" data-i18n="platform.label">跨平台</div>
+      <h2 class="section-title" data-i18n="platform.title">支持三大桌面平台</h2>
+      <p class="section-desc" data-i18n="platform.desc">无论你使用什么操作系统，Mythpen 都能带来一致的创作体验。</p>
+    </div>
+
+    <div class="platform-grid stagger-children" id="platformGrid">
+      <div class="platform-card">
+        <div class="platform-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+        </div>
+        <h3 class="platform-name">macOS</h3>
+        <p class="platform-detail" data-i18n="platform.mac.detail">macOS 11+ (Big Sur) · Intel & Apple Silicon</p>
+        <span class="platform-badge" data-i18n="platform.available">✓ 可用</span>
+      </div>
+      <div class="platform-card">
+        <div class="platform-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7.5v7.5H3V3zm0 10.5h7.5V21H3v-7.5zM13.5 3H21v7.5h-7.5V3zm0 10.5H21V21h-7.5v-7.5z"/></svg>
+        </div>
+        <h3 class="platform-name">Windows</h3>
+        <p class="platform-detail" data-i18n="platform.win.detail">Windows 10+ · .msi 一键安装</p>
+        <span class="platform-badge" data-i18n="platform.available">✓ 可用</span>
+      </div>
+      <div class="platform-card">
+        <div class="platform-icon">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        </div>
+        <h3 class="platform-name">Linux</h3>
+        <p class="platform-detail" data-i18n="platform.linux.detail">主流发行版 · .AppImage</p>
+        <span class="platform-badge" data-i18n="platform.available">✓ 可用</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ Workflow ═══════════════ -->
+<section class="section" id="workflow" style="background:var(--canvas-soft);">
+  <div class="container">
+    <div class="section-header animate-on-scroll">
+      <div class="section-label" data-i18n="workflow.label">创作工作流</div>
+      <h2 class="section-title" data-i18n="workflow.title">七步完成一部小说</h2>
+      <p class="section-desc" data-i18n="workflow.desc">从灵感到完成，Mythpen 引导你走完完整的创作流程。</p>
+    </div>
+
+    <div class="workflow-steps animate-on-scroll" id="workflowSteps">
+      <div class="workflow-step" data-step="0">
+        <div class="workflow-step-num">1</div>
+        <div class="workflow-connector"></div>
+        <div class="workflow-step-label" data-i18n="workflow.step1">选题</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc1">确定故事方向</div>
+      </div>
+      <div class="workflow-step" data-step="1">
+        <div class="workflow-step-num">2</div>
+        <div class="workflow-connector"></div>
+        <div class="workflow-step-label" data-i18n="workflow.step2">设定</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc2">构建世界与角色</div>
+      </div>
+      <div class="workflow-step" data-step="2">
+        <div class="workflow-step-num">3</div>
+        <div class="workflow-connector"></div>
+        <div class="workflow-step-label" data-i18n="workflow.step3">大纲</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc3">规划情节脉络</div>
+      </div>
+      <div class="workflow-step" data-step="3">
+        <div class="workflow-step-num">4</div>
+        <div class="workflow-connector"></div>
+        <div class="workflow-step-label" data-i18n="workflow.step4">写作</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc4">AI 协作创作</div>
+      </div>
+      <div class="workflow-step" data-step="4">
+        <div class="workflow-step-num">5</div>
+        <div class="workflow-connector"></div>
+        <div class="workflow-step-label" data-i18n="workflow.step5">审阅</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc5">修订与润色</div>
+      </div>
+      <div class="workflow-step" data-step="5">
+        <div class="workflow-step-num">6</div>
+        <div class="workflow-connector"></div>
+        <div class="workflow-step-label" data-i18n="workflow.step6">一致性</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc6">AI 检查矛盾</div>
+      </div>
+      <div class="workflow-step" data-step="6">
+        <div class="workflow-step-num">7</div>
+        <div class="workflow-step-label" data-i18n="workflow.step7">导出</div>
+        <div class="workflow-step-sub" data-i18n="workflow.desc7">完成你的作品</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ CTA ═══════════════ -->
+<section class="section cta" id="download">
+  <div class="container">
+    <div class="animate-on-scroll">
+      <h2 class="cta-title" data-i18n="cta.title">今天就开始创作你的小说</h2>
+      <p class="cta-desc" data-i18n="cta.desc">免费下载 Mythpen，开启 AI 辅助创作之旅。本地数据，隐私无忧。</p>
+      <div class="download-buttons">
+        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-primary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          <span class="btn-label">
+            <span class="btn-os">Download for macOS</span>
+            <span class="btn-arch">macOS 11+ · Intel & Apple Silicon</span>
+          </span>
+        </a>
+        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7.5v7.5H3V3zm0 10.5h7.5V21H3v-7.5zM13.5 3H21v7.5h-7.5V3zm0 10.5H21V21h-7.5v-7.5z"/></svg>
+          <span class="btn-label">
+            <span class="btn-os">Download for Windows</span>
+            <span class="btn-arch">Windows 10+ · .msi installer</span>
+          </span>
+        </a>
+        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          <span class="btn-label">
+            <span class="btn-os">Download for Linux</span>
+            <span class="btn-arch">Linux · .AppImage</span>
+          </span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ Footer ═══════════════ -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <div class="footer-brand">Mythpen</div>
+      <p class="footer-tagline" data-i18n="footer.tagline">AI 辅助小说创作桌面软件</p>
+      <p class="footer-copyright">© 2025–2026 Nico · <a href="https://github.com/niyongsheng/mythpen/blob/main/LICENSE" target="_blank" rel="noopener" style="color:var(--ink-tertiary);">CC BY-NC-SA 4.0</a></p>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/niyongsheng/mythpen" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/niyongsheng/mythpen/releases" target="_blank" rel="noopener" data-i18n="footer.releases">Releases</a>
+      <a href="https://github.com/niyongsheng/mythpen/issues" target="_blank" rel="noopener" data-i18n="footer.issues">Issues</a>
+    </div>
+    <div class="footer-tech">
+      <span>Built with <span class="dot">✦</span> React 19 <span class="dot">·</span> Express 5 <span class="dot">·</span> Tauri 2 <span class="dot">·</span> SQLite</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ═══════════════ JavaScript ═══════════════ -->
+<script>
+/* ═══ App Version (single source of truth) ═══ */
+const APP_VERSION = '0.0.2';
+
+/* ═══ i18n Data ═══ */
+const i18n = {
+  zh: {
+    'nav.features': '功能特性',
+    'nav.preview': '应用预览',
+    'nav.download': '下载',
+    'hero.badge': `v${APP_VERSION} · 本地数据`,
+    'hero.tagline': 'AI 辅助小说创作桌面软件',
+    'hero.desc': 'Mythpen 是一款面向写作者的 AI 辅助创作工具。让 AI 成为你的协作伙伴，在角色管理、世界观构建、情节设计中提供智能支持。本地优先，隐私安全。',
+    'hero.tagLocal': '本地优先',
+    'hero.tagPrivacy': '隐私安全',
+    'hero.tagOffline': '离线可用',
+    'features.label': '核心功能',
+    'features.title': '钱钟书 | 年轻时，总将创作冲动误解为创作才能',
+    'features.desc': 'Mythpen 帮你把创作热情变成真正的作品',
+    'features.aiWriting.title': 'AI 辅助写作',
+    'features.aiWriting.desc': '与 AI 协作完成小说创作。流式生成、续写、共创，AI 以协作伙伴的方式参与，从不侵入你的创作空间。',
+    'features.characters.title': '角色管理',
+    'features.characters.desc': '深入的角色设定与管理。管理姓名、外貌、性格、背景故事，以及角色间的复杂关系图谱。',
+    'features.world.title': '世界观构建',
+    'features.world.desc': '构建丰富的世界观。设定规则、历史、地理、文化，让虚构世界真实可信。AI 辅助检视设定一致性。',
+    'features.foreshadow.title': '伏笔与情节',
+    'features.foreshadow.desc': '追踪和管理故事中的伏笔。确保每个铺垫都有它的揭示，用看板视图管理伏笔状态，避免情节漏洞。',
+    'features.timeline.title': '时间线管理',
+    'features.timeline.desc': '可视化故事时间线。管理大事记、角色年龄、事件顺序，确保时间逻辑一致，再也不会出现时间线矛盾。',
+    'features.consistency.title': '一致性检查',
+    'features.consistency.desc': 'AI 驱动的一致性检查。自动发现设定矛盾、角色偏差、时间逻辑问题，确保长篇创作的前后统一。',
+    'preview.label': '应用预览',
+    'preview.title': '沉浸式创作体验',
+    'preview.desc': '精心设计的编辑界面，让 AI 融入创作流程的每一步。',
+    'preview.slide1.label': '编辑区',
+    'preview.slide1.panel': 'AI 面板',
+    'preview.slide2.label': '角色管理',
+    'preview.slide3.label': '世界观设定',
+    'preview.slide4.label': '故事时间线',
+    'platform.label': '跨平台',
+    'platform.title': '支持三大桌面平台',
+    'platform.desc': '无论你使用什么操作系统，Mythpen 都能带来一致的创作体验。',
+    'platform.mac.detail': 'macOS 11+ (Big Sur) · Intel & Apple Silicon',
+    'platform.win.detail': 'Windows 10+ · .msi 一键安装',
+    'platform.linux.detail': '主流发行版 · .AppImage',
+    'platform.available': '✓ 可用',
+    'workflow.label': '创作工作流',
+    'workflow.title': '七步完成一部小说',
+    'workflow.desc': '从灵感到完成，Mythpen 引导你走完完整的创作流程。',
+    'workflow.step1': '选题',
+    'workflow.step2': '设定',
+    'workflow.step3': '大纲',
+    'workflow.step4': '写作',
+    'workflow.step5': '审阅',
+    'workflow.step6': '一致性',
+    'workflow.step7': '导出',
+    'workflow.desc1': '确定故事方向',
+    'workflow.desc2': '构建世界与角色',
+    'workflow.desc3': '规划情节脉络',
+    'workflow.desc4': 'AI 协作创作',
+    'workflow.desc5': '修订与润色',
+    'workflow.desc6': 'AI 检查矛盾',
+    'workflow.desc7': '完成你的作品',
+    'cta.title': '今天就开始创作你的小说',
+    'cta.desc': '免费下载 Mythpen，开启 AI 辅助创作之旅。本地数据，隐私无忧。',
+    'footer.tagline': 'AI 辅助小说创作桌面软件',
+    'footer.releases': '发行版',
+    'footer.issues': '问题反馈',
+  },
+  en: {
+    'nav.features': 'Features',
+    'nav.preview': 'Preview',
+    'nav.download': 'Download',
+    'hero.badge': `v${APP_VERSION} · Local Data`,
+    'hero.tagline': 'AI-Assisted Novel Writing Desktop App',
+    'hero.desc': 'Mythpen is an AI-assisted writing tool for novelists. AI works as your creative partner, providing intelligent support for character management, world building, and plot design. Local-first, private, and secure.',
+    'hero.tagLocal': 'Local-First',
+    'hero.tagPrivacy': 'Private & Secure',
+    'hero.tagOffline': 'Offline Capable',
+    'features.label': 'Core Features',
+    'features.title': 'Qian Zhongshu | In youth, we mistake creative impulse for talent',
+    'features.desc': 'Mythpen turns creative passion into real work',
+    'features.aiWriting.title': 'AI Writing',
+    'features.aiWriting.desc': 'Write collaboratively with AI. Streaming generation, continuation, and co-creation — AI as your writing partner, never invading your creative space.',
+    'features.characters.title': 'Characters',
+    'features.characters.desc': 'Deep character profiles. Manage names, appearances, personalities, backstories, and complex relationship networks with ease.',
+    'features.world.title': 'World Building',
+    'features.world.desc': 'Build rich, believable worlds. Define rules, history, geography, and culture. Let AI help check setting consistency.',
+    'features.foreshadow.title': 'Foreshadow & Plot',
+    'features.foreshadow.desc': 'Track every setup and payoff. Use kanban views to manage foreshadowing status, ensuring no plot thread is left dangling.',
+    'features.timeline.title': 'Timeline',
+    'features.timeline.desc': 'Visual story timeline. Manage key events, character ages, and chronological order — never worry about timeline contradictions again.',
+    'features.consistency.title': 'Consistency Check',
+    'features.consistency.desc': 'AI-powered consistency checking. Automatically detect setting contradictions, character drift, and timeline issues across your entire novel.',
+    'preview.label': 'App Preview',
+    'preview.title': 'Immersive Writing Experience',
+    'preview.desc': 'A carefully designed editing interface that integrates AI into every step of your creative process.',
+    'preview.slide1.label': 'Editor',
+    'preview.slide1.panel': 'AI Panel',
+    'preview.slide2.label': 'Characters',
+    'preview.slide3.label': 'World Settings',
+    'preview.slide4.label': 'Story Timeline',
+    'platform.label': 'Cross-Platform',
+    'platform.title': 'Available on All Major Platforms',
+    'platform.desc': 'No matter your OS, Mythpen delivers a consistent creative experience.',
+    'platform.mac.detail': 'macOS 11+ (Big Sur) · Intel & Apple Silicon',
+    'platform.win.detail': 'Windows 10+ · .msi Installer',
+    'platform.linux.detail': 'Major Distributions · .AppImage',
+    'platform.available': '✓ Available',
+    'workflow.label': 'Writing Workflow',
+    'workflow.title': 'Seven Steps to Your Novel',
+    'workflow.desc': 'From idea to completion, Mythpen guides you through a complete creative workflow.',
+    'workflow.step1': 'Idea',
+    'workflow.step2': 'Setting',
+    'workflow.step3': 'Outline',
+    'workflow.step4': 'Writing',
+    'workflow.step5': 'Review',
+    'workflow.step6': 'Consistency',
+    'workflow.step7': 'Export',
+    'workflow.desc1': 'Define your story',
+    'workflow.desc2': 'Build world & chars',
+    'workflow.desc3': 'Plot your arc',
+    'workflow.desc4': 'AI-assisted writing',
+    'workflow.desc5': 'Revise & polish',
+    'workflow.desc6': 'AI checks conflicts',
+    'workflow.desc7': 'Ship your novel',
+    'cta.title': 'Start Writing Your Novel Today',
+    'cta.desc': 'Download Mythpen for free and begin your AI-assisted writing journey. Local data, total privacy.',
+    'footer.tagline': 'AI-Assisted Novel Writing Desktop App',
+    'footer.releases': 'Releases',
+    'footer.issues': 'Issues',
+  }
+};
+
+/* ═══ State ═══ */
+let currentLang = localStorage.getItem('mythpen-lang') || 'zh';
+let currentTheme = localStorage.getItem('mythpen-theme') || 'dark';
+let currentSlide = 0;
+const TOTAL_SLIDES = 4;
+let carouselTimer = null;
+
+/* ═══ DOM Ready ═══ */
+document.addEventListener('DOMContentLoaded', function() {
+  // Apply saved theme
+  if (currentTheme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.getElementById('sunIcon').style.display = 'none';
+    document.getElementById('moonIcon').style.display = 'block';
+  }
+
+  // Apply saved language
+  applyLanguage();
+
+  // Navbar scroll effect
+  const navbar = document.getElementById('navbar');
+  let lastScroll = 0;
+  window.addEventListener('scroll', function() {
+    const sy = window.scrollY;
+    if (sy > 40) {
+      navbar.classList.add('scrolled');
+    } else {
+      navbar.classList.remove('scrolled');
+    }
+    lastScroll = sy;
+  }, { passive: true });
+
+  // Intersection Observer for scroll animations
+  const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.animate-on-scroll').forEach(function(el) {
+    observer.observe(el);
+  });
+
+  // Also observe stagger containers
+  document.querySelectorAll('.stagger-children').forEach(function(el) {
+    observer.observe(el);
+  });
+
+  // Start carousel
+  startCarousel();
+
+  // Typewriter effect for features title
+  const featuresTitle = document.getElementById('featuresTitle');
+  if (featuresTitle) {
+    const twObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          startTypewriter(featuresTitle);
+          twObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.5 });
+    twObserver.observe(featuresTitle);
+  }
+
+  // Watch for workflow section reveal to start marquee
+  const workflowSection = document.getElementById('workflow');
+  const workflowSteps = document.getElementById('workflowSteps');
+  if (workflowSection && workflowSteps) {
+    const wfObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          startWorkflowMarquee();
+          wfObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.3 });
+    wfObserver.observe(workflowSection);
+  }
+});
+
+/* ═══ Language ═══ */
+function toggleLang() {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('mythpen-lang', currentLang);
+  applyLanguage();
+
+  // Update toggle button text
+  document.getElementById('langToggle').textContent = currentLang === 'zh' ? '中 / EN' : 'EN / 中';
+}
+
+function applyLanguage() {
+  const langData = i18n[currentLang];
+  if (!langData) return;
+
+  // Collect typewriter target before updating others
+  const featuresTitle = document.getElementById('featuresTitle');
+  const shouldRestartTW = featuresTitle && featuresTitle.classList.contains('typewriter-target');
+
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    const key = el.getAttribute('data-i18n');
+    if (langData[key]) {
+      el.textContent = langData[key];
+    }
+  });
+
+  // Restart typewriter with new language text
+  if (shouldRestartTW && featuresTitle) {
+    startTypewriter(featuresTitle, langData['features.title']);
+  }
+}
+
+/* ═══ Theme ═══ */
+function toggleTheme() {
+  const html = document.documentElement;
+  const sunIcon = document.getElementById('sunIcon');
+  const moonIcon = document.getElementById('moonIcon');
+
+  if (currentTheme === 'dark') {
+    currentTheme = 'light';
+    html.setAttribute('data-theme', 'light');
+    sunIcon.style.display = 'none';
+    moonIcon.style.display = 'block';
+  } else {
+    currentTheme = 'dark';
+    html.removeAttribute('data-theme');
+    sunIcon.style.display = 'block';
+    moonIcon.style.display = 'none';
+  }
+  localStorage.setItem('mythpen-theme', currentTheme);
+}
+
+/* ═══ Mobile Menu ═══ */
+function toggleMobileMenu() {
+  document.getElementById('mobileNav').classList.toggle('open');
+}
+function closeMobileMenu() {
+  document.getElementById('mobileNav').classList.remove('open');
+}
+
+/* ═══ Carousel ═══ */
+function goToSlide(index) {
+  currentSlide = index;
+  const slides = document.querySelectorAll('.preview-slide');
+  const dots = document.querySelectorAll('.carousel-dot');
+  const tabs = document.querySelectorAll('.preview-tab');
+
+  slides.forEach(function(s, i) {
+    s.style.transform = 'translateX(-' + (index * 100) + '%)';
+  });
+
+  dots.forEach(function(d, i) {
+    d.classList.toggle('active', i === index);
+  });
+
+  tabs.forEach(function(t, i) {
+    t.classList.toggle('active', i === index);
+  });
+
+  // Reset timer on manual navigation
+  if (carouselTimer) {
+    clearInterval(carouselTimer);
+    startCarousel();
+  }
+}
+
+function startCarousel() {
+  if (carouselTimer) clearInterval(carouselTimer);
+  carouselTimer = setInterval(function() {
+    const next = (currentSlide + 1) % TOTAL_SLIDES;
+    goToSlide(next);
+  }, 4500);
+}
+
+/* ═══ Typewriter Effect ═══ */
+let typewriterTimer = null;
+
+function startTypewriter(el, customText) {
+  const text = customText || el.textContent;
+  if (!text) return;
+  el.textContent = '';
+  el.classList.add('typewriter-target', 'typewriter-cursor');
+  el.classList.remove('typewriter-done');
+  let idx = 0;
+  const speed = 110;
+
+  if (typewriterTimer) { clearTimeout(typewriterTimer); typewriterTimer = null; }
+
+  function typeChar() {
+    if (idx < text.length) {
+      el.textContent += text.charAt(idx);
+      idx++;
+      typewriterTimer = setTimeout(typeChar, speed);
+    } else {
+      el.classList.remove('typewriter-cursor');
+      el.classList.add('typewriter-done');
+      typewriterTimer = null;
+    }
+  }
+  typeChar();
+}
+
+/* ═══ Workflow Marquee ═══ */
+let workflowMarqueeTimer = null;
+
+function startWorkflowMarquee() {
+  if (workflowMarqueeTimer) clearInterval(workflowMarqueeTimer);
+  const steps = document.querySelectorAll('#workflowSteps .workflow-step');
+  if (!steps.length) return;
+  let current = 0;
+
+  // Helper: clear all step states
+  function resetSteps() {
+    steps.forEach(function(s) {
+      s.classList.remove('active-glow', 'dimmed', 'dimmed-left');
+    });
+    // Reset all connectors
+    document.querySelectorAll('#workflowSteps .workflow-connector').forEach(function(c) {
+      c.classList.remove('done');
+    });
+  }
+
+  // Helper: set a step as active with the light running effect
+  function illuminateStep(index) {
+    resetSteps();
+    const total = steps.length;
+
+    // Steps to the left of current: dimmed-left (passed)
+    for (let i = 0; i < index; i++) {
+      steps[i].classList.add('dimmed-left');
+      // Light up connectors between passed steps
+      const conn = steps[i].querySelector('.workflow-connector');
+      if (conn) conn.classList.add('done');
+    }
+
+    // Current step: gold glow
+    steps[index].classList.add('active-glow');
+    // Also light connector into current step
+    if (index > 0) {
+      const prevConn = steps[index - 1].querySelector('.workflow-connector');
+      if (prevConn) prevConn.classList.add('done');
+    }
+
+    // Steps to the right: dimmed (future)
+    for (let i = index + 1; i < total; i++) {
+      steps[i].classList.add('dimmed');
+    }
+  }
+
+  // Start: illuminate step 0
+  illuminateStep(0);
+
+  // Advance one step every 1500ms
+  workflowMarqueeTimer = setInterval(function() {
+    current = (current + 1) % steps.length;
+    illuminateStep(current);
+  }, 1500);
+}
+
+/* ═══ Close mobile menu on resize ═══ */
+window.addEventListener('resize', function() {
+  if (window.innerWidth > 768) {
+    closeMobileMenu();
+  }
+});
+</script>
+
+</body>
+</html>
