@@ -5,11 +5,11 @@ import { ToastContainer } from '@/components/ToastContainer'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
 import { aiApi, chatApi } from '@/lib/api'
+import { getModifiedEntities, notifyDataChanged } from '@/lib/dataEvents'
 import { useProjectName } from '@/lib/useProjectData'
 import { useAgentStore } from '@/stores/useAgentStore'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
-import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
 
 export function AIPanel() {
@@ -266,73 +266,13 @@ export function AIPanel() {
       setToolCalls([])
       toolCallsRef.current = []
       const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户提问：${userMsg}\n\n我们正在一起构建这部小说的世界。在回答前，你可以先查询当前的角色、世界观、伏笔等已有设定。根据用户的问题，展开有建设性的讨论，提出创意建议。如果达成共识，使用对应工具将设定写入数据库。`
-      // ── 自动压缩历史对话（基于 token 占用比例） ──
-      const sett = useSettingsStore.getState().settings
       // Build conversation history from stored messages.
-      // Note: tool_calls patterns (assistant → tool result) are not persisted in full,
-      // so we only send text content. The AI retains context from its own previous responses.
-      let chatHistory: any[] = []
+      const chatHistory: any[] = []
       for (const msg of messages) {
         chatHistory.push({
           role: msg.role === 'ai' ? 'assistant' : (msg.role as 'user' | 'system'),
           content: msg.content,
         })
-      }
-      if (sett.compressionEnabled && messages.length > 2) {
-        // 估算 token：中文约 1.5 token/字，英文约 0.25 token/字符，取保守值 1 token/字符
-        const estimateTokens = (text: string) => Math.ceil(text.length * 0.8)
-        const totalTokens = chatHistory.reduce((s, m) => s + estimateTokens(m.content), 0)
-        const contextWindow = (sett.contextLengthKb || 1024) * 1000
-        const threshold = Math.floor((contextWindow * sett.compressionThreshold) / 100)
-        if (totalTokens > threshold) {
-          // 从最新的消息开始累加，直到达到目标保留量
-          const targetTokens = Math.floor((contextWindow * sett.compressionTarget) / 100)
-          let keepTokens = 0
-          let splitIdx = chatHistory.length
-          for (let i = chatHistory.length - 1; i >= 0; i--) {
-            keepTokens += estimateTokens(chatHistory[i].content)
-            if (keepTokens > targetTokens) {
-              splitIdx = i + 1
-              break
-            }
-          }
-          // Guard: 至少保留最后一条消息
-          if (splitIdx >= chatHistory.length) {
-            splitIdx = chatHistory.length - 1
-          }
-          const toCompress = chatHistory.slice(0, splitIdx)
-          const keep = chatHistory.slice(splitIdx)
-          // 异步压缩：用 AI 总结旧对话插入 system 消息
-          if (toCompress.length > 0) {
-            aiApi
-              .chat(
-                [
-                  {
-                    role: 'system',
-                    content:
-                      '你是一个对话摘要工具。将以下小说创作讨论压缩为一段 100 字以内的要点总结，仅保留关键决策、已完成的修改和重要信息。不要加问候语。',
-                  },
-                  {
-                    role: 'user',
-                    content: toCompress
-                      .map((m) => `${m.role === 'assistant' ? 'AI' : '用户'}: ${m.content.slice(0, 500)}`)
-                      .join('\n'),
-                  },
-                ],
-                project,
-              )
-              .then((res) => {
-                const summary = res.choices?.[0]?.message?.content?.trim() || ''
-                if (summary) {
-                  addMessage({ id: nextMsgId(), role: 'system', content: `📝 历史摘要：${summary}` })
-                  saveMsg({ role: 'system', content: `📝 历史摘要：${summary}` }).catch(() => {})
-                }
-              })
-              .catch(() => {})
-          }
-          // 插入摘要占位，让当前请求立即受益于压缩
-          chatHistory = [{ role: 'system', content: '📝 历史摘要：正在压缩旧对话...' }, ...keep]
-        }
       }
       abortRef.current = aiApi.chatStream(
         [...chatHistory, { role: 'user', content: context }],
@@ -357,6 +297,13 @@ export function AIPanel() {
           showToast(fullText ? 'AI 回答完成' : '对话完成', 'success')
           generateAITitle(userMsg, fullText || undefined)
           if (hadToolCalls) {
+            const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
+            const entities = getModifiedEntities(toolNames)
+            // Broadcast each modified entity type so all stores can react
+            for (const entity of entities) {
+              notifyDataChanged(entity)
+            }
+            // Legacy: still reload critical data immediately for responsiveness
             useChapterStore.getState().loadChapters(project!)
             useProjectStore.getState().loadProjects()
           }
@@ -416,6 +363,14 @@ export function AIPanel() {
           const hadToolCalls = toolCallsRef.current.length > 0
           done()
           generateAITitle(userMsg, fullText || undefined)
+          // Broadcast data change events to all stores
+          if (hadToolCalls) {
+            const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
+            const entities = getModifiedEntities(toolNames)
+            for (const entity of entities) {
+              notifyDataChanged(entity)
+            }
+          }
           // Reload chapter content if tool calls were made (content was saved to DB)
           if (hadToolCalls && ch?.num) {
             await loadChapterContent(project, ch.num)

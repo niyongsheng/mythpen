@@ -1,4 +1,4 @@
-import { Book, Download, File, FileEdit, FileText, Trash2, Upload, type LucideIcon } from 'lucide-react'
+import { Book, Download, File, FileEdit, FileText, type LucideIcon, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { projectsApi } from '@/lib/api'

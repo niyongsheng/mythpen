@@ -14,6 +14,7 @@ import {
   Link2,
   PenSquare,
   Plus,
+  RefreshCw,
   ScrollText,
   ShieldCheck,
   Users,
@@ -21,11 +22,11 @@ import {
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { projectsApi } from '@/lib/api'
+import { refreshAllData } from '@/lib/dataEvents'
 import { NEXT_STATUS } from '@/lib/status'
 import { useStats } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
-import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import type { SidebarItem } from '@/types'
 
@@ -50,9 +51,9 @@ export function Sidebar() {
   const currentProject = useProjectStore((s) => s.currentProject)
   const projectLoading = useProjectStore((s) => s.loading)
   const { data: stats } = useStats()
-  const contextLengthKb = useSettingsStore((s) => s.settings.contextLengthKb || 1024)
   const { t } = useT()
   const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([])
+  const [spinKey, setSpinKey] = useState(0)
 
   // Load sidebar items filtered by project genre
   const loadSidebarItems = useCallback(async () => {
@@ -89,6 +90,11 @@ export function Sidebar() {
     return nums.length > 0 ? Math.max(...nums) + 1 : 1
   }
 
+  const handleRefresh = () => {
+    setSpinKey((k) => k + 1)
+    refreshAllData(currentProject || undefined).catch(() => {})
+  }
+
   return (
     <aside className="w-[var(--sidebar-w)] bg-[var(--canvas-soft)] border-r border-[var(--hairline)] shrink-0 flex flex-col overflow-y-auto custom-scrollbar">
       {/* Outline Section */}
@@ -96,6 +102,13 @@ export function Sidebar() {
         <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
           <BookOpen className="w-3.5 h-3.5" />
           {t('sidebar.outline')}
+          <button
+            className="ml-auto flex items-center gap-1 px-1.5 py-[2px] rounded text-[var(--ink-mute)] cursor-pointer border-none bg-transparent hover:text-[var(--accent-gold)] hover:bg-[var(--accent-gold-soft-bg)] transition-colors"
+            onClick={handleRefresh}
+            title="手动刷新所有数据（快捷键 ⌘⇧R）"
+          >
+            <RefreshCw key={spinKey} className="w-3 h-3 animate-spin-once" />
+          </button>
         </div>
 
         {volumes.map((vol) => (
@@ -199,6 +212,65 @@ export function Sidebar() {
           {t('sidebar.stats')}
         </div>
         <div className="px-4">
+          {/* Completion progress */}
+          {stats?.targetWords &&
+            stats.targetWords > 0 &&
+            (() => {
+              const pct = Math.min((stats.totalWords / stats.targetWords) * 100, 100)
+              const remaining = Math.max(stats.targetWords - stats.totalWords, 0)
+              const color = pct >= 75 ? 'var(--success)' : pct >= 40 ? 'var(--accent-gold)' : 'var(--ink-mute)'
+              return (
+                <div className="mb-3 pb-3 border-b border-[var(--hairline-light)]">
+                  <div className="flex items-center gap-2.5">
+                    <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0">
+                      <circle cx="18" cy="18" r="14" fill="none" stroke="var(--canvas-mid)" strokeWidth="3" />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="none"
+                        stroke={color}
+                        strokeWidth="3"
+                        strokeDasharray={2 * Math.PI * 14}
+                        strokeDashoffset={2 * Math.PI * 14 * (1 - pct / 100)}
+                        strokeLinecap="round"
+                        transform="rotate(-90 18 18)"
+                        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+                      />
+                      <text
+                        x="18"
+                        y="18"
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        fill="var(--ink)"
+                        fontSize="9"
+                        fontWeight="600"
+                        fontFamily="monospace"
+                      >
+                        {Math.round(pct)}%
+                      </text>
+                    </svg>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between text-[11px] text-[var(--ink-tertiary)]">
+                        <span>{t('sidebar.completion')}</span>
+                        <span className="font-mono">
+                          {stats.totalWords.toLocaleString()} / {stats.targetWords.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="h-1 bg-[var(--canvas-mid)] rounded-full mt-1 overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+                      </div>
+                      {remaining > 0 && (
+                        <div className="text-[10px] text-[var(--ink-mute)] mt-[2px]">
+                          {t('sidebar.remaining', { n: remaining.toLocaleString() })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
           {/* Sparkline — last 7 days */}
           <div className="flex items-end gap-[2px] h-7 my-1 mb-2.5">
             {(() => {
@@ -228,48 +300,16 @@ export function Sidebar() {
             </span>
           </div>
           <div className="flex justify-between items-center py-[3px] text-[13px]">
-            <span className="text-[12px] text-[var(--ink-mute)]">总计</span>
+            <span className="text-[12px] text-[var(--ink-mute)]">{t('sidebar.totalWords')}</span>
             <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
               {(stats?.totalWords || 0).toLocaleString()} {t('editor.words')}
             </span>
           </div>
           <div className="flex justify-between items-center py-[3px] text-[13px]">
-            <span className="text-[12px] text-[var(--ink-mute)]">今日</span>
-            <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">{stats?.chapterCount || 0} 章</span>
-          </div>
-
-          {/* Context Budget */}
-          <div className="mt-2.5">
-            <div className="flex justify-between text-[11px] text-[var(--ink-mute)] mb-1">
-              <span>上下文预算</span>
-              <span className="font-mono">
-                {((stats?.totalWords || 0) / 1000).toFixed(1)}k / {contextLengthKb}k
-              </span>
-            </div>
-            <div className="h-2 bg-[var(--canvas-mid)] rounded-full overflow-hidden flex">
-              <div
-                className="h-full bg-[var(--accent-gold)]"
-                style={{ width: `${Math.min(((stats?.totalWords || 0) / (contextLengthKb * 1000)) * 100, 100)}%` }}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-x-2.5 gap-y-[3px] mt-[7px] text-[10px] text-[var(--ink-tertiary)]">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-[2px] shrink-0" style={{ background: 'var(--accent-gold)' }} />
-                正文 {(stats?.totalWords || 0).toLocaleString()} 字
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-[2px] shrink-0" style={{ background: 'var(--accent-mist)' }} />
-                角色 {stats?.characterCount || 0} 人
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-[2px] shrink-0" style={{ background: 'var(--info)' }} />
-                伏笔 {stats?.foreshadowCount || 0} 条
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-[2px] shrink-0" style={{ background: 'var(--accent-ember)' }} />
-                设定 {stats?.worldCount || 0} 条
-              </div>
-            </div>
+            <span className="text-[12px] text-[var(--ink-mute)]">{t('sidebar.today')}</span>
+            <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
+              {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} {t('editor.words')}
+            </span>
           </div>
         </div>
       </div>

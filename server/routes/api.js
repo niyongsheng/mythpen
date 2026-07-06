@@ -562,6 +562,11 @@ router.get('/:project/stats', (req, res) => {
   const sciCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM science_entries')?.cnt || 0;
   const tokenUsage = db.projectGet(pn, 'SELECT COALESCE(SUM(input_tokens), 0) as input, COALESCE(SUM(output_tokens), 0) as output FROM token_usage') || { input: 0, output: 0 };
 
+  // Target words from project mode
+  const projectMode = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'mode'")?.value || 'medium-novel';
+  const TARGET_WORDS = { 'short-story': 30000, 'medium-novel': 100000, 'long-novel': 200000 };
+  const targetWords = TARGET_WORDS[projectMode] || 100000;
+
   // Daily word counts for sparkline (last 7 days)
   const rawDaily = db.projectQuery(pn,
     "SELECT date(updated_at) as day, SUM(word_count) as words FROM chapters WHERE updated_at >= date('now', '-6 days') GROUP BY date(updated_at) ORDER BY day"
@@ -580,6 +585,7 @@ router.get('/:project/stats', (req, res) => {
     totalWords, chapterCount: chCount, acceptedCount, characterCount: charCount,
     foreshadowCount, resolvedForeshadow, overdueForeshadow, worldCount, sciCount,
     tokenInput: tokenUsage.input || 0, tokenOutput: tokenUsage.output || 0,
+    targetWords,
     currentChapter: db.projectGet(pn, "SELECT * FROM chapters WHERE status = 'writing' ORDER BY num LIMIT 1"),
     chapters: db.projectQuery(pn, 'SELECT id, num, title, word_count, status FROM chapters ORDER BY num'),
     dailyWords,

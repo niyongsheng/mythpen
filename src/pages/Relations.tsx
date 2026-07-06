@@ -1,7 +1,8 @@
 import { HeartHandshake, Link2, Loader, Plus, RefreshCcw, Sparkles, Users } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { aiApi, relationsApi, getAIResponseText, extractAIJsonArray } from '@/lib/api'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { aiApi, extractAIJsonArray, getAIResponseText, relationsApi } from '@/lib/api'
 import { useCharacters, useProjectName, useRelations } from '@/lib/useProjectData'
 
 interface PositionedNode {
@@ -106,6 +107,7 @@ function computeCircleLayout(
 export function Relations() {
   const { data: characters, loading: charsLoading } = useCharacters()
   const { data: relations, loading: relsLoading, reload: reloadRels } = useRelations()
+  useDataRefresh('relation', reloadRels)
   const { t } = useT()
   const project = useProjectName()
   const [layoutSeed, setLayoutSeed] = useState(0)

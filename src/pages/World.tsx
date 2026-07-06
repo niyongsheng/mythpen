@@ -2,6 +2,7 @@ import { Building2, Calendar, Cog, Globe, Lightbulb, MapPin } from 'lucide-react
 import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useT } from '@/hooks/useT'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { worldApi } from '@/lib/api'
 import { useProjectName, useWorldEntries } from '@/lib/useProjectData'
 
@@ -37,6 +38,7 @@ const CAT_ICONS: Record<string, React.ReactNode> = {
 
 export function World() {
   const { data: entries, loading, reload } = useWorldEntries()
+  useDataRefresh('world', reload)
   const [activeTab, setActiveTab] = useState('全部')
   const [showCreate, setShowCreate] = useState(false)
   const { t } = useT()

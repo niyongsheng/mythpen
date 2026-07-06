@@ -1,7 +1,11 @@
 // API client for Mythpen backend
-// Always uses HTTP fetch to the Express backend (localhost:3001 in Tauri, proxied in dev)
+// Dev: /api is proxied by Vite to localhost:3001
+// Tauri production: sidecar server runs on 127.0.0.1:3001
 
-const API_BASE = '/api'
+// In Tauri v2, __TAURI_INTERNALS__ is injected by the runtime automatically.
+// No npm package needed for this detection.
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
 
 async function request(path: string, options: any = {}) {
   const url = `${API_BASE}${path}`
@@ -293,5 +297,5 @@ export function getAIResponseText(res: any): string {
 }
 
 export function getCoverUrl(name: string): string {
-  return `/api/${encodeURIComponent(name)}/cover`
+  return `${API_BASE}/${encodeURIComponent(name)}/cover`
 }

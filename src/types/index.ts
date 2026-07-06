@@ -192,12 +192,26 @@ export interface AppSettings {
   backupEnabled: boolean
   accentColor: string
   maxOutputTokens: number
-  contextBudget: string
   httpTimeout: number
-  compressionEnabled: boolean
-  compressionThreshold: number
-  compressionTarget: number
-  contextLengthKb: number
+}
+
+// ─── Statistics ───
+export interface ProjectStats {
+  totalWords: number
+  chapterCount: number
+  acceptedCount: number
+  characterCount: number
+  foreshadowCount: number
+  resolvedForeshadow: number
+  overdueForeshadow: number
+  worldCount: number
+  sciCount: number
+  tokenInput: number
+  tokenOutput: number
+  currentChapter?: { id: number; num: number; title: string; word_count: number; status: string; content: string }
+  chapters: { id: number; num: number; title: string; word_count: number; status: string }[]
+  dailyWords: number[]
+  targetWords: number
 }
 
 // ─── Export ───

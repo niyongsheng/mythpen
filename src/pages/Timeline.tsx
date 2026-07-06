@@ -2,11 +2,13 @@ import { CalendarDays, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useT } from '@/hooks/useT'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { timelineApi } from '@/lib/api'
 import { useProjectName, useTimelineEvents } from '@/lib/useProjectData'
 
 export function Timeline() {
   const { data: events, loading, reload } = useTimelineEvents()
+  useDataRefresh('timeline', reload)
   const { t } = useT()
   const project = useProjectName()
   const [showCreate, setShowCreate] = useState(false)

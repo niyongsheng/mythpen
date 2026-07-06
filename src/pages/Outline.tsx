@@ -1,7 +1,7 @@
 import { Check, Loader, Pen, Plus, Save, ScrollText, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { aiApi, getAIResponseText, extractAIJsonObject } from '@/lib/api'
+import { aiApi, extractAIJsonObject, getAIResponseText } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 

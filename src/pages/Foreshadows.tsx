@@ -3,7 +3,8 @@ import { CheckCircle2, Link2, Loader, Pin, Plus, RefreshCw, Target } from 'lucid
 import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useT } from '@/hooks/useT'
-import { aiApi, foreshadowsApi, getAIResponseText, extractAIJsonArray } from '@/lib/api'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { aiApi, extractAIJsonArray, foreshadowsApi, getAIResponseText } from '@/lib/api'
 import { useChapters, useForeshadows, useProjectName } from '@/lib/useProjectData'
 
 interface Column {
@@ -20,6 +21,7 @@ const COLUMNS: Column[] = [
 
 export function Foreshadows() {
   const { data: foreshadows, loading, reload } = useForeshadows()
+  useDataRefresh('foreshadow', reload)
   const { chapters } = useChapters()
   const { t } = useT()
   const project = useProjectName()

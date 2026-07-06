@@ -1,7 +1,8 @@
 import { Brain, Loader, Search, Sparkles, X } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { aiApi, memoriesApi, getAIResponseText, extractAIJsonArray } from '@/lib/api'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
+import { aiApi, extractAIJsonArray, getAIResponseText, memoriesApi } from '@/lib/api'
 import { useMemories, useProjectName } from '@/lib/useProjectData'
 
 const CAT_LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ const CAT_COLORS: Record<string, { bg: string; text: string }> = {
 
 export function Memory() {
   const { data: memories, loading, reload } = useMemories()
+  useDataRefresh('memory', reload)
   const { t } = useT()
   const project = useProjectName()
   const [searchMode, setSearchMode] = useState(false)

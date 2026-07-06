@@ -26,12 +26,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   backupEnabled: true,
   accentColor: '#c9a96e',
   maxOutputTokens: 8192,
-  contextBudget: '128K',
   httpTimeout: 300,
-  compressionEnabled: true,
-  compressionThreshold: 80,
-  compressionTarget: 25,
-  contextLengthKb: 1024,
 }
 
 const STORAGE_KEY = 'mythpen-settings'

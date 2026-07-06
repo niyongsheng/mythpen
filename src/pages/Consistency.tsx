@@ -1,7 +1,7 @@
 import { CheckCircle2, Loader, SearchCheck, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { aiApi, chaptersApi, foreshadowsApi, getAIResponseText, extractAIJsonArray } from '@/lib/api'
+import { aiApi, chaptersApi, extractAIJsonArray, foreshadowsApi, getAIResponseText } from '@/lib/api'
 import { useProjectName } from '@/lib/useProjectData'
 
 export function Consistency() {

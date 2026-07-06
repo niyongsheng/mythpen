@@ -2,6 +2,7 @@ import { FlaskConical } from 'lucide-react'
 import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useT } from '@/hooks/useT'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { scienceApi } from '@/lib/api'
 import { useProjectName, useScienceEntries } from '@/lib/useProjectData'
 
@@ -14,6 +15,7 @@ const FILTER_OPTIONS = ['全部', 'known', 'extrapolation', 'hypothesis']
 
 export function Science() {
   const { data: entries, loading, reload } = useScienceEntries()
+  useDataRefresh('science', reload)
   const [filter, setFilter] = useState(FILTER_OPTIONS[0])
   const [showCreate, setShowCreate] = useState(false)
   const { t } = useT()

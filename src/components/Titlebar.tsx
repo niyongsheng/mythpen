@@ -11,17 +11,7 @@ export function Titlebar() {
   const { t } = useT()
 
   return (
-    <div
-      className="flex items-center h-[var(--titlebar-h)] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] px-4 gap-3 select-none shrink-0"
-      data-tauri-drag-region
-    >
-      {/* Traffic dots */}
-      <div className="flex gap-[7px]">
-        <span className="w-[11px] h-[11px] rounded-full bg-[#ff5f57]" />
-        <span className="w-[11px] h-[11px] rounded-full bg-[#febc2e]" />
-        <span className="w-[11px] h-[11px] rounded-full bg-[#2bc840]" />
-      </div>
-
+    <div className="flex items-center h-[var(--titlebar-h)] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] px-4 gap-3 select-none shrink-0">
       {/* Brand */}
       <span
         className="font-display text-[13px] text-[var(--ink-tertiary)] tracking-[0.04em] uppercase ml-1 cursor-pointer"

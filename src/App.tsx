@@ -5,6 +5,9 @@ import { NewProjectDialog } from '@/components/NewProjectDialog'
 import { SettingsDrawer } from '@/components/SettingsDrawer'
 import { Sidebar } from '@/components/Sidebar'
 import { Titlebar } from '@/components/Titlebar'
+import { ToastContainer } from '@/components/ToastContainer'
+import { useToast } from '@/hooks/useToast'
+import { refreshAllData } from '@/lib/dataEvents'
 import { Characters } from '@/pages/Characters'
 import { Consistency } from '@/pages/Consistency'
 import { Dashboard } from '@/pages/Dashboard'
@@ -48,12 +51,27 @@ function App() {
   const loadSettings = useSettingsStore((s) => s.loadFromServer)
   const rightPanelVisible = useUIStore((s) => s.rightPanelVisible)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
+  const { toasts, show: showToast } = useToast()
 
   // Load projects and settings on mount
   useEffect(() => {
     loadProjects()
     loadSettings()
   }, [])
+
+  // Global keyboard shortcut: ⌘⇧R / Ctrl+Shift+R — manual refresh
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'R') {
+        e.preventDefault()
+        refreshAllData(currentProject || undefined).then(() => {
+          showToast('数据已刷新', 'success', 3000)
+        })
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentProject])
 
   // Reload chapters when project changes
   useEffect(() => {
@@ -101,6 +119,7 @@ function App() {
       <BottomStatusbar />
       <NewProjectDialog />
       <SettingsDrawer />
+      <ToastContainer toasts={toasts} />
 
       {/* Global styles for reused patterns */}
       <style>{`
@@ -288,6 +307,13 @@ function App() {
         @keyframes slideIn {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
+        }
+        .animate-spin-once {
+          animation: spin-once 0.5s ease-in-out;
+        }
+        @keyframes spin-once {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </>

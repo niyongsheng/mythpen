@@ -272,89 +272,34 @@ export function SettingsDrawer() {
                 </button>
               </div>
             </SettingRow>
-            <div className="pt-2.5 flex items-center gap-2.5">
-              <button
-                className="h-[30px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-50 flex items-center gap-1.5"
-                onClick={handleTestConnection}
-                disabled={testStatus === 'testing'}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                {testStatus === 'testing' ? t('settings.testing') : t('settings.testConnection')}
-              </button>
+            <div className="pt-2.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2.5">
+                <button
+                  className="h-[30px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-50 flex items-center gap-1.5"
+                  onClick={handleTestConnection}
+                  disabled={testStatus === 'testing'}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  {testStatus === 'testing' ? t('settings.testing') : t('settings.testConnection')}
+                </button>
+                <a
+                  href="https://platform.deepseek.com/api_keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-auto text-[12px] text-[var(--accent-gold)] no-underline hover:underline"
+                >
+                  {t('settings.getApiKey')}
+                </a>
+              </div>
               {testStatus === 'ok' && (
-                <span className="text-[12px] text-[var(--success)]">
+                <span className="text-[12px] text-[var(--success)] pl-1">
                   {t('settings.connectionSuccess', { time: testTime })}
                 </span>
               )}
               {testStatus === 'fail' && (
-                <span className="text-[12px] text-[var(--error)]">{t('settings.connectionFailed')}</span>
+                <span className="text-[12px] text-[var(--error)] pl-1">{t('settings.connectionFailed')}</span>
               )}
             </div>
-          </div>
-
-          {/* ── Conversation Compression ── */}
-          <div className="mb-7">
-            <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
-              <Bot className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.conversationCompression')}
-            </div>
-            <SettingRow label={t('settings.compressionEnabled')} desc={t('settings.compressionEnabledDesc')}>
-              <button
-                className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
-                  ${settings.compressionEnabled ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
-                onClick={() => updateSetting('compressionEnabled', !settings.compressionEnabled)}
-              >
-                <span
-                  className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-[var(--ink)] transition-transform ${settings.compressionEnabled ? 'translate-x-4' : ''}`}
-                />
-              </button>
-            </SettingRow>
-            <SettingRow label={t('settings.contextLength')} desc={t('settings.contextLengthDesc')}>
-              <div className="flex items-center gap-1.5">
-                <input
-                  type="number"
-                  min={64}
-                  max={4096}
-                  className="h-[30px] w-[80px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)]"
-                  value={settings.contextLengthKb}
-                  onChange={(e) => updateSetting('contextLengthKb', parseInt(e.target.value) || 1024)}
-                />
-                <span className="text-[11px] text-[var(--ink-mute)]">KB</span>
-              </div>
-            </SettingRow>
-            <SettingRow
-              label={t('settings.compressionThreshold')}
-              desc={t('settings.compressionThresholdDesc', { percent: settings.compressionThreshold })}
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={20}
-                  max={99}
-                  value={settings.compressionThreshold}
-                  onChange={(e) => updateSetting('compressionThreshold', parseInt(e.target.value))}
-                  className="w-[100px] accent-[var(--accent-gold)]"
-                />
-                <span className="text-[12px] text-[var(--ink)] font-mono w-[36px]">
-                  {settings.compressionThreshold}%
-                </span>
-              </div>
-            </SettingRow>
-            <SettingRow
-              label={t('settings.compressionTarget')}
-              desc={t('settings.compressionTargetDesc', { percent: settings.compressionTarget })}
-            >
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min={10}
-                  max={50}
-                  value={settings.compressionTarget}
-                  onChange={(e) => updateSetting('compressionTarget', parseInt(e.target.value))}
-                  className="w-[100px] accent-[var(--accent-gold)]"
-                />
-                <span className="text-[12px] text-[var(--ink)] font-mono w-[36px]">{settings.compressionTarget}%</span>
-              </div>
-            </SettingRow>
           </div>
 
           {/* ── Project ── */}

@@ -4,8 +4,6 @@ import {
   BarChartHorizontal,
   BookOpenText,
   Check,
-  Clock,
-  CreditCard,
   FolderOpen,
   LayoutDashboard,
   Link2,
@@ -18,7 +16,7 @@ import { useT } from '@/hooks/useT'
 import { useProjectName, useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import type { WorkflowPhase } from '@/types'
+import type { ProjectStats, WorkflowPhase } from '@/types'
 
 const PHASE_ORDER: WorkflowPhase[] = ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export']
 
@@ -84,7 +82,7 @@ export function Dashboard() {
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
   }
 
-  const s = stats || {
+  const s: ProjectStats = stats || {
     totalWords: 0,
     chapterCount: 0,
     acceptedCount: 0,
@@ -97,11 +95,11 @@ export function Dashboard() {
     tokenInput: 0,
     tokenOutput: 0,
     chapters: [],
+    dailyWords: [],
+    targetWords: 0,
   }
 
   const progressPct = s.chapterCount > 0 ? Math.round((s.acceptedCount / s.chapterCount) * 100) : 0
-  const totalTokens = (s.tokenInput || 0) + (s.tokenOutput || 0)
-  const inputRatio = totalTokens > 0 ? (s.tokenInput / totalTokens) * 100 : 86
 
   return (
     <>
@@ -159,18 +157,8 @@ export function Dashboard() {
           <div className="text-[12px] text-[var(--ink-tertiary)] mt-1">共 {s.chapterCount} 章</div>
         </DashCard>
 
-        <DashCard icon={Clock} title={t('pages.cardDuration')}>
-          <div className="font-mono text-[28px] text-[var(--accent-gold)]">
-            {Math.round((s.totalWords || 0) / 500)}h
-          </div>
-          <div className="text-[12px] text-[var(--ink-tertiary)] mt-1">
-            角色 {s.characterCount} · 伏笔 {s.foreshadowCount}
-          </div>
-        </DashCard>
-
         <DashCard icon={Users} title={t('pages.cardCharacters')}>
           <div className="text-lg text-[var(--ink)] mb-1">{s.characterCount || 0} 个角色</div>
-          <div className="text-[12px] text-[var(--ink-tertiary)]">世界观 {s.worldCount || 0} 条</div>
         </DashCard>
 
         <DashCard icon={Link2} title={t('pages.cardForeshadows')}>
@@ -180,27 +168,9 @@ export function Dashboard() {
           <div className="text-[12px] text-[var(--ink-tertiary)]">已回收 {s.resolvedForeshadow || 0} 个</div>
         </DashCard>
 
-        <DashCard icon={FolderOpen} title={t('pages.cardSettings')}>
+        <DashCard icon={FolderOpen} title="设定">
           <div className="text-lg text-[var(--ink)] mb-1">{s.worldCount || 0} 条世界观</div>
           <div className="text-[12px] text-[var(--ink-tertiary)]">{s.sciCount || 0} 条科学设定</div>
-        </DashCard>
-
-        <DashCard icon={CreditCard} title={t('pages.cardTokens')}>
-          <TuRow label="累计输入" value={formatTokens(s.tokenInput)} />
-          <TuRow label="累计输出" value={formatTokens(s.tokenOutput)} />
-          <TuRow label="总计" value={formatTokens(totalTokens)} />
-          {totalTokens > 0 && (
-            <>
-              <div className="h-1 bg-[var(--canvas-mid)] rounded-full mt-2 overflow-hidden flex">
-                <div className="h-full bg-[var(--accent-mist)]" style={{ width: `${inputRatio}%` }} />
-                <div className="h-full bg-[var(--accent-gold)]" style={{ width: `${100 - inputRatio}%` }} />
-              </div>
-              <div className="flex justify-between text-[10px] text-[var(--ink-mute)] mt-1">
-                <span>输入 {formatTokens(s.tokenInput)}</span>
-                <span>输出 {formatTokens(s.tokenOutput)}</span>
-              </div>
-            </>
-          )}
         </DashCard>
 
         <div className="col-span-3 bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-5">
@@ -331,15 +301,6 @@ function DashCard({ icon: Icon, title, children }: { icon?: LucideIcon; title: s
   )
 }
 
-function TuRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between py-1 text-[12px]">
-      <span className="text-[var(--ink-tertiary)]">{label}</span>
-      <span className="font-mono text-[var(--ink)]">{value}</span>
-    </div>
-  )
-}
-
 function ChapterListItem({ num, title, status, words }: { num: number; title: string; status: string; words: string }) {
   const badgeColors: Record<string, string> = {
     accepted: 'var(--success)',
@@ -380,10 +341,4 @@ function ChapterListItem({ num, title, status, words }: { num: number; title: st
       <span style={{ color: 'var(--ink-tertiary)', fontSize: 12 }}>{words}</span>
     </div>
   )
-}
-
-function formatTokens(n: number): string {
-  if (!n) return '0'
-  if (n < 1000) return `${n}`
-  return `${(n / 1000).toFixed(1)}k`
 }

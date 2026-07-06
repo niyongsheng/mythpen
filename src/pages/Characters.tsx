@@ -2,6 +2,7 @@ import { Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useT } from '@/hooks/useT'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { charactersApi } from '@/lib/api'
 import { useCharacters, useProjectName } from '@/lib/useProjectData'
 
@@ -9,6 +10,7 @@ export function Characters() {
   const { t } = useT()
   const project = useProjectName()
   const { data: characters, loading, reload } = useCharacters()
+  useDataRefresh('character', reload)
   const [selected, setSelected] = useState(null)
   const [showCreate, setShowCreate] = useState(false)
 
