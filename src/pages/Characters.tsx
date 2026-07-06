@@ -115,34 +115,34 @@ export function Characters() {
 
               <div className="flex gap-3 mb-4">
                 <FormField label={t('pages.name')} full>
-                  <input type="text" defaultValue={selected.name} className="form-input" readOnly />
+                  <input type="text" value={selected.name} className="form-input" readOnly />
                 </FormField>
                 <FormField label={t('pages.age')}>
-                  <input type="text" defaultValue={selected.age} className="form-input" readOnly />
+                  <input type="text" value={selected.age || ''} className="form-input" readOnly />
                 </FormField>
                 <FormField label={t('pages.gender')}>
-                  <input type="text" defaultValue={selected.gender} className="form-input" readOnly />
+                  <input type="text" value={selected.gender || ''} className="form-input" readOnly />
                 </FormField>
               </div>
               <div className="mb-4">
                 <FormField label={t('pages.appearance')}>
-                  <textarea rows={2} defaultValue={selected.appearance} className="form-textarea" readOnly />
+                  <textarea rows={2} value={selected.appearance || ''} className="form-textarea" readOnly />
                 </FormField>
               </div>
               <div className="flex gap-3 mb-4">
                 <FormField label={t('pages.personality')} full>
-                  <textarea rows={2} defaultValue={selected.personality} className="form-textarea" readOnly />
+                  <textarea rows={2} value={selected.personality || ''} className="form-textarea" readOnly />
                 </FormField>
                 <FormField label={t('pages.background')} full>
-                  <textarea rows={2} defaultValue={selected.background} className="form-textarea" readOnly />
+                  <textarea rows={2} value={selected.background || ''} className="form-textarea" readOnly />
                 </FormField>
               </div>
               <div className="flex gap-3 mb-4">
                 <FormField label={t('pages.motivation')} full>
-                  <textarea rows={2} defaultValue={selected.motivation} className="form-textarea" readOnly />
+                  <textarea rows={2} value={selected.motivation || ''} className="form-textarea" readOnly />
                 </FormField>
                 <FormField label={t('pages.arc')} full>
-                  <textarea rows={2} defaultValue={selected.arc} className="form-textarea" readOnly />
+                  <textarea rows={2} value={selected.arc || ''} className="form-textarea" readOnly />
                 </FormField>
               </div>
             </div>

@@ -197,6 +197,7 @@ export interface AppSettings {
   compressionEnabled: boolean
   compressionThreshold: number
   compressionTarget: number
+  contextLengthKb: number
 }
 
 // ─── Export ───
@@ -215,4 +216,16 @@ export interface ConsistencyIssue {
   title: string
   description: string
   location: string
+}
+
+// ─── Sidebar ───
+export interface SidebarItem {
+  id: string
+  labelKey: string
+  icon: string
+  category: 'universal' | 'genre' | 'optional'
+  genres: string
+  sortOrder: number
+  route: string
+  enabled: boolean
 }

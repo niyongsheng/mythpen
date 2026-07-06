@@ -164,7 +164,7 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          category: { type: 'string', description: '类别，如：地理、历史、科技、文化、政治、魔法体系等' },
+          category: { type: 'string', enum: ['location', 'organization', 'concept', 'event'], description: '类别：location(地点)、organization(组织)、concept(概念)、event(事件)' },
           name: { type: 'string', description: '条目名称' },
           description: { type: 'string', description: '详细描述' },
           tags: { type: 'string', description: '标签，逗号分隔（可选）' },
@@ -551,6 +551,127 @@ const TOOLS = [
       },
     },
   },
+  // ── Chapter Characters ──
+  {
+    type: 'function',
+    function: {
+      name: 'list_chapter_characters',
+      description: '查询指定章节或指定角色的出场记录。可传 chapter_num 按章查询，或传 character_name 按角色查询。',
+      parameters: {
+        type: 'object',
+        properties: {
+          chapter_num: { type: 'number', description: '章节编号（可选，不传则按角色查）' },
+          character_name: { type: 'string', description: '角色姓名（可选，不传则按章节查）' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'set_chapter_character',
+      description: '设置角色在指定章节中的出场角色（appears/speaks/pov/mentioned）。如果已存在则更新角色。',
+      parameters: {
+        type: 'object',
+        properties: {
+          chapter_num: { type: 'number', description: '章节编号' },
+          character_name: { type: 'string', description: '角色姓名' },
+          role: { type: 'string', enum: ['appears', 'speaks', 'pov', 'mentioned'], description: '出场方式' },
+        },
+        required: ['chapter_num', 'character_name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'remove_chapter_character',
+      description: '移除角色在指定章节中的出场记录。',
+      parameters: {
+        type: 'object',
+        properties: {
+          chapter_num: { type: 'number', description: '章节编号' },
+          character_name: { type: 'string', description: '角色姓名' },
+        },
+        required: ['chapter_num', 'character_name'],
+      },
+    },
+  },
+  // ── Clue Board ──
+  {
+    type: 'function',
+    function: {
+      name: 'list_clues',
+      description: '查询线索板所有条目。可传 status 过滤未解决/已解决。',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['all', 'unresolved', 'resolved'], description: '过滤状态（默认 all）' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_clue',
+      description: '在线索板上创建新条目。kind 类型：clue（线索）、red-herring（误导）、deduction（推理结论）、question（待解问题）。',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: '线索标题' },
+          description: { type: 'string', description: '详细描述' },
+          kind: { type: 'string', enum: ['clue', 'red-herring', 'deduction', 'question'], description: '条目类型' },
+          related_chapter_num: { type: 'number', description: '关联章节编号（可选）' },
+        },
+        required: ['title', 'kind'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_clue',
+      description: '更新线索板条目。可修改标题、描述、类型，或标记为已解决/未解决。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '线索ID' },
+          title: { type: 'string', description: '新标题（可选）' },
+          description: { type: 'string', description: '新描述（可选）' },
+          kind: { type: 'string', enum: ['clue', 'red-herring', 'deduction', 'question'], description: '新类型（可选）' },
+          resolved: { type: 'boolean', description: '是否已解决（可选）' },
+        },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_clue',
+      description: '删除线索板条目。此操作不可逆。',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: '线索ID' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_project_phase',
+      description: '推进项目创作阶段。阶段流转：选题(idea) → 设定(setting) → 大纲(outline) → 写作(writing) → 审阅(review) → 一致性(consistency) → 导出(export)。当当前阶段的创作要素讨论完成并写入数据库后，调用此工具推进到下一阶段。',
+      parameters: {
+        type: 'object',
+        properties: {
+          phase: { type: 'string', enum: ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export'], description: '要推进到的目标阶段' },
+        },
+        required: ['phase'],
+      },
+    },
+  },
 ];
 const { v4: uuidv4 } = require('uuid');
 
@@ -598,9 +719,10 @@ function executeTool(projectName, toolName, args) {
         const max = pdb.prepare('SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?').get(volId);
         num = (max?.mx || 0) + 1;
       }
-      pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
+      pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
         .run(volId, num, args.title, args.outline || '', args.content || '',
+          args.content ? String(args.content).replace(/\s/g, '').length : 0,
           args.cognitive_frame || '', args.emotional_anchor || '', args.world_texture || '',
           args.concrete_mystery || '', args.interpersonal_tension || '');
       return { created: true, chapter_num: num, title: args.title };
@@ -625,16 +747,14 @@ function executeTool(projectName, toolName, args) {
       updates.push("updated_at = datetime('now')");
       params.push(chapter_num);
       pdb.prepare(`UPDATE chapters SET ${updates.join(', ')} WHERE num = ?`).run(...params);
-      // Update project word count
-      const total = pdb.prepare('SELECT SUM(word_count) as total FROM chapters').get().total || 0;
-      pdb.prepare("UPDATE project_meta SET value = ? WHERE key = 'word_count'").run(String(total));
-      pdb.prepare("UPDATE project_meta SET value = ? WHERE key = 'updated_at'").run(new Date().toISOString());
+      db.recalculateWordCount(projectName);
       return { updated: true, chapter_num, changed_fields: Object.keys(fields).filter(k => allowed.includes(k)) };
     }
     case 'delete_chapter': {
       const row = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!row) return { error: `章节 ${args.chapter_num} 不存在` };
       pdb.prepare('DELETE FROM chapters WHERE num = ?').run(args.chapter_num);
+      db.recalculateWordCount(projectName);
       return { deleted: true, chapter_num: args.chapter_num };
     }
 
@@ -865,6 +985,104 @@ function executeTool(projectName, toolName, args) {
     // ── Foreshadow delete ──
     case 'delete_foreshadow': {
       return deleteById(args.title, 'foreshadows', 'title', '伏笔');
+    }
+
+    // ── Chapter Characters ──
+    case 'list_chapter_characters': {
+      if (args.chapter_num) {
+        return pdb.prepare(`
+          SELECT cc.chapter_id, c.title as chapter_title, cc.character_id, ch.name as character_name, cc.role
+          FROM chapter_characters cc
+          JOIN chapters c ON c.id = cc.chapter_id
+          JOIN characters ch ON ch.id = cc.character_id
+          WHERE c.num = ?
+          ORDER BY ch.name`).all(args.chapter_num);
+      }
+      if (args.character_name) {
+        return pdb.prepare(`
+          SELECT cc.chapter_id, c.num as chapter_num, c.title as chapter_title, cc.role
+          FROM chapter_characters cc
+          JOIN chapters c ON c.id = cc.chapter_id
+          JOIN characters ch ON ch.id = cc.character_id
+          WHERE ch.name = ?
+          ORDER BY c.num`).all(args.character_name);
+      }
+      // Return all
+      return pdb.prepare(`
+        SELECT cc.chapter_id, c.num as chapter_num, c.title as chapter_title,
+               ch.name as character_name, cc.role
+        FROM chapter_characters cc
+        JOIN chapters c ON c.id = cc.chapter_id
+        JOIN characters ch ON ch.id = cc.character_id
+        ORDER BY c.num, ch.name`).all();
+    }
+    case 'set_chapter_character': {
+      const ch = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
+      if (!ch) return { error: `章节 ${args.chapter_num} 不存在` };
+      const char = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_name);
+      if (!char) return { error: `角色 ${args.character_name} 不存在` };
+      const role = args.role || 'appears';
+      pdb.prepare('INSERT OR REPLACE INTO chapter_characters (chapter_id, character_id, role) VALUES (?, ?, ?)')
+        .run(ch.id, char.id, role);
+      return { set: true, chapter_num: args.chapter_num, character_name: args.character_name, role };
+    }
+    case 'remove_chapter_character': {
+      const ch = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
+      if (!ch) return { error: `章节 ${args.chapter_num} 不存在` };
+      const char = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_name);
+      if (!char) return { error: `角色 ${args.character_name} 不存在` };
+      const info = pdb.prepare('DELETE FROM chapter_characters WHERE chapter_id = ? AND character_id = ?').run(ch.id, char.id);
+      if (info.changes === 0) return { error: `角色 ${args.character_name} 在章节 ${args.chapter_num} 中没有出场记录` };
+      return { deleted: true, chapter_num: args.chapter_num, character_name: args.character_name };
+    }
+
+    // ── Clue Board ──
+    case 'list_clues': {
+      let sql = 'SELECT * FROM clue_board ORDER BY resolved, created_at DESC';
+      if (args.status === 'unresolved') { sql = 'SELECT * FROM clue_board WHERE resolved = 0 ORDER BY created_at DESC'; }
+      if (args.status === 'resolved') { sql = 'SELECT * FROM clue_board WHERE resolved = 1 ORDER BY resolved_at DESC'; }
+      return pdb.prepare(sql).all();
+    }
+    case 'create_clue': {
+      const id = uuidv4();
+      let relatedChapterId = null;
+      if (args.related_chapter_num) {
+        const ch = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.related_chapter_num);
+        if (ch) relatedChapterId = ch.id;
+      }
+      pdb.prepare('INSERT INTO clue_board (id, title, description, kind, related_chapter_id, resolved, created_at) VALUES (?, ?, ?, ?, ?, 0, datetime(\'now\'))')
+        .run(id, args.title, args.description || '', args.kind, relatedChapterId);
+      return { created: true, id, title: args.title, kind: args.kind };
+    }
+    case 'update_clue': {
+      const existing = pdb.prepare('SELECT * FROM clue_board WHERE id = ?').get(args.id);
+      if (!existing) return { error: `线索 ${args.id} 不存在` };
+      const updates = []; const params = [];
+      if (args.title !== undefined) { updates.push('title = ?'); params.push(args.title); }
+      if (args.description !== undefined) { updates.push('description = ?'); params.push(args.description); }
+      if (args.kind !== undefined) { updates.push('kind = ?'); params.push(args.kind); }
+      if (args.resolved !== undefined) {
+        updates.push('resolved = ?');
+        params.push(args.resolved ? 1 : 0);
+        updates.push(args.resolved ? "resolved_at = datetime('now')" : 'resolved_at = NULL');
+      }
+      if (updates.length === 0) return { error: '没有要更新的字段' };
+      params.push(args.id);
+      pdb.prepare(`UPDATE clue_board SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      return { updated: true, id: args.id };
+    }
+    case 'delete_clue': {
+      return deleteById(args.id, 'clue_board', 'id', '线索');
+    }
+
+    // ── Project Phase ──
+    case 'update_project_phase': {
+      const validPhases = ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export'];
+      if (!validPhases.includes(args.phase)) {
+        return { error: `无效阶段: ${args.phase}，有效值: ${validPhases.join('、')}` };
+      }
+      pdb.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('workflow_phase', ?)").run(args.phase);
+      return { updated: true, phase: args.phase };
     }
 
     default:

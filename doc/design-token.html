@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mythpen — Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&family=Instrument+Serif:opsz@8&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── Design Tokens ─── */
+:root {
+  --canvas: #0e0e10;
+  --canvas-soft: #161618;
+  --canvas-card: #1a1a1e;
+  --canvas-elevated: #202024;
+  --canvas-mid: #2a2a30;
+  --canvas-pop: #323238;
+  --hairline: #26262b;
+  --hairline-light: #2e2e35;
+  --ink: #f0eee6;
+  --ink-hover: #faf8f2;
+  --ink-secondary: #c8c6be;
+  --ink-tertiary: #8a8880;
+  --ink-mute: #5e5c56;
+  --accent-gold: #c9a96e;
+  --accent-gold-soft: #e8d5a3;
+  --accent-ember: #d4743c;
+  --accent-mist: #7a8ea8;
+  --success: #4caf7d;
+  --success-soft: #1a3a2a;
+  --warning: #d4a040;
+  --warning-soft: #3a2a10;
+  --error: #c84a4a;
+  --error-soft: #3a1a1a;
+  --info: #6090c0;
+  --info-soft: #1a2a3a;
+  --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, serif;
+  --font-editor: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif;
+  --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+::selection { background: rgba(201, 169, 110, 0.3); color: var(--ink); }
+
+/* ─── Layout ─── */
+.wrapper {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 48px 80px;
+}
+
+/* ─── Header ─── */
+header {
+  margin-bottom: 48px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--hairline);
+}
+header h1 {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-bottom: 6px;
+}
+header .sub {
+  color: var(--ink-tertiary);
+  font-size: 15px;
+  max-width: 600px;
+}
+header .version {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-gold);
+  background: rgba(201, 169, 110, 0.12);
+  padding: 2px 10px;
+  border-radius: 9999px;
+  margin-top: 10px;
+}
+
+/* ─── Sections ─── */
+.section { margin-bottom: 56px; }
+.section-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.section-desc {
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+.subgroup-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  margin-top: 24px;
+}
+
+/* ─── Principles ─── */
+.principles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.principle-card {
+  background: var(--canvas-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  transition: all 0.15s;
+}
+.principle-card:hover { border-color: var(--hairline-light); background: var(--canvas-elevated); }
+.principle-card .num {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  color: var(--accent-gold);
+  opacity: 0.5;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.principle-card h4 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.principle-card p {
+  font-size: 13px;
+  color: var(--ink-tertiary);
+  line-height: 1.6;
+}
+
+/* ─── Color Swatches ─── */
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 10px;
+}
+.swatch {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  background: var(--canvas-card);
+  transition: transform 0.1s;
+}
+.swatch:hover { transform: translateY(-2px); }
+.swatch-color {
+  height: 68px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 6px;
+}
+.swatch-color .hex {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: rgba(255,255,255,0.7);
+  background: rgba(0,0,0,0.4);
+  padding: 1px 5px;
+  border-radius: 4px;
+  backdrop-filter: blur(2px);
+}
+.swatch-info { padding: 8px 10px; }
+.swatch-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+  font-family: var(--font-mono);
+}
+.swatch-role {
+  font-size: 10px;
+  color: var(--ink-mute);
+  margin-top: 1px;
+}
+
+/* ─── Surface Stack ─── */
+.surface-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 520px;
+}
+.surface-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.surface-row .bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
+.surface-row .bar {
+  flex: 1;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline);
+  transition: transform 0.1s;
+}
+.surface-row:hover .bar { transform: scaleY(1.15); }
+.surface-row .s-label {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  min-width: 100px;
+  font-family: var(--font-mono);
+}
+.surface-row .s-val {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  min-width: 65px;
+  text-align: right;
+}
+.surface-row .s-bright {
+  font-size: 10px;
+  color: var(--ink-mute);
+  min-width: 50px;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+/* ─── Typography ─── */
+.type-grid { display: flex; flex-direction: column; gap: 4px; }
+.type-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+.type-item:last-child { border-bottom: none; }
+.type-meta {
+  display: flex;
+  gap: 20px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.type-meta span { white-space: nowrap; }
+.type-token { color: var(--accent-gold); }
+.type-sample { padding: 2px 0; color: var(--ink); }
+
+/* ─── Spacing ─── */
+.spacing-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 500px;
+}
+.spacing-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.spacing-row .sp-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-secondary);
+  min-width: 80px;
+}
+.spacing-row .sp-bar {
+  background: var(--accent-gold);
+  border-radius: 2px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: height 0.1s;
+}
+.spacing-row:hover .sp-bar { height: 18px; }
+.spacing-row .sp-val {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  min-width: 40px;
+}
+
+/* ─── Radius ─── */
+.radius-grid {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.radius-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.radius-box {
+  width: 64px;
+  height: 64px;
+  background: var(--canvas-elevated);
+  border: 1px solid var(--hairline-light);
+  transition: background 0.15s;
+}
+.radius-box:hover { background: var(--canvas-mid); }
+.radius-label {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  text-align: center;
+}
+.radius-sub {
+  font-size: 10px;
+  color: var(--ink-mute);
+}
+
+/* ─── Shadow ─── */
+.shadow-grid {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.shadow-box {
+  width: 130px;
+  height: 80px;
+  background: var(--canvas-card);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  flex-direction: column;
+  gap: 2px;
+  transition: transform 0.15s;
+}
+.shadow-box:hover { transform: translateY(-4px); }
+.shadow-box .lbl { font-size: 12px; color: var(--ink-secondary); }
+
+/* ─── Components ─── */
+.comp-grid { display: flex; flex-direction: column; gap: 20px; }
+.comp-group {
+  background: var(--canvas-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+.comp-group-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-mute);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+.comp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+.comp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.comp-item .clbl {
+  font-size: 10px;
+  color: var(--ink-tertiary);
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+/* ─── Do's & Don'ts ─── */
+.dos-donts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+@media (max-width: 700px) {
+  .dos-donts { grid-template-columns: 1fr; }
+  .wrapper { padding: 24px 20px; }
+}
+.do-card, .dont-card {
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+.do-card {
+  border: 1px solid var(--success-soft);
+  background: rgba(76, 175, 125, 0.05);
+}
+.do-card h4 { color: var(--success); margin-bottom: 8px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.dont-card {
+  border: 1px solid var(--error-soft);
+  background: rgba(200, 74, 74, 0.05);
+}
+.dont-card h4 { color: var(--error); margin-bottom: 8px; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.do-card ul, .dont-card ul { list-style: none; padding: 0; margin: 0; }
+.do-card li, .dont-card li {
+  font-size: 13px;
+  color: var(--ink-secondary);
+  padding: 4px 0;
+  line-height: 1.5;
+}
+.do-card li::before { content: '✓ '; color: var(--success); font-weight: 600; }
+.dont-card li::before { content: '✗ '; color: var(--error); font-weight: 600; }
+
+/* ─── Helpers ─── */
+.btn {
+  height: 34px;
+  padding: 0 20px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+.btn-primary { background: var(--accent-gold); color: var(--canvas); font-weight: 500; }
+.btn-primary:hover { background: var(--accent-gold-soft); }
+.btn-secondary {
+  background: var(--canvas-elevated);
+  color: var(--ink);
+  border: 1px solid var(--hairline-light);
+}
+.btn-secondary:hover { background: var(--canvas-mid); }
+.form-input {
+  width: 100%;
+  height: 36px;
+  background: var(--canvas-card);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+  transition: border 0.15s;
+}
+.form-input::placeholder { color: var(--ink-mute); }
+.form-input:focus {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 2px rgba(201, 169, 110, 0.2);
+}
+.badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  line-height: 16px;
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+}
+.badge-accepted { background: var(--success-soft); color: var(--success); }
+.badge-review { background: var(--warning-soft); color: var(--warning); }
+.badge-writing { background: var(--info-soft); color: var(--info); }
+.badge-pending { background: var(--canvas-pop); color: var(--ink-mute); }
+.badge-count { background: var(--canvas-mid); color: var(--ink-tertiary); }
+.toggle {
+  width: 36px; height: 20px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.off { background: var(--canvas-mid); }
+.toggle.on { background: var(--accent-gold); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--ink);
+  transition: transform 0.2s;
+}
+.toggle.on::after { transform: translateX(16px); }
+.genre-tag {
+  padding: 5px 14px;
+  height: 30px;
+  border-radius: 9999px;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.genre-tag.unselected { background: var(--canvas-mid); color: var(--ink-secondary); }
+.genre-tag.unselected:hover { background: var(--canvas-pop); }
+.genre-tag.selected { background: var(--accent-gold); color: var(--canvas); font-weight: 500; }
+.ai-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  background: var(--accent-gold);
+  animation: blink 0.8s step-end infinite;
+  vertical-align: text-bottom;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* ─── Animations ─── */
+.fade-in {
+  animation: fadeInUp 0.5s ease both;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- ═══ Header ═══ -->
+  <header>
+    <h1>🎨 <span style="font-family:var(--font-display);">mythpen</span> Design System</h1>
+    <div class="sub">Mythpen 设计语言规范 — 面向写作者的 AI 辅助小说创作桌面软件。暗色静谧 + 纸墨质感 + 工程克制。</div>
+    <div class="version">v alpha</div>
+  </header>
+
+  <!-- ═══════════ 设计原则 ═══════════ -->
+  <section class="section fade-in">
+    <h2 class="section-title">📐 设计原则</h2>
+    <p class="section-desc">Mythpen 的四个核心设计原则，贯穿所有组件的决策。</p>
+    <div class="principles">
+      <div class="principle-card">
+        <div class="num">01</div>
+        <h4>暗色静谧</h4>
+        <p>单一深色背景 <code>#0e0e10</code>（"深夜纸张"），通过 2-4% 的亮度差分层而非投影，减少长时间写作的视觉疲劳。</p>
+      </div>
+      <div class="principle-card">
+        <div class="num">02</div>
+        <h4>纸墨质感</h4>
+        <p>编辑器使用衬线字体（宋体/Serif），行高 1.9，最大宽度 720px，模拟纸上书写的舒适体验。</p>
+      </div>
+      <div class="principle-card">
+        <div class="num">03</div>
+        <h4>AI 是协作伙伴</h4>
+        <p>AI 操作有清晰的视觉边界（右侧面板），从不侵入编辑区。流式文字用金色区分。</p>
+      </div>
+      <div class="principle-card">
+        <div class="num">04</div>
+        <h4>质感而非扁平</h4>
+        <p>微妙的深色层次、克制的金色点缀、书卷气的暖色调，让软件有"温度"而非科技感。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 色彩系统 ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">🎨 色彩系统</h2>
+    <p class="section-desc">所有色彩令牌及其用途。文字色为暖调米白 <code>#f0eee6</code>，非纯白，减少长时间阅读的刺激。</p>
+
+    <!-- Brand / Accent -->
+    <div class="subgroup-title">品牌与强调色</div>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="swatch-color" style="background:#ffffff;"><span class="hex">#ffffff</span></div><div class="swatch-info"><div class="swatch-name">primary</div><div class="swatch-role">主文本/按钮文字</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#0a0a0a;"><span class="hex">#0a0a0a</span></div><div class="swatch-info"><div class="swatch-name">on-primary</div><div class="swatch-role">白底按钮文字</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#c9a96e;"><span class="hex">#c9a96e</span></div><div class="swatch-info"><div class="swatch-name">accent-gold</div><div class="swatch-role">✨ 金色强调色 — 光标/选中/指示器</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#e8d5a3;"><span class="hex">#e8d5a3</span></div><div class="swatch-info"><div class="swatch-name">accent-gold-soft</div><div class="swatch-role">AI 流式文本/hover</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#d4743c;"><span class="hex">#d4743c</span></div><div class="swatch-info"><div class="swatch-name">accent-ember</div><div class="swatch-role">暖橙色/图表/数据</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#f0b88a;"><span class="hex">#f0b88a</span></div><div class="swatch-info"><div class="swatch-name">accent-ember-soft</div><div class="swatch-role">暖橙弱化态</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#7a8ea8;"><span class="hex">#7a8ea8</span></div><div class="swatch-info"><div class="swatch-name">accent-mist</div><div class="swatch-role">雾蓝灰/次要信息/注释</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#b0c4d8;"><span class="hex">#b0c4d8</span></div><div class="swatch-info"><div class="swatch-name">accent-mist-soft</div><div class="swatch-role">雾蓝灰弱化</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#6b4e71;"><span class="hex">#6b4e71</span></div><div class="swatch-info"><div class="swatch-name">accent-plum</div><div class="swatch-role">深紫/特殊标签</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#b8a0c0;"><span class="hex">#b8a0c0</span></div><div class="swatch-info"><div class="swatch-name">accent-plum-soft</div><div class="swatch-role">深紫弱化</div></div></div>
+    </div>
+
+    <!-- Surface Stack -->
+    <div class="subgroup-title">表面堆栈（Surface Stack）</div>
+    <p class="section-desc">所有表面在同一个色域内分层，层级差异通过 2-4% 的亮度差体现。</p>
+    <div class="surface-stack">
+      <div class="surface-row"><span class="s-label">canvas</span><div class="bar-wrap"><div class="bar" style="background:#0e0e10;"></div></div><span class="s-val">#0e0e10</span><span class="s-bright">—</span></div>
+      <div class="surface-row"><span class="s-label">canvas-soft</span><div class="bar-wrap"><div class="bar" style="background:#161618;"></div></div><span class="s-val">#161618</span><span class="s-bright">+3%</span></div>
+      <div class="surface-row"><span class="s-label">canvas-card</span><div class="bar-wrap"><div class="bar" style="background:#1a1a1e;"></div></div><span class="s-val">#1a1a1e</span><span class="s-bright">+5%</span></div>
+      <div class="surface-row"><span class="s-label">canvas-elevated</span><div class="bar-wrap"><div class="bar" style="background:#202024;"></div></div><span class="s-val">#202024</span><span class="s-bright">+7%</span></div>
+      <div class="surface-row"><span class="s-label">canvas-mid</span><div class="bar-wrap"><div class="bar" style="background:#2a2a30;"></div></div><span class="s-val">#2a2a30</span><span class="s-bright">+11%</span></div>
+      <div class="surface-row"><span class="s-label">canvas-pop</span><div class="bar-wrap"><div class="bar" style="background:#323238;"></div></div><span class="s-val">#323238</span><span class="s-bright">+14%</span></div>
+    </div>
+
+    <!-- Text Colors -->
+    <div class="subgroup-title">文字色（Ink Hierarchy）</div>
+    <p class="section-desc">非纯白，暖调米白减少长时间阅读刺激。</p>
+    <div class="surface-stack" style="margin-bottom:16px;">
+      <div class="surface-row"><span class="s-label">ink</span><div class="bar-wrap"><div class="bar" style="background:#f0eee6;"></div></div><span class="s-val">#f0eee6</span><span class="s-bright">最高</span></div>
+      <div class="surface-row"><span class="s-label">ink-hover</span><div class="bar-wrap"><div class="bar" style="background:#faf8f2;"></div></div><span class="s-val">#faf8f2</span><span class="s-bright">hover</span></div>
+      <div class="surface-row"><span class="s-label">ink-secondary</span><div class="bar-wrap"><div class="bar" style="background:#c8c6be;"></div></div><span class="s-val">#c8c6be</span><span class="s-bright">中高</span></div>
+      <div class="surface-row"><span class="s-label">ink-tertiary</span><div class="bar-wrap"><div class="bar" style="background:#8a8880;"></div></div><span class="s-val">#8a8880</span><span class="s-bright">中低</span></div>
+      <div class="surface-row"><span class="s-label">ink-mute</span><div class="bar-wrap"><div class="bar" style="background:#5e5c56;"></div></div><span class="s-val">#5e5c56</span><span class="s-bright">低</span></div>
+    </div>
+
+    <!-- Semantic -->
+    <div class="subgroup-title">语义色</div>
+    <div class="swatch-grid">
+      <div class="swatch"><div class="swatch-color" style="background:#4caf7d;"><span class="hex">#4caf7d</span></div><div class="swatch-info"><div class="swatch-name">success</div><div class="swatch-role">事实核查通过/导出成功</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#1a3a2a;"><span class="hex">#1a3a2a</span></div><div class="swatch-info"><div class="swatch-name">success-soft</div><div class="swatch-role">成功态毛玻璃背景</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#d4a040;"><span class="hex">#d4a040</span></div><div class="swatch-info"><div class="swatch-name">warning</div><div class="swatch-role">一致性警告/建议修改</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#3a2a10;"><span class="hex">#3a2a10</span></div><div class="swatch-info"><div class="swatch-name">warning-soft</div><div class="swatch-role">警告态背景</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#c84a4a;"><span class="hex">#c84a4a</span></div><div class="swatch-info"><div class="swatch-name">error</div><div class="swatch-role">事实核查失败/冲突</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#3a1a1a;"><span class="hex">#3a1a1a</span></div><div class="swatch-info"><div class="swatch-name">error-soft</div><div class="swatch-role">错误态背景</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#6090c0;"><span class="hex">#6090c0</span></div><div class="swatch-info"><div class="swatch-name">info</div><div class="swatch-role">AI 工具调用信息/系统消息</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#1a2a3a;"><span class="hex">#1a2a3a</span></div><div class="swatch-info"><div class="swatch-name">info-soft</div><div class="swatch-role">信息态背景</div></div></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 排版 ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">✍️ 排版</h2>
+    <p class="section-desc">双字体体系：衬线体用于创作内容，无衬线体用于界面。所有字号层级以 editor-md（17px）为基准。</p>
+    <div class="type-grid">
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">display-xl</span><span>48px</span><span>600</span><span>1.2</span><span>-0.02em</span></div>
+        <div class="type-sample" style="font-family:'Instrument Serif','Noto Serif SC',Georgia,serif;font-size:48px;font-weight:600;line-height:1.2;letter-spacing:-0.02em;">项目标题 — 觉醒</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">display-lg</span><span>36px</span><span>600</span><span>1.25</span><span>-0.015em</span></div>
+        <div class="type-sample" style="font-family:'Instrument Serif','Noto Serif SC',Georgia,serif;font-size:36px;font-weight:600;line-height:1.25;letter-spacing:-0.015em;">第一章：转机</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">display-md</span><span>28px</span><span>600</span><span>1.3</span><span>-0.01em</span></div>
+        <div class="type-sample" style="font-family:'Instrument Serif','Noto Serif SC',Georgia,serif;font-size:28px;font-weight:600;line-height:1.3;letter-spacing:-0.01em;">新建项目 · 选择创作类型</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">display-sm</span><span>22px</span><span>500</span><span>1.35</span><span>-0.005em</span></div>
+        <div class="type-sample" style="font-family:'Instrument Serif','Noto Serif SC',Georgia,serif;font-size:22px;font-weight:500;line-height:1.35;letter-spacing:-0.005em;">角色管理 · 林晨的设定卡片</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">display-xs</span><span>18px</span><span>500</span><span>1.4</span></div>
+        <div class="type-sample" style="font-family:'Instrument Serif','Noto Serif SC',Georgia,serif;font-size:18px;font-weight:500;line-height:1.4;">小标题 · 面板内分组标题</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">editor-lg</span><span>19px</span><span>400</span><span>1.9</span><span>0.005em</span></div>
+        <div class="type-sample" style="font-family:'Noto Serif SC','Source Han Serif SC','STSong',Georgia,serif;font-size:19px;line-height:1.9;letter-spacing:0.005em;">她推开门的时候，雨已经停了。屋檐还在滴水，一滴一滴落在青石板上。</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">editor-md</span><span>17px</span><span>400</span><span>1.9</span><span>0.01em</span></div>
+        <div class="type-sample" style="font-family:'Noto Serif SC','Source Han Serif SC','STSong',Georgia,serif;font-size:17px;line-height:1.9;letter-spacing:0.01em;">她推开门的时候，雨已经停了。屋檐还在滴水，一滴一滴落在青石板上。</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">body-lg</span><span>16px</span><span>400</span><span>1.75</span></div>
+        <div class="type-sample" style="font-family:'Inter','Noto Sans SC',system-ui,sans-serif;font-size:16px;line-height:1.75;">界面正文 — 侧边栏较长文字、描述段落</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">body-md</span><span>15px</span><span>400</span><span>1.7</span></div>
+        <div class="type-sample" style="font-family:'Inter','Noto Sans SC',system-ui,sans-serif;font-size:15px;line-height:1.7;">默认界面文字 — 表单、面板、按钮</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">body-sm</span><span>13px</span><span>400</span><span>1.6</span></div>
+        <div class="type-sample" style="font-family:'Inter','Noto Sans SC',system-ui,sans-serif;font-size:13px;line-height:1.6;">次要界面文字 — 侧边栏条目、大纲</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">body-xs</span><span>12px</span><span>400</span><span>1.5</span></div>
+        <div class="type-sample" style="font-family:'Inter','Noto Sans SC',system-ui,sans-serif;font-size:12px;line-height:1.5;">标注 · 时间戳 · 小字信息</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">label-md</span><span>13px / 500</span><span>0.04em UPPERCASE</span></div>
+        <div class="type-sample" style="font-family:'Inter',system-ui,sans-serif;font-size:13px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;">区域标签 · 面板标题 · 表单 Label</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">label-sm</span><span>11px / 500</span><span>0.06em UPPERCASE</span></div>
+        <div class="type-sample" style="font-family:'Inter',system-ui,sans-serif;font-size:11px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;">小型标签 · 侧边栏分类标题</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">code-md</span><span>14px</span><span>0.02em</span></div>
+        <div class="type-sample" style="font-family:'JetBrains Mono','SF Mono','Fira Code',monospace;font-size:14px;line-height:1.6;letter-spacing:0.02em;">status: writing · words: 3,240 · token: 12.4k</div>
+      </div>
+      <div class="type-item">
+        <div class="type-meta"><span class="type-token">code-sm</span><span>12px</span><span>0.02em</span></div>
+        <div class="type-sample" style="font-family:'JetBrains Mono','SF Mono',monospace;font-size:12px;line-height:1.5;letter-spacing:0.02em;">L12 C34 · 字数统计</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 间距 ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">📐 间距系统</h2>
+    <p class="section-desc">基础单位 4px。从 <code>xxs (2px)</code> 到 <code>6xl (64px)</code> 共 11 个级别。</p>
+    <div class="spacing-grid">
+      <div class="spacing-row"><span class="sp-label">xxs</span><div class="sp-bar" style="width:2px;"></div><span class="sp-val">2px</span></div>
+      <div class="spacing-row"><span class="sp-label">xs</span><div class="sp-bar" style="width:4px;"></div><span class="sp-val">4px</span></div>
+      <div class="spacing-row"><span class="sp-label">sm</span><div class="sp-bar" style="width:8px;"></div><span class="sp-val">8px</span></div>
+      <div class="spacing-row"><span class="sp-label">md</span><div class="sp-bar" style="width:12px;"></div><span class="sp-val">12px</span></div>
+      <div class="spacing-row"><span class="sp-label">lg</span><div class="sp-bar" style="width:16px;"></div><span class="sp-val">16px</span></div>
+      <div class="spacing-row"><span class="sp-label">xl</span><div class="sp-bar" style="width:20px;"></div><span class="sp-val">20px</span></div>
+      <div class="spacing-row"><span class="sp-label">2xl</span><div class="sp-bar" style="width:24px;"></div><span class="sp-val">24px</span></div>
+      <div class="spacing-row"><span class="sp-label">3xl</span><div class="sp-bar" style="width:32px;"></div><span class="sp-val">32px</span></div>
+      <div class="spacing-row"><span class="sp-label">4xl</span><div class="sp-bar" style="width:40px;"></div><span class="sp-val">40px</span></div>
+      <div class="spacing-row"><span class="sp-label">5xl</span><div class="sp-bar" style="width:48px;"></div><span class="sp-val">48px</span></div>
+      <div class="spacing-row"><span class="sp-label">6xl</span><div class="sp-bar" style="width:64px;"></div><span class="sp-val">64px</span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 圆角 ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">🔲 圆角系统</h2>
+    <p class="section-desc">默认圆角 <code>8px</code>（温和沉稳），Pill 仅用于 Badge 和进度条。</p>
+    <div class="radius-grid">
+      <div class="radius-item"><div class="radius-box" style="border-radius:0;"><span style="font-size:12px;color:var(--ink-mute);">□</span></div><div class="radius-label">none</div><div class="radius-sub">0px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:4px;"></div><div class="radius-label">xs</div><div class="radius-sub">4px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:6px;"></div><div class="radius-label">sm</div><div class="radius-sub">6px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:8px;"></div><div class="radius-label" style="color:var(--accent-gold);">md ✨</div><div class="radius-sub">8px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:12px;"></div><div class="radius-label">lg</div><div class="radius-sub">12px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:16px;"></div><div class="radius-label">xl</div><div class="radius-sub">16px</div></div>
+      <div class="radius-item"><div class="radius-box" style="border-radius:9999px;width:64px;height:40px;margin-top:12px;"></div><div class="radius-label">pill</div><div class="radius-sub">9999px</div></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 阴影 ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">🌓 阴影系统</h2>
+    <p class="section-desc">Mythpen 主要依赖表面堆栈而非阴影表达层次。阴影仅在弹窗/Tooltip 中使用。</p>
+    <div class="shadow-grid">
+      <div class="shadow-box" style="box-shadow:0 1px 2px rgba(0,0,0,0.3);"><span class="lbl">sm</span>0 1px 2px</div>
+      <div class="shadow-box" style="box-shadow:0 2px 8px rgba(0,0,0,0.35);"><span class="lbl">md</span>0 2px 8px</div>
+      <div class="shadow-box" style="box-shadow:0 4px 16px rgba(0,0,0,0.4);"><span class="lbl">lg</span>0 4px 16px</div>
+      <div class="shadow-box" style="box-shadow:0 8px 32px rgba(0,0,0,0.45);"><span class="lbl">xl</span>0 8px 32px</div>
+    </div>
+  </section>
+
+  <!-- ═══════════ 组件展示 ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">🧩 组件展示</h2>
+    <p class="section-desc">核心 UI 组件的视觉规范参考。</p>
+    <div class="comp-grid">
+
+      <!-- Buttons -->
+      <div class="comp-group">
+        <div class="comp-group-title">按钮系统</div>
+        <div class="comp-row">
+          <div class="comp-item"><button class="btn btn-primary">主要操作</button><span class="clbl">primary</span></div>
+          <div class="comp-item"><button class="btn btn-secondary">次要操作</button><span class="clbl">secondary</span></div>
+          <div class="comp-item"><button style="background:none;border:none;color:var(--ink-secondary);border-radius:var(--radius-md);padding:4px 12px;height:28px;font-family:var(--font-sans);font-size:13px;cursor:pointer;transition:all 0.1s;">Ghost</button><span class="clbl">ghost</span></div>
+          <div class="comp-item"><button style="background:none;border:none;color:var(--ink-tertiary);border-radius:var(--radius-sm);width:28px;height:28px;cursor:pointer;font-size:16px;transition:all 0.1s;">⚙</button><span class="clbl">icon</span></div>
+          <div class="comp-item"><button class="btn btn-primary" style="background:var(--accent-gold);color:var(--canvas);font-weight:500;">✨ AI 操作</button><span class="clbl">ai-primary</span></div>
+        </div>
+        <div style="margin-top:16px;">
+          <div class="comp-group-title">尺寸对比</div>
+          <div class="comp-row">
+            <button class="btn btn-primary" style="height:28px;padding:0 12px;font-size:12px;">小尺寸</button>
+            <button class="btn btn-primary" style="height:34px;">默认</button>
+            <button class="btn btn-primary" style="height:40px;padding:0 24px;">大尺寸</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Inputs -->
+      <div class="comp-group">
+        <div class="comp-group-title">输入框</div>
+        <div style="display:flex;flex-direction:column;gap:12px;max-width:400px;">
+          <div><div style="font-size:11px;color:var(--ink-mute);margin-bottom:4px;">默认状态</div><input class="form-input" type="text" placeholder="请输入章节标题..." value="第三章 转机"></div>
+          <div><div style="font-size:11px;color:var(--ink-mute);margin-bottom:4px;">聚焦状态（金色光晕）</div><input class="form-input" type="text" placeholder="聚焦时的金色边框和光晕" style="border-color:var(--accent-gold);box-shadow:0 0 0 2px rgba(201,169,110,0.2);"></div>
+          <div><div style="font-size:11px;color:var(--ink-mute);margin-bottom:4px;">文本域</div><textarea class="form-input" style="height:auto;padding:8px 12px;resize:vertical;min-height:60px;" placeholder="输入多行文本...">量子物理博士，某研究院研究员。
+性格理性、谨慎，有轻微的社交焦虑。</textarea></div>
+          <div><div style="font-size:11px;color:var(--ink-mute);margin-bottom:4px;">禁用状态</div><input class="form-input" type="text" placeholder="不可编辑" disabled style="opacity:0.5;cursor:not-allowed;"></div>
+        </div>
+      </div>
+
+      <!-- Badges -->
+      <div class="comp-group">
+        <div class="comp-group-title">Badge / 标签</div>
+        <div class="comp-row">
+          <span class="badge badge-accepted">✓ 已完成</span>
+          <span class="badge badge-writing">◉ 写作中</span>
+          <span class="badge badge-review">◎ 审阅中</span>
+          <span class="badge badge-pending">待办</span>
+        </div>
+        <div class="comp-row" style="margin-top:10px;">
+          <span class="badge" style="background:var(--success-soft);color:var(--success);">success</span>
+          <span class="badge" style="background:var(--warning-soft);color:var(--warning);">warning</span>
+          <span class="badge" style="background:var(--error-soft);color:var(--error);">error</span>
+          <span class="badge" style="background:var(--info-soft);color:var(--info);">info</span>
+          <span class="badge badge-count">12</span>
+        </div>
+      </div>
+
+      <!-- Cards -->
+      <div class="comp-group">
+        <div class="comp-group-title">卡片</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="background:var(--canvas-card);border:1px solid var(--hairline);border-radius:var(--radius-md);padding:16px;">
+            <div style="font-size:13px;font-weight:500;margin-bottom:4px;">默认卡片</div>
+            <div style="font-size:12px;color:var(--ink-tertiary);">border: 1px solid hairline<br>bg: canvas-card</div>
+          </div>
+          <div style="background:var(--canvas-elevated);border:1px solid var(--hairline-light);border-radius:var(--radius-md);padding:16px;">
+            <div style="font-size:13px;font-weight:500;margin-bottom:4px;">hover / elevated</div>
+            <div style="font-size:12px;color:var(--ink-tertiary);">border: 1px solid hairline-light<br>bg: canvas-elevated</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="comp-group">
+        <div class="comp-group-title">标签页 / Tabs</div>
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--hairline);">
+          <span style="padding:8px 14px;font-size:13px;color:var(--ink);border-bottom:2px solid var(--accent-gold);cursor:pointer;">活跃</span>
+          <span style="padding:8px 14px;font-size:13px;color:var(--ink-tertiary);cursor:pointer;">未选中</span>
+          <span style="padding:8px 14px;font-size:13px;color:var(--ink-tertiary);cursor:pointer;">悬停</span>
+        </div>
+        <div style="font-size:10px;color:var(--ink-mute);margin-top:6px;">活跃标签底部 2px 金色指示条</div>
+      </div>
+
+      <!-- Toggle + Progress -->
+      <div class="comp-group">
+        <div class="comp-group-title">开关 & 进度条</div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div style="display:flex;gap:16px;align-items:center;">
+            <button class="toggle on"></button><span style="font-size:13px;color:var(--ink-secondary);">开启</span>
+            <button class="toggle off"></button><span style="font-size:13px;color:var(--ink-secondary);">关闭</span>
+          </div>
+          <div>
+            <div style="height:3px;background:var(--canvas-mid);border-radius:9999px;overflow:hidden;">
+              <div style="height:100%;width:57%;background:var(--accent-gold);border-radius:9999px;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink-mute);margin-top:4px;">
+              <span>进度 57%</span><span>已完成 4/7 章</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Genre Tags -->
+      <div class="comp-group">
+        <div class="comp-group-title">流派标签 / Genre Tag</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          <button class="genre-tag selected">🎭 科幻</button>
+          <button class="genre-tag unselected">🧙 玄幻</button>
+          <button class="genre-tag selected">💕 言情</button>
+          <button class="genre-tag unselected">🌆 都市</button>
+          <button class="genre-tag unselected">📜 其他</button>
+        </div>
+      </div>
+
+      <!-- Dialog -->
+      <div class="comp-group">
+        <div class="comp-group-title">对话框 / Dialog</div>
+        <div style="display:flex;gap:16px;align-items:center;">
+          <div style="background:var(--canvas-elevated);border:1px solid var(--hairline-light);border-radius:var(--radius-md);box-shadow:0 4px 16px rgba(0,0,0,0.4);padding:12px 16px;min-width:180px;font-size:13px;">
+            <div style="font-weight:500;margin-bottom:4px;">确认删除？</div>
+            <div style="font-size:12px;color:var(--ink-tertiary);margin-bottom:10px;">此操作不可撤销</div>
+            <div style="display:flex;gap:6px;justify-content:flex-end;">
+              <button style="padding:4px 12px;border-radius:6px;border:1px solid var(--hairline-light);background:var(--canvas-elevated);color:var(--ink);font-size:12px;cursor:pointer;">取消</button>
+              <button style="padding:4px 12px;border-radius:6px;border:none;background:var(--error);color:white;font-size:12px;cursor:pointer;">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Streaming Cursor -->
+      <div class="comp-group">
+        <div class="comp-group-title">AI 流式光标</div>
+        <div style="display:flex;align-items:center;gap:8px;font-family:var(--font-editor);font-size:17px;color:var(--accent-gold-soft);">
+          <span>他沉默了很久，久到我以为他不会回答了。</span>
+          <span class="ai-cursor"></span>
+        </div>
+        <div style="font-size:10px;color:var(--ink-mute);margin-top:8px;">闪烁金色竖线 · 动画 0.8s blink</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══════════ Do's & Don'ts ═══════════ -->
+  <section class="section">
+    <h2 class="section-title">✅ Do's & Don'ts</h2>
+    <p class="section-desc">Mythpen 设计中的关键原则和禁忌。</p>
+    <div class="dos-donts">
+      <div class="do-card">
+        <h4>✓ DO</h4>
+        <ul>
+          <li>保持编辑器安静 — 所有 UI 元素在编辑器之外</li>
+          <li>使用暖调白 <code>#f0eee6</code>，纯白只用于 hover 增强</li>
+          <li>利用表面堆栈表达层次（2-4% 亮度差）</li>
+          <li>金色点缀要克制 — 只用在一两个关键地方</li>
+          <li>区分"写作字"（衬线）和"界面字"（无衬线）</li>
+          <li>AI 内容要有视觉标记（金色区分）</li>
+        </ul>
+      </div>
+      <div class="dont-card">
+        <h4>✗ DON'T</h4>
+        <ul>
+          <li>不要在暗色背景上使用纯白文本 — 产生眩光</li>
+          <li>不要用明亮的强调色作为 UI 主色（如蓝色按钮）</li>
+          <li>不要过度使用圆角 — 8px 默认，16px 上限</li>
+          <li>不要添加不必要的动效 — 弹跳和旋转不适合写作工具</li>
+          <li>不要让 AI 面板默认展开</li>
+          <li>不要混合字体混用 — 编辑器只用衬线，界面只用无衬线</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer style="border-top:1px solid var(--hairline);padding-top:16px;margin-top:32px;">
+    <div style="font-size:11px;color:var(--ink-mute);font-family:var(--font-mono);">mythpen design system · alpha · 2025</div>
+  </footer>
+
+</div>
+
+</body>
+</html>

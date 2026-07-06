@@ -10,7 +10,6 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
-doc/
 *.local
 
 # Editor directories and files
@@ -23,8 +22,3 @@ doc/
 *.njsproj
 *.sln
 *.sw?
-
-# Test screenshots
-*test*.png
-*screenshot*.png
-tauri-build-success.png

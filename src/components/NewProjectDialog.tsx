@@ -3,14 +3,14 @@ import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
 
 const GENRES = [
-  { key: 'sci-fi', label: '科幻' },
-  { key: 'fantasy', label: '玄幻' },
-  { key: 'romance', label: '言情' },
-  { key: 'history', label: '历史' },
-  { key: 'urban', label: '都市' },
-  { key: 'power-fantasy', label: '爽文' },
-  { key: 'biography', label: '传记' },
-  { key: 'other', label: '其他' },
+  { key: 'sci-fi', icon: '🎭', label: '科幻' },
+  { key: 'fantasy', icon: '🧙', label: '玄幻' },
+  { key: 'romance', icon: '💕', label: '言情' },
+  { key: 'history', icon: '🏛️', label: '历史' },
+  { key: 'urban', icon: '🌆', label: '都市' },
+  { key: 'power-fantasy', icon: '⚡', label: '爽文' },
+  { key: 'biography', icon: '📖', label: '传记' },
+  { key: 'other', icon: '📜', label: '其他' },
 ]
 
 const MODES = [
@@ -103,7 +103,7 @@ export function NewProjectDialog() {
                 className={selectedGenres.includes(g.key) ? activeBtn : inactiveBtn}
                 onClick={() => toggleGenre(g.key)}
               >
-                {g.label}
+                {g.icon} {g.label}
               </button>
             ))}
           </div>

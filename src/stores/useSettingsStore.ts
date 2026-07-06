@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiKeyAnthropic: '',
   apiKeyOpenai: '',
   apiBaseUrl: 'https://api.deepseek.com/v1',
-  apiModel: 'deepseek-chat',
+  apiModel: 'deepseek-v4-flash',
   apiType: 'openai',
   uiLanguage: 'zh',
   theme: 'dark',
@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   compressionEnabled: true,
   compressionThreshold: 80,
   compressionTarget: 25,
+  contextLengthKb: 1024,
 }
 
 const STORAGE_KEY = 'mythpen-settings'

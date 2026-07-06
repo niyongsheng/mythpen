@@ -266,6 +266,8 @@ function App() {
           border-radius: 9999px;
           padding: 3px 12px;
           height: 28px;
+          min-width: 72px;
+          justify-content: center;
           color: var(--accent-gold);
           font-size: 12px;
           font-weight: 500;

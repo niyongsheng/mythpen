@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  ArrowRight,
   BarChartHorizontal,
   BookOpenText,
   Check,
@@ -11,15 +12,12 @@ import {
   List,
   PenLine,
   Users,
-  ArrowRight,
 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { useStats } from '@/lib/useProjectData'
-import { useProjectName } from '@/lib/useProjectData'
+import { useProjectName, useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import { chaptersApi, charactersApi, worldApi } from '@/lib/api'
-import { useCallback, useEffect, useState } from 'react'
 import type { WorkflowPhase } from '@/types'
 
 const PHASE_ORDER: WorkflowPhase[] = ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export']
@@ -43,6 +41,7 @@ export function Dashboard() {
   const setPhase = useProjectStore((s) => s.setPhase)
   const loadPhase = useProjectStore((s) => s.loadPhase)
   const [advancing, setAdvancing] = useState(false)
+  const [confirmPhase, setConfirmPhase] = useState<string | null>(null)
 
   // Load phase on mount
   useEffect(() => {
@@ -51,54 +50,34 @@ export function Dashboard() {
 
   const currentIdx = PHASE_ORDER.indexOf(workflowPhase)
 
-  const canAdvance = useCallback(async (): Promise<WorkflowPhase | null> => {
-    if (!project) return null
+  const canAdvance = useCallback((): WorkflowPhase | null => {
     const idx = PHASE_ORDER.indexOf(workflowPhase)
     const next = PHASE_ORDER[idx + 1]
-    if (!next) return null
-
-    try {
-      if (workflowPhase === 'setting') {
-        // Auto-detect: has characters or world entries
-        const [chars, worlds] = await Promise.all([charactersApi.list(project), worldApi.list(project)])
-        if (chars.length === 0 && worlds.length === 0) return null
-      }
-      if (workflowPhase === 'outline') {
-        // Auto-detect: all chapters have at least an outline
-        const chapters = await chaptersApi.list(project)
-        if (chapters.length === 0 || chapters.some((ch: any) => !ch.outline)) return null
-      }
-      if (workflowPhase === 'writing') {
-        // Auto-detect: at least one chapter has content
-        const chapters = await chaptersApi.list(project)
-        if (chapters.every((ch: any) => !ch.content || ch.word_count === 0)) return null
-      }
-      if (workflowPhase === 'review') {
-        // Auto-detect: all chapters are accepted
-        const chapters = await chaptersApi.list(project)
-        if (chapters.length === 0 || chapters.some((ch: any) => ch.status !== 'accepted')) return null
-      }
-      if (workflowPhase === 'consistency') {
-        // Auto-detect: basic checks pass (no overdue foreshadows)
-        // For now, allow manual advancement
-      }
-      return next
-    } catch {
-      return null
-    }
-  }, [project, workflowPhase])
+    return next || null
+  }, [workflowPhase])
 
   const handleAdvance = async () => {
     if (!project || advancing) return
     setAdvancing(true)
     try {
-      const next = await canAdvance()
+      const next = canAdvance()
       if (next) {
         await setPhase(project, next)
       }
     } finally {
       setAdvancing(false)
     }
+  }
+
+  const handlePhaseSelect = (phase: string) => {
+    if (!project || phase === workflowPhase) return
+    setConfirmPhase(phase)
+  }
+
+  const handleConfirmPhase = async () => {
+    if (!project || !confirmPhase) return
+    await setPhase(project, confirmPhase as any)
+    setConfirmPhase(null)
   }
 
   if (loading) {
@@ -150,12 +129,13 @@ export function Dashboard() {
               num={PHASE_LABELS[phase].num}
               active={i === currentIdx}
               onAdvance={i === currentIdx && currentIdx < PHASE_ORDER.length - 1 ? handleAdvance : undefined}
+              onSelect={i !== currentIdx ? () => handlePhaseSelect(phase) : undefined}
               advancing={advancing}
             />
             {i < PHASE_ORDER.length - 1 && <PhaseConnector done={i < currentIdx} />}
           </span>
         ))}
-        <div className="ml-auto text-[11px] text-[var(--ink-mute)] font-mono">
+        <div className="ml-auto text-[11px] text-[var(--ink-mute)] font-mono min-w-[140px] text-right">
           共 {s.chapterCount} 章 · {s.acceptedCount} 章已完成
         </div>
       </div>
@@ -240,6 +220,38 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Phase confirm dialog */}
+      {confirmPhase && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
+          onClick={() => setConfirmPhase(null)}
+        >
+          <div
+            className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-xl p-6 w-[360px] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-[16px] font-medium text-[var(--ink)] mb-2">切换项目阶段</h3>
+            <p className="text-[13px] text-[var(--ink-tertiary)] mb-5">
+              将阶段切换到「{t(`pages.${PHASE_LABELS[confirmPhase as keyof typeof PHASE_LABELS]?.key}`)}」？
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer hover:bg-[var(--canvas-mid)]"
+                onClick={() => setConfirmPhase(null)}
+              >
+                取消
+              </button>
+              <button
+                className="h-[32px] px-4 rounded-lg bg-[var(--accent-gold)] text-[var(--canvas)] text-[13px] font-medium cursor-pointer border-none hover:brightness-110"
+                onClick={handleConfirmPhase}
+              >
+                确认切换
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -250,6 +262,7 @@ function PhaseStep({
   num,
   active,
   onAdvance,
+  onSelect,
   advancing,
 }: {
   state: string
@@ -257,12 +270,16 @@ function PhaseStep({
   num: string
   active?: boolean
   onAdvance?: () => void
+  onSelect?: () => void
   advancing?: boolean
 }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 text-[12px] whitespace-nowrap px-2 py-1 rounded-[var(--radius-sm)]
-      ${state === 'active' ? 'text-[var(--ink)] font-medium' : state === 'done' ? 'text-[var(--ink-tertiary)]' : 'text-[var(--ink-mute)]'}`}
+      ${onSelect ? 'cursor-pointer' : ''}
+      ${state === 'active' ? 'text-[var(--ink)] font-medium' : state === 'done' ? 'text-[var(--ink-tertiary)]' : 'text-[var(--ink-mute)]'}
+      hover:bg-[var(--canvas-card)]`}
+      onClick={() => onSelect?.()}
     >
       <span
         className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] shrink-0

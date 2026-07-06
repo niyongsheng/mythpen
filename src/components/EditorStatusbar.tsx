@@ -1,7 +1,7 @@
 import { useT } from '@/hooks/useT'
-import { useChapterStore } from '@/stores/useChapterStore'
-import { useProjectName } from '@/lib/useProjectData'
 import { NEXT_STATUS } from '@/lib/status'
+import { useProjectName } from '@/lib/useProjectData'
+import { useChapterStore } from '@/stores/useChapterStore'
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'var(--pending)',

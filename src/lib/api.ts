@@ -30,6 +30,23 @@ export const projectsApi = {
   getPhase: (name: string) => request(`/${encodeURIComponent(name)}/workflow/phase`),
   setPhase: (name: string, phase: string) =>
     request(`/${encodeURIComponent(name)}/workflow/phase`, { method: 'PUT', body: { phase } }),
+  getSidebarItems: async (name: string) => {
+    const items: any[] = await request(`/${encodeURIComponent(name)}/sidebar-items`)
+    return items.map((item: any) => ({
+      id: item.id,
+      labelKey: item.label_key,
+      icon: item.icon,
+      category: item.category,
+      genres: item.genres,
+      sortOrder: item.sort_order,
+      route: item.route,
+      enabled: !!item.enabled,
+    }))
+  },
+  uploadCover: (name: string, data: string, mime: string) =>
+    request(`/${encodeURIComponent(name)}/cover`, { method: 'POST', body: { data, mime } }),
+  deleteCover: (name: string) => request(`/${encodeURIComponent(name)}/cover`, { method: 'DELETE' }),
+  getCoverUrl: (name: string) => `/api/${encodeURIComponent(name)}/cover`,
 }
 
 // ─── Chapters ───
@@ -88,12 +105,18 @@ export const foreshadowsApi = {
 
 export const relationsApi = {
   list: (project: string) => request(`/${encodeURIComponent(project)}/relations`),
+  create: (project: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/relations`, { method: 'POST', body: data }),
 }
 
 // ─── Memories ───
 
 export const memoriesApi = {
   list: (project: string) => request(`/${encodeURIComponent(project)}/memories`),
+  create: (project: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/memories`, { method: 'POST', body: data }),
+  search: (project: string, query: string) =>
+    request(`/${encodeURIComponent(project)}/memories/search`, { method: 'POST', body: { query } }),
 }
 
 // ─── Timeline ───
@@ -241,4 +264,34 @@ export const chatApi = {
   },
   save: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/chat/messages`, { method: 'POST', body: data }),
+}
+
+// ─── AI Response JSON extraction utilities ───
+// Common pattern across pages: extract JSON array/object from AI chat response text
+export function extractAIJsonArray(text: string | null | undefined): any[] | null {
+  if (!text) return null
+  const m = text.match(/\[[\s\S]*\]/)
+  return m ? tryParseJSON(m[0]) : null
+}
+
+export function extractAIJsonObject(text: string | null | undefined): Record<string, any> | null {
+  if (!text) return null
+  const m = text.match(/\{[\s\S]*\}/)
+  return m ? tryParseJSON(m[0]) : null
+}
+
+function tryParseJSON(s: string): any | null {
+  try {
+    return JSON.parse(s)
+  } catch {
+    return null
+  }
+}
+
+export function getAIResponseText(res: any): string {
+  return res?.choices?.[0]?.message?.content?.trim() || ''
+}
+
+export function getCoverUrl(name: string): string {
+  return `/api/${encodeURIComponent(name)}/cover`
 }

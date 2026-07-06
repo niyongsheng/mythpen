@@ -1,7 +1,7 @@
 import { Check, Loader, Pen, Plus, Save, ScrollText, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { aiApi } from '@/lib/api'
+import { aiApi, getAIResponseText, extractAIJsonObject } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 
@@ -88,23 +88,56 @@ export function Outline() {
           {
             role: 'system',
             content:
-              '你是一个小说大纲生成器。根据用户提供的章节信息，生成一份结构清晰的大纲（200字以内），包含：核心事件、角色发展、关键冲突。直接返回大纲内容，不要前缀说明。',
+              '你是一个小说大纲生成器。根据用户提供的章节信息，生成JSON格式的输出，包含：\n' +
+              '1. title: 章节标题建议（若当前标题为"新章节"或"第一章"之类的占位名则给出有吸引力的标题，否则保留原标题）\n' +
+              '2. outline: 章节大纲（150字以内），包含核心事件、角色发展、关键冲突\n' +
+              '3. cognitive_frame: 角色认知框架的变化（30字以内）\n' +
+              '4. emotional_anchor: 本章的情感锚点（30字以内）\n' +
+              '5. world_texture: 世界质感/场景氛围（30字以内）\n' +
+              '6. concrete_mystery: 具体悬念（30字以内）\n' +
+              '7. interpersonal_tension: 人际张力（30字以内）\n' +
+              '直接返回JSON，不要前缀说明。',
           },
           {
             role: 'user',
-            content: `第${activeChapter.num}章「${activeChapter.title}」\n当前正文预览：${contentPreview}\n\n请为这一章生成大纲。`,
+            content: `第${activeChapter.num}章「${activeChapter.title}」\n当前正文预览：${contentPreview}\n\n请为这一章生成完整的大纲和五维信息。`,
           },
         ],
         currentProject,
       )
-      const generated = res.choices?.[0]?.message?.content?.trim() || ''
-      if (generated) {
-        setOutlineText(generated)
+      const text = getAIResponseText(res)
+      const parsed = extractAIJsonObject(text)
+      if (parsed) {
+        if (parsed.title && activeChapter.title === '新章节') {
+          handleSaveTitle(parsed.title)
+        }
+        if (parsed.outline) setOutlineText(parsed.outline)
+        setDimensions({
+          cognitiveFrame: parsed.cognitive_frame || dimensions.cognitiveFrame,
+          emotionalAnchor: parsed.emotional_anchor || dimensions.emotionalAnchor,
+          worldTexture: parsed.world_texture || dimensions.worldTexture,
+          concreteMystery: parsed.concrete_mystery || dimensions.concreteMystery,
+          interpersonalTension: parsed.interpersonal_tension || dimensions.interpersonalTension,
+        })
+        // Auto-save after generation
+        setTimeout(() => handleSaveOutline(), 100)
+      } else if (text) {
+        setOutlineText(text)
       }
     } catch (e) {
       console.error('Generate outline failed:', e)
     }
     setGenerating(false)
+  }
+
+  const handleSaveTitle = async (title: string) => {
+    if (!currentProject || !activeChapter) return
+    try {
+      await updateChapter(currentProject, activeChapter.num, { title })
+      await loadChapters(currentProject)
+    } catch (e) {
+      console.error('Save title failed:', e)
+    }
   }
 
   const handleAIOptimize = async () => {
@@ -155,7 +188,7 @@ export function Outline() {
         <div className="page-header-actions">
           <button
             className="btn-primary flex items-center gap-1.5"
-            style={{ height: 30, padding: '0 14px' }}
+            style={{ height: 30, padding: '0 14px', minWidth: 110 }}
             onClick={handleGenerateOutline}
             disabled={!activeChapter || generating}
           >
@@ -315,7 +348,7 @@ export function Outline() {
               <div className="flex gap-2 mt-5">
                 <button
                   className="btn-primary flex items-center gap-1.5"
-                  style={{ height: 30, padding: '0 16px' }}
+                  style={{ height: 30, padding: '0 16px', minWidth: 110 }}
                   onClick={handleSaveOutline}
                   disabled={saving}
                 >
@@ -323,7 +356,7 @@ export function Outline() {
                 </button>
                 <button
                   className="btn-secondary flex items-center gap-1.5"
-                  style={{ height: 30, padding: '0 16px' }}
+                  style={{ height: 30, padding: '0 16px', minWidth: 135 }}
                   onClick={handleAIOptimize}
                   disabled={optimizing || !outlineText.trim()}
                 >

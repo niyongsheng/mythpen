@@ -18,39 +18,62 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { projectsApi } from '@/lib/api'
+import { NEXT_STATUS } from '@/lib/status'
 import { useStats } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import { NEXT_STATUS } from '@/lib/status'
+import type { SidebarItem } from '@/types'
 
-interface CreativeItem {
-  page: string
-  icon: LucideIcon
-  labelKey: string
+// Map icon string names from backend to Lucide components
+const ICON_MAP: Record<string, LucideIcon> = {
+  LayoutDashboard,
+  Users,
+  Globe,
+  FlaskConical,
+  ScrollText,
+  Link2,
+  Brain,
+  HeartHandshake,
+  CalendarDays,
+  ShieldCheck,
+  Download,
 }
-
-const CREATIVE_ITEMS: CreativeItem[] = [
-  { page: 'page-dashboard', icon: LayoutDashboard, labelKey: 'sidebar.dashboard' },
-  { page: 'page-characters', icon: Users, labelKey: 'sidebar.characters' },
-  { page: 'page-world', icon: Globe, labelKey: 'sidebar.world' },
-  { page: 'page-science', icon: FlaskConical, labelKey: 'sidebar.science' },
-  { page: 'page-outline', icon: ScrollText, labelKey: 'sidebar.outline_page' },
-  { page: 'page-foreshadow', icon: Link2, labelKey: 'sidebar.foreshadow' },
-  { page: 'page-memory', icon: Brain, labelKey: 'sidebar.memory' },
-  { page: 'page-relations', icon: HeartHandshake, labelKey: 'sidebar.relations' },
-  { page: 'page-timeline', icon: CalendarDays, labelKey: 'sidebar.timeline' },
-  { page: 'page-consistency', icon: ShieldCheck, labelKey: 'sidebar.consistency' },
-  { page: 'page-export', icon: Download, labelKey: 'sidebar.export' },
-]
 
 export function Sidebar() {
   const { volumes, currentChapter, setCurrentChapter, loadChapterContent, createChapter } = useChapterStore()
   const { activePage, setActivePage } = useSidebarStore()
   const currentProject = useProjectStore((s) => s.currentProject)
+  const projectLoading = useProjectStore((s) => s.loading)
   const { data: stats } = useStats()
+  const contextLengthKb = useSettingsStore((s) => s.settings.contextLengthKb || 1024)
   const { t } = useT()
+  const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([])
+
+  // Load sidebar items filtered by project genre
+  const loadSidebarItems = useCallback(async () => {
+    if (!currentProject) {
+      setSidebarItems([])
+      return
+    }
+    try {
+      const items = await projectsApi.getSidebarItems(currentProject)
+      setSidebarItems(items)
+    } catch {
+      setSidebarItems([])
+    }
+  }, [currentProject])
+
+  // Load sidebar items when project is ready; retry once loaded (race guard)
+  useEffect(() => {
+    if (!projectLoading && currentProject && sidebarItems.length === 0) {
+      loadSidebarItems()
+    }
+  }, [projectLoading, currentProject, sidebarItems.length, loadSidebarItems])
 
   const allChapters = volumes.flatMap((v) => v.chapters)
   const hasChapters = allChapters.length > 0
@@ -138,31 +161,34 @@ export function Sidebar() {
 
       <div className="h-px bg-[var(--hairline)] mx-3" />
 
-      {/* Creative Section */}
-      <div className="py-3">
-        <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
-          <PenSquare className="w-3.5 h-3.5" />
-          {t('sidebar.creative')}
+      {/* Creative Section — dynamically loaded by project genre */}
+      {sidebarItems.length > 0 && (
+        <div className="py-3">
+          <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
+            <PenSquare className="w-3.5 h-3.5" />
+            {t('sidebar.creative')}
+          </div>
+          {sidebarItems.map((item) => {
+            const Icon = ICON_MAP[item.icon]
+            if (!Icon || !item.labelKey) return null
+            return (
+              <div
+                key={item.id}
+                className={`flex items-center gap-2 px-4 pl-5 py-1 text-[13px] cursor-pointer transition-colors relative
+                  ${activePage === item.route ? 'text-[var(--ink)] bg-[var(--canvas-card)]' : 'text-[var(--ink-secondary)]'}
+                  hover:bg-[var(--canvas-mid)] hover:text-[var(--ink)]`}
+                onClick={() => setActivePage(item.route)}
+              >
+                {activePage === item.route && (
+                  <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
+                )}
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="flex-1">{t(item.labelKey)}</span>
+              </div>
+            )
+          })}
         </div>
-        {CREATIVE_ITEMS.map((item) => {
-          const Icon = item.icon
-          return (
-            <div
-              key={item.page}
-              className={`flex items-center gap-2 px-4 pl-5 py-1 text-[13px] cursor-pointer transition-colors relative
-                ${activePage === item.page ? 'text-[var(--ink)] bg-[var(--canvas-card)]' : 'text-[var(--ink-secondary)]'}
-                hover:bg-[var(--canvas-mid)] hover:text-[var(--ink)]`}
-              onClick={() => setActivePage(item.page)}
-            >
-              {activePage === item.page && (
-                <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
-              )}
-              <Icon className="w-4 h-4 shrink-0" />
-              <span className="flex-1">{t(item.labelKey)}</span>
-            </div>
-          )
-        })}
-      </div>
+      )}
 
       <div className="h-px bg-[var(--hairline)] mx-3" />
 
@@ -173,15 +199,27 @@ export function Sidebar() {
           {t('sidebar.stats')}
         </div>
         <div className="px-4">
-          {/* Sparkline */}
+          {/* Sparkline — last 7 days */}
           <div className="flex items-end gap-[2px] h-7 my-1 mb-2.5">
-            {[8, 12, 6, 18, 14, 22, 16].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 bg-[var(--accent-gold)] opacity-40 rounded-[1px] min-h-[3px] hover:opacity-80 transition-opacity"
-                style={{ height: `${h}px` }}
-              />
-            ))}
+            {(() => {
+              const dw = stats?.dailyWords || []
+              const mx = Math.max(...dw, 1)
+              return dw.map((v: number, i: number) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-[1px] transition-opacity relative group"
+                  style={{
+                    height: `${Math.max((v / mx) * 28, v > 0 ? 3 : 0)}px`,
+                    background: v > 0 ? 'var(--accent-gold)' : 'var(--canvas-mid)',
+                    opacity: v > 0 ? 0.5 : 0.3,
+                  }}
+                >
+                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--ink-mute)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                    {v.toLocaleString()}
+                  </span>
+                </div>
+              ))
+            })()}
           </div>
           <div className="flex justify-between items-center py-[3px] text-[13px]">
             <span className="text-[12px] text-[var(--ink-mute)]">{t('editor.characters_zh')}</span>
@@ -200,16 +238,18 @@ export function Sidebar() {
             <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">{stats?.chapterCount || 0} 章</span>
           </div>
 
-          {/* Context Budget - calculated from actual content */}
+          {/* Context Budget */}
           <div className="mt-2.5">
             <div className="flex justify-between text-[11px] text-[var(--ink-mute)] mb-1">
               <span>上下文预算</span>
-              <span className="font-mono">{((stats?.totalWords || 0) / 1000).toFixed(1)}k / 128k</span>
+              <span className="font-mono">
+                {((stats?.totalWords || 0) / 1000).toFixed(1)}k / {contextLengthKb}k
+              </span>
             </div>
             <div className="h-2 bg-[var(--canvas-mid)] rounded-full overflow-hidden flex">
               <div
                 className="h-full bg-[var(--accent-gold)]"
-                style={{ width: `${Math.min(((stats?.totalWords || 0) / 128000) * 100, 100)}%` }}
+                style={{ width: `${Math.min(((stats?.totalWords || 0) / (contextLengthKb * 1000)) * 100, 100)}%` }}
               />
             </div>
             <div className="grid grid-cols-2 gap-x-2.5 gap-y-[3px] mt-[7px] text-[10px] text-[var(--ink-tertiary)]">

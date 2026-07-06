@@ -1,7 +1,9 @@
 {
-  "name": "mythpen",
+  "name": "Mythpen",
   "private": true,
   "version": "0.0.0",
+  "author": "Nico",
+  "license": "CC BY-NC-SA 4.0",
   "packageManager": "pnpm@10.10.0",
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -9,6 +11,14 @@
     ]
   },
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niyongsheng/mythpen.git"
+  },
+  "bugs": {
+    "url": "https://github.com/niyongsheng/mythpen/issues"
+  },
+  "homepage": "https://github.com/niyongsheng/mythpen#readme",
   "scripts": {
     "dev": "vite",
     "seed": "node server/seed.js",
@@ -35,6 +45,7 @@
     "@anthropic-ai/sdk": "^0.110.0",
     "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
+    "epub-gen": "^0.1.0",
     "express": "^5.2.1",
     "lucide-react": "^1.23.0",
     "react": "^19.2.7",

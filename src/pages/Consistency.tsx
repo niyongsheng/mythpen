@@ -1,7 +1,7 @@
-import { CheckCircle2, SearchCheck, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, Loader, SearchCheck, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { chaptersApi, foreshadowsApi } from '@/lib/api'
+import { aiApi, chaptersApi, foreshadowsApi, getAIResponseText, extractAIJsonArray } from '@/lib/api'
 import { useProjectName } from '@/lib/useProjectData'
 
 export function Consistency() {
@@ -9,6 +9,7 @@ export function Consistency() {
   const [issues, setIssues] = useState<any[]>([])
   const [stats, setStats] = useState({ passed: 0, conflicts: 0, warnings: 0, sciErrors: 0 })
   const [loading, setLoading] = useState(true)
+  const [deepChecking, setDeepChecking] = useState(false)
   const { t } = useT()
 
   const runCheck = useCallback(async () => {
@@ -28,7 +29,7 @@ export function Consistency() {
             severity: 'warn',
             title: `"${f.title}"预期回收章落后于当前进度`,
             desc: `伏笔埋设于第${f.planted_chapter_id}章，预期第${f.expected_resolve_chapter}章回收，当前已写到第${maxChapterNum}章。`,
-            loc: `伏笔 #${f.id?.slice(0, 8)}`,
+            loc: `伏笔 #${(f.id || '').slice(0, 8)}`,
           })
           warnings++
         }
@@ -48,17 +49,57 @@ export function Consistency() {
       }
 
       setIssues(found)
-      setStats({
-        passed: Math.max(0, chapters?.length - found.length),
-        conflicts,
-        warnings,
-        sciErrors: 0,
-      })
-    } catch (e) {
-      // ignore
-    }
+      setStats({ passed: Math.max(0, chapters?.length - found.length), conflicts, warnings, sciErrors: 0 })
+    } catch (e) {}
     setLoading(false)
   }, [project])
+
+  const handleDeepCheck = async () => {
+    if (!project) return
+    setDeepChecking(true)
+    try {
+      const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project), foreshadowsApi.list(project)])
+
+      const chSummary = (chapters || [])
+        .map((c: any) => `第${c.num}章 "${c.title}" 状态:${c.status} 字数:${c.word_count}`)
+        .join('\n')
+      const fSummary = (foreshadows || [])
+        .map((f: any) => `${f.title} 状态:${f.status} 优先级:${f.priority}`)
+        .join('\n')
+
+      const res = await aiApi.chat(
+        [
+          {
+            role: 'system',
+            content:
+              '你是一个小说创作一致性检查专家。分析以下章节状态和伏笔数据，找出所有一致性问题。' +
+              '检查项包括：伏笔逾期未回收、章节状态异常、伏笔计划不合理等。' +
+              '直接返回JSON数组，每个问题格式：{"tag":"问题分类","severity":"warn|error","title":"标题","desc":"详细描述"}。' +
+              '不要前缀说明。如果无问题返回空数组[]。',
+          },
+          {
+            role: 'user',
+            content: `章节概览：\n${chSummary}\n\n伏笔概览：\n${fSummary}\n\n请进行一致性检查。`,
+          },
+        ],
+        project,
+      )
+      const text = getAIResponseText(res)
+      const aiIssues = extractAIJsonArray(text)
+      if (aiIssues) {
+        setIssues(aiIssues)
+        const statsUpdate = { passed: 0, conflicts: 0, warnings: 0, sciErrors: 0 }
+        for (const i of aiIssues) {
+          if (i.severity === 'error') statsUpdate.conflicts++
+          else statsUpdate.warnings++
+        }
+        setStats(statsUpdate)
+      }
+    } catch (e) {
+      console.error('Deep check failed:', e)
+    }
+    setDeepChecking(false)
+  }
 
   useEffect(() => {
     runCheck()
@@ -79,8 +120,14 @@ export function Consistency() {
           >
             {loading ? '检查中...' : t('pages.quickScan')}
           </button>
-          <button className="btn-primary flex items-center gap-1.5" style={{ height: 30, padding: '0 14px' }}>
-            <SearchCheck className="w-3.5 h-3.5" /> {t('pages.deepCheck')}
+          <button
+            className="btn-primary flex items-center gap-1.5"
+            style={{ height: 30, padding: '0 14px' }}
+            onClick={handleDeepCheck}
+            disabled={deepChecking}
+          >
+            {deepChecking ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <SearchCheck className="w-3.5 h-3.5" />}
+            {deepChecking ? 'AI 分析中...' : t('pages.deepCheck')}
           </button>
         </div>
       </div>
@@ -92,8 +139,10 @@ export function Consistency() {
           <StatCard label="科学错误" value={String(stats.sciErrors)} color="var(--ink-tertiary)" />
         </div>
 
-        {loading ? (
-          <div className="text-center py-10 text-[var(--ink-tertiary)]">分析中...</div>
+        {loading || deepChecking ? (
+          <div className="text-center py-10 text-[var(--ink-tertiary)]">
+            {deepChecking ? 'AI 正在分析项目数据...' : '分析中...'}
+          </div>
         ) : issues.length === 0 ? (
           <div className="text-center py-10 text-[var(--ink-tertiary)]">
             <CheckCircle2 className="w-4 h-4 inline-block mr-1" />
@@ -106,7 +155,7 @@ export function Consistency() {
                 <div className="flex gap-1.5 items-start">
                   <span
                     className={`text-[9px] px-[5px] py-[1px] rounded-full shrink-0 mt-[1px]
-                    ${issue.severity === 'error' ? 'bg-[var(--error-soft)] text-[var(--error)]' : 'bg-[var(--warning-soft)] text-[var(--warning)]'}`}
+                    ${issue.severity === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'}`}
                   >
                     {issue.tag}
                   </span>

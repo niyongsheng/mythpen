@@ -1,4 +1,4 @@
-import { Bot, Eye, EyeOff, Folder, Globe, Palette, Pen, X } from 'lucide-react'
+import { Bot, Eye, EyeOff, Folder, Globe, Palette, Pen, X, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { useEditorStore } from '@/stores/useEditorStore'
@@ -162,7 +162,14 @@ export function SettingsDrawer() {
                 <span className="text-[11px] text-[var(--ink-mute)]">px</span>
               </div>
             </SettingRow>
-            <SettingRow label={t('settings.autoSave')} desc={t('settings.autoSaveDesc')}>
+            <SettingRow
+              label={t('settings.autoSave')}
+              desc={
+                settings.autoSaveInterval > 0
+                  ? t('settings.autoSaveEnabled', { seconds: settings.autoSaveInterval })
+                  : t('settings.autoSaveDisabled')
+              }
+            >
               <button
                 className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
                   ${settings.autoSaveInterval > 0 ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
@@ -218,16 +225,7 @@ export function SettingsDrawer() {
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
               <Bot className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.aiService')}
             </div>
-            <SettingRow label={t('settings.apiBaseUrl')}>
-              <input
-                type="url"
-                className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
-                value={settings.apiBaseUrl}
-                onChange={(e) => updateSetting('apiBaseUrl', e.target.value)}
-                placeholder="https://api.deepseek.com/v1"
-              />
-            </SettingRow>
-            <SettingRow label="接口类型" desc="OpenAI 格式或 Anthropic 格式">
+            <SettingRow label={t('settings.apiType')} desc={t('settings.apiTypeDesc')}>
               <select
                 className="h-[30px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)] w-[120px]"
                 value={settings.apiType}
@@ -237,24 +235,16 @@ export function SettingsDrawer() {
                 <option value="claude">Anthropic</option>
               </select>
             </SettingRow>
-            <SettingRow label="API Key">
-              <div className="flex gap-1 items-center">
-                <input
-                  type={showApiKey ? 'text' : 'password'}
-                  className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[180px]"
-                  value={settings.apiKey}
-                  onChange={(e) => updateSetting('apiKey', e.target.value)}
-                />
-                <button
-                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] border-none bg-none text-[var(--ink-tertiary)] cursor-pointer hover:text-[var(--ink)] transition-colors shrink-0"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  title={showApiKey ? '隐藏' : '显示'}
-                >
-                  {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+            <SettingRow label={t('settings.apiBaseUrl')}>
+              <input
+                type="url"
+                className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
+                value={settings.apiBaseUrl}
+                onChange={(e) => updateSetting('apiBaseUrl', e.target.value)}
+                placeholder="https://api.deepseek.com/v1"
+              />
             </SettingRow>
-            <SettingRow label="模型">
+            <SettingRow label={t('settings.model')}>
               <div className="flex gap-1.5 items-center">
                 <input
                   type="text"
@@ -265,27 +255,49 @@ export function SettingsDrawer() {
                 />
               </div>
             </SettingRow>
+            <SettingRow label={t('settings.apiKey')}>
+              <div className="flex gap-1 items-center">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[180px]"
+                  value={settings.apiKey}
+                  onChange={(e) => updateSetting('apiKey', e.target.value)}
+                />
+                <button
+                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] border-none bg-none text-[var(--ink-tertiary)] cursor-pointer hover:text-[var(--ink)] transition-colors shrink-0"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  title={showApiKey ? t('settings.hideKey') : t('settings.showKey')}
+                >
+                  {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </SettingRow>
             <div className="pt-2.5 flex items-center gap-2.5">
               <button
-                className="h-[30px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-50"
+                className="h-[30px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-50 flex items-center gap-1.5"
                 onClick={handleTestConnection}
                 disabled={testStatus === 'testing'}
               >
-                {testStatus === 'testing' ? '测试中...' : t('settings.testConnection')}
+                <Zap className="w-3.5 h-3.5" />
+                {testStatus === 'testing' ? t('settings.testing') : t('settings.testConnection')}
               </button>
               {testStatus === 'ok' && (
-                <span className="text-[12px] text-[var(--success)]">连接成功 ({testTime}ms)</span>
+                <span className="text-[12px] text-[var(--success)]">
+                  {t('settings.connectionSuccess', { time: testTime })}
+                </span>
               )}
-              {testStatus === 'fail' && <span className="text-[12px] text-[var(--error)]">连接失败</span>}
+              {testStatus === 'fail' && (
+                <span className="text-[12px] text-[var(--error)]">{t('settings.connectionFailed')}</span>
+              )}
             </div>
           </div>
 
           {/* ── Conversation Compression ── */}
           <div className="mb-7">
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
-              <Bot className="w-3.5 h-3.5 inline-block mr-1" /> 对话压缩
+              <Bot className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.conversationCompression')}
             </div>
-            <SettingRow label="自动压缩" desc="占用上下文比例过高时，AI 自动总结旧对话为摘要">
+            <SettingRow label={t('settings.compressionEnabled')} desc={t('settings.compressionEnabledDesc')}>
               <button
                 className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
                   ${settings.compressionEnabled ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
@@ -296,12 +308,28 @@ export function SettingsDrawer() {
                 />
               </button>
             </SettingRow>
-            <SettingRow label="触发阈值" desc={`历史对话占用上下文超过 ${settings.compressionThreshold}% 时触发压缩`}>
+            <SettingRow label={t('settings.contextLength')} desc={t('settings.contextLengthDesc')}>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  min={64}
+                  max={4096}
+                  className="h-[30px] w-[80px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)]"
+                  value={settings.contextLengthKb}
+                  onChange={(e) => updateSetting('contextLengthKb', parseInt(e.target.value) || 1024)}
+                />
+                <span className="text-[11px] text-[var(--ink-mute)]">KB</span>
+              </div>
+            </SettingRow>
+            <SettingRow
+              label={t('settings.compressionThreshold')}
+              desc={t('settings.compressionThresholdDesc', { percent: settings.compressionThreshold })}
+            >
               <div className="flex items-center gap-2">
                 <input
                   type="range"
                   min={20}
-                  max={80}
+                  max={99}
                   value={settings.compressionThreshold}
                   onChange={(e) => updateSetting('compressionThreshold', parseInt(e.target.value))}
                   className="w-[100px] accent-[var(--accent-gold)]"
@@ -311,7 +339,10 @@ export function SettingsDrawer() {
                 </span>
               </div>
             </SettingRow>
-            <SettingRow label="压缩目标" desc={`压缩后历史对话占比降至 ${settings.compressionTarget}%`}>
+            <SettingRow
+              label={t('settings.compressionTarget')}
+              desc={t('settings.compressionTargetDesc', { percent: settings.compressionTarget })}
+            >
               <div className="flex items-center gap-2">
                 <input
                   type="range"

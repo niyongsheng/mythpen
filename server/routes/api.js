@@ -48,7 +48,7 @@ router.get('/projects', (req, res) => {
         genres: genres.map(g => genreLabels[g] || g),
         wordCount, chapterCount: chCount, lastOpened: r.last_opened,
         mode: meta.mode || 'medium-novel',
-        status: r.word_count > 30000 ? '写作中' : r.word_count > 5000 ? '进行中' : '刚起步',
+        status: wordCount > 30000 ? '写作中' : wordCount > 5000 ? '进行中' : '刚起步',
       };
     } catch (e) {
       return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: '未知' };
@@ -109,6 +109,26 @@ router.delete('/projects/:name', (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Sidebar Items (genre-filtered) ───
+router.get('/:project/sidebar-items', (req, res) => {
+  const pdb = db.getProjectDb(req.params.project);
+  try {
+    const genres = pdb.prepare('SELECT genre FROM project_genres').all().map((g) => g.genre);
+    const items = pdb.prepare('SELECT * FROM sidebar_items WHERE enabled = 1 ORDER BY sort_order').all();
+    const filtered = items.filter((item) => {
+      if (item.category === 'universal') return true;
+      if (item.category === 'genre') {
+        const itemGenres = item.genres ? item.genres.split(',').map((s) => s.trim()) : [];
+        return genres.some((g) => itemGenres.includes(g));
+      }
+      return false;
+    });
+    res.json(filtered);
+  } catch (e) {
+    res.status(500).json({ error: { message: e.message } });
+  }
+});
+
 // ═══════════════════════════════════════════
 // CHAPTERS
 // ═══════════════════════════════════════════
@@ -155,12 +175,7 @@ router.put('/:project/chapters/:num', (req, res) => {
 
   const sql = `UPDATE chapters SET ${fields.join(', ')} WHERE num = ?`;
   db.projectExecute(project(req.params.project), sql, params);
-
-  // Update project total word count
-  const totalWc = db.projectGet(project(req.params.project), 'SELECT SUM(word_count) as total FROM chapters').total || 0;
-  const pdb = db.getProjectDb(project(req.params.project));
-  pdb.prepare("UPDATE project_meta SET value = ? WHERE key = 'word_count'").run(String(totalWc));
-  pdb.prepare("UPDATE project_meta SET value = ? WHERE key = 'updated_at'").run(new Date().toISOString());
+  db.recalculateWordCount(project(req.params.project));
 
   const updated = db.projectGet(project(req.params.project),
     'SELECT * FROM chapters WHERE num = ?', [parseInt(num)]
@@ -188,6 +203,7 @@ router.post('/:project/chapters', (req, res) => {
 router.delete('/:project/chapters/:num', (req, res) => {
   const changes = db.projectExecute(project(req.params.project), 'DELETE FROM chapters WHERE num = ?', [parseInt(req.params.num)]);
   if (changes === 0) return res.status(404).json({ error: { message: `章节 ${req.params.num} 不存在` } });
+  db.recalculateWordCount(project(req.params.project));
   res.json({ success: true, deleted_num: parseInt(req.params.num) });
 });
 
@@ -422,6 +438,18 @@ router.delete('/:project/memories/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ─── Memory Search ───
+router.post('/:project/memories/search', (req, res) => {
+  const pn = project(req.params.project);
+  const { query } = req.body || {};
+  if (!query) return res.status(400).json({ error: { message: '缺少搜索关键词' } });
+  const rows = db.projectQuery(pn,
+    "SELECT * FROM memories WHERE content LIKE ? ORDER BY created_at DESC LIMIT 20",
+    [`%${query}%`]
+  );
+  res.json(rows);
+});
+
 // ═══════════════════════════════════════════
 // TIMELINE
 // ═══════════════════════════════════════════
@@ -534,14 +562,29 @@ router.get('/:project/stats', (req, res) => {
   const sciCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM science_entries')?.cnt || 0;
   const tokenUsage = db.projectGet(pn, 'SELECT COALESCE(SUM(input_tokens), 0) as input, COALESCE(SUM(output_tokens), 0) as output FROM token_usage') || { input: 0, output: 0 };
 
+  // Daily word counts for sparkline (last 7 days)
+  const rawDaily = db.projectQuery(pn,
+    "SELECT date(updated_at) as day, SUM(word_count) as words FROM chapters WHERE updated_at >= date('now', '-6 days') GROUP BY date(updated_at) ORDER BY day"
+  );
+  const dailyMap = {};
+  for (const r of rawDaily) dailyMap[r.day] = r.words;
+  const dailyWords = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    dailyWords.push(dailyMap[key] || 0);
+  }
+
   res.json({
     totalWords, chapterCount: chCount, acceptedCount, characterCount: charCount,
     foreshadowCount, resolvedForeshadow, overdueForeshadow, worldCount, sciCount,
     tokenInput: tokenUsage.input || 0, tokenOutput: tokenUsage.output || 0,
     currentChapter: db.projectGet(pn, "SELECT * FROM chapters WHERE status = 'writing' ORDER BY num LIMIT 1"),
     chapters: db.projectQuery(pn, 'SELECT id, num, title, word_count, status FROM chapters ORDER BY num'),
+    dailyWords,
+    });
   });
-});
 
 // ═══════════════════════════════════════════
 // TOKEN USAGE
@@ -553,29 +596,197 @@ router.get('/:project/tokens', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// COVER IMAGE
+// ═══════════════════════════════════════════
+
+router.post('/:project/cover', (req, res) => {
+  const pn = project(req.params.project);
+  const { data, mime } = req.body || {};
+  if (!data) return res.status(400).json({ error: { message: '缺少图片数据' } });
+  const coverDir = db.getCoverDir(pn);
+  if (!fs.existsSync(coverDir)) fs.mkdirSync(coverDir, { recursive: true });
+  const ext = db.MIME_TO_EXT[mime || 'image/png'] || 'png';
+  const coverPath = path.join(coverDir, `cover.${ext}`);
+  fs.writeFileSync(coverPath, Buffer.from(data, 'base64'));
+  db.projectExecute(pn, "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('cover_mime', ?)", [mime || 'image/png']);
+  db.projectExecute(pn, "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('cover_ext', ?)", [ext]);
+  res.json({ success: true, ext, mime: mime || 'image/png' });
+});
+
+router.get('/:project/cover', (req, res) => {
+  const pn = project(req.params.project);
+  const coverPath = db.findCoverPath(pn);
+  if (coverPath) {
+    const ext = path.extname(coverPath).slice(1);
+    res.setHeader('Content-Type', db.EXT_TO_MIME[ext] || 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    return res.end(fs.readFileSync(coverPath));
+  }
+  res.status(404).json({ error: { message: '未上传封面' } });
+});
+
+router.delete('/:project/cover', (req, res) => {
+  const pn = project(req.params.project);
+  const coverPath = db.findCoverPath(pn);
+  if (coverPath) {
+    fs.unlinkSync(coverPath);
+    db.projectExecute(pn, "DELETE FROM project_meta WHERE key IN ('cover_mime', 'cover_ext')");
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: { message: '未上传封面' } });
+  }
+});
+
+// ═══════════════════════════════════════════
 // EXPORT
 // ═══════════════════════════════════════════
 
-router.get('/:project/export', (req, res) => {
+router.get('/:project/export', async (req, res) => {
   const { format = 'txt' } = req.query;
   const pn = project(req.params.project);
-  const chapters = db.projectQuery(pn, "SELECT num, title, content FROM chapters WHERE content != '' ORDER BY num");
+  const chapters = db.projectQuery(pn, "SELECT num, title, content, volume_id FROM chapters WHERE content != '' ORDER BY num");
+  const volumes = db.projectQuery(pn, 'SELECT * FROM volumes ORDER BY sort_order');
   const meta = {};
   db.projectQuery(pn, 'SELECT key, value FROM project_meta').forEach(m => meta[m.key] = m.value);
 
-  let output;
+  const totalWords = chapters.reduce((s, c) => s + (c.content?.replace(/\s/g, '').length || 0), 0);
+  const EXPORT_DIR = path.join(require('os').homedir(), '.mythpen', 'exports', pn);
+  if (!fs.existsSync(EXPORT_DIR)) fs.mkdirSync(EXPORT_DIR, { recursive: true });
+
+  // Find cover image
+  const coverPath = db.findCoverPath(pn);
+  const coverBase64 = coverPath ? fs.readFileSync(coverPath).toString('base64') : null;
+  const coverMime = coverPath ? (db.EXT_TO_MIME[path.extname(coverPath).slice(1)] || 'image/png') : null;
+
   let ext = 'txt';
   let mime = 'text/plain; charset=utf-8';
+  let output;
+  let filename;
 
-  if (format === 'md' || format === 'markdown') {
+  if (format === 'epub') {
+    // ── EPUB with cover ──
+    ext = 'epub';
+    mime = 'application/epub+zip';
+    filename = `${pn}.epub`;
+
+    const EpubGen = require('epub-gen');
+
+    // Build content grouped by volume
+    const volumeMap = new Map();
+    for (const v of volumes) volumeMap.set(v.id, v);
+    const volChapters = new Map();
+    for (const ch of chapters) {
+      const vId = ch.volume_id || 1;
+      if (!volChapters.has(vId)) volChapters.set(vId, []);
+      volChapters.get(vId).push(ch);
+    }
+
+    const content = [];
+
+    for (const [vId, vchs] of volChapters) {
+      const vol = volumeMap.get(vId);
+      if (volumes.length > 1 && vol) {
+        content.push({
+          title: vol.title,
+          data: `<h2>第${vol.sort_order}卷 ${vol.title}</h2>${vol.summary ? `<p>${vol.summary}</p>` : ''}`,
+        });
+      }
+      for (const ch of vchs) {
+        const displayTitle = ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`;
+        content.push({
+          title: ch.title,
+          data: `<h1>${displayTitle}</h1>${ch.content}`,
+        });
+      }
+    }
+
+    const epubPath = path.join(EXPORT_DIR, filename);
+    const epubOptions = {
+      title: meta.name || pn,
+      author: meta.author_name || '佚名',
+      publisher: 'Mythpen',
+      cover: coverPath || undefined,
+      output: epubPath,
+      content,
+    };
+    await new EpubGen(epubOptions).promise;
+
+    if (req.query.download === '1' || req.query.download === 'true') {
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      return res.end(fs.readFileSync(epubPath));
+    }
+    return res.json({ success: true, format: 'epub', filePath: epubPath, wordCount: totalWords, chapterCount: chapters.length, filename });
+
+  } else if (format === 'html') {
+    // ── HTML with cover (for save-as-PDF) ──
+    ext = 'html';
+    mime = 'text/html; charset=utf-8';
+    filename = `${pn}.html`;
+
+    let coverHtml = '';
+    if (coverPath) {
+      coverHtml = `<div class="cover-page"><img src="data:${coverMime};base64,${coverBase64}" alt="封面"></div>`;
+    }
+
+    output = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>${meta.name || pn}</title>
+<style>
+  @page { margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Noto Serif SC', 'Songti SC', serif; color: #333; background: #fff; line-height: 1.8; }
+  .cover-page { page-break-after: always; text-align: center; padding: 20px; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .cover-page img { max-width: 100%; max-height: 90vh; object-fit: contain; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+  .toc-page { page-break-after: always; padding: 40px; }
+  .toc-page h1 { text-align: center; font-size: 24px; margin-bottom: 30px; }
+  .toc-page ul { list-style: none; padding: 0; max-width: 500px; margin: 0 auto; }
+  .toc-page li { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 16px; }
+  .chapter { page-break-after: always; padding: 40px; max-width: 700px; margin: 0 auto; }
+  .chapter h1 { font-size: 22px; text-align: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #333; }
+  .chapter p { text-indent: 2em; margin-bottom: 0.8em; font-size: 16px; }
+  .chapter h1, .chapter h2, .chapter h3, .chapter h4 { text-indent: 0; }
+</style>
+</head>
+<body>
+${coverHtml}
+<div class="toc-page">
+  <h1>${meta.name || pn}</h1>
+  <p style="text-align:center;color:#999;margin-bottom:30px;">${meta.author_name || '佚名'} 著</p>
+  <ul>${chapters.map(ch => `<li>第${ch.num}章 ${ch.title}</li>`).join('')}</ul>
+</div>
+${chapters.map(ch => `<div class="chapter"><h1>第${ch.num}章 ${ch.title}</h1>${ch.content}</div>`).join('')}
+</body>
+</html>`;
+
+    const filePath = path.join(EXPORT_DIR, filename);
+    fs.writeFileSync(filePath, output, 'utf-8');
+
+    if (req.query.download === '1' || req.query.download === 'true') {
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      return res.send(output);
+    }
+    return res.json({ success: true, format: 'html', filePath, wordCount: totalWords, chapterCount: chapters.length, filename });
+
+  } else if (format === 'md' || format === 'markdown') {
     ext = 'md';
     mime = 'text/markdown; charset=utf-8';
+    filename = `${pn}.md`;
     output = `# ${meta.name || pn}\n\n${meta.description ? `> ${meta.description}\n\n` : ''}`;
+    if (coverPath) {
+      output += `<img src="data:${coverMime};base64,${coverBase64}" alt="封面" style="max-width:100%;height:auto;">\n\n`;
+    }
     for (const ch of chapters) {
       output += `\n---\n\n## 第${ch.num}章 ${ch.title}\n\n${ch.content}\n`;
     }
   } else {
     // TXT
+    ext = 'txt';
+    mime = 'text/plain; charset=utf-8';
+    filename = `${pn}.txt`;
     output = `${meta.name || pn}\n${'='.repeat(meta.name?.length || 10)}\n\n`;
     if (meta.description) output += `${meta.description}\n\n`;
     for (const ch of chapters) {
@@ -583,13 +794,9 @@ router.get('/:project/export', (req, res) => {
     }
   }
 
-  const totalWords = chapters.reduce((s, c) => s + (c.content?.replace(/\s/g, '').length || 0), 0);
   output += `\n\n---\n共 ${chapters.length} 章 · ${totalWords} 字\n`;
 
   // Save to exports dir
-  const EXPORT_DIR = path.join(require('os').homedir(), '.mythpen', 'exports', pn);
-  if (!fs.existsSync(EXPORT_DIR)) fs.mkdirSync(EXPORT_DIR, { recursive: true });
-  const filename = `${pn}-第1章.${ext}`;
   const filePath = path.join(EXPORT_DIR, filename);
   fs.writeFileSync(filePath, output, 'utf-8');
 
@@ -601,7 +808,6 @@ router.get('/:project/export', (req, res) => {
     );
   } catch(e) {}
 
-  // If download=1, send the file directly
   if (req.query.download === '1' || req.query.download === 'true') {
     res.setHeader('Content-Type', mime);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
@@ -614,7 +820,7 @@ router.get('/:project/export', (req, res) => {
     filePath,
     wordCount: totalWords,
     chapterCount: chapters.length,
-    preview: output.slice(0, 2000),
+    preview: (output || '').slice(0, 2000),
     filename,
   });
 });

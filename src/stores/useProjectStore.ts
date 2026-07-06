@@ -128,4 +128,4 @@ export const useProjectStore = create<ProjectState>((set) => ({
   },
 }))
 
-export { type ProjectSummary, type ProjectState }
+export type { ProjectState, ProjectSummary }

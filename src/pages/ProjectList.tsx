@@ -1,8 +1,8 @@
+import { Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { ProjectIcon } from '@/components/ProjectIcon'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
-import { Trash2, X } from 'lucide-react'
 
 export function ProjectList() {
   const { projects, setCurrentProject, showProjectList, deleteProject } = useProjectStore()

@@ -4,9 +4,8 @@ import { useT } from '@/hooks/useT'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useEditorStore } from '@/stores/useEditorStore'
 import { useProjectStore } from '@/stores/useProjectStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-
-const AUTOSAVE_DELAY = 1500 // 1.5s debounce after last keystroke
 
 export function EditorContent() {
   const { fontSize, fontFamily } = useEditorStore()
@@ -137,16 +136,18 @@ export function EditorContent() {
     setIsDirty(false)
   }, [updateChapter, setSaveStatus]) // no longer depends on chapter/currentProject
 
-  // Debounced auto-save — uses ref to hold latest doSave
+  // Debounced auto-save — reads autoSaveInterval from settings
   const doSaveRef = useRef(doSave)
   doSaveRef.current = doSave
 
   const scheduleAutosave = useCallback(() => {
+    const interval = useSettingsStore.getState().settings.autoSaveInterval
+    if (!interval || interval <= 0) return // auto-save disabled
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(() => {
       doSaveRef.current()
-    }, AUTOSAVE_DELAY)
-  }, []) // stable — reads doSave through ref
+    }, interval * 1000)
+  }, []) // stable — reads doSave and settings through refs
 
   // Sync editor content from store when chapter changes
   const syncContent = useCallback(() => {

@@ -174,6 +174,19 @@ function migrateProject(db) {
       route       TEXT NOT NULL,
       enabled     INTEGER NOT NULL DEFAULT 1
     );
+    -- Seed default sidebar items
+    INSERT OR IGNORE INTO sidebar_items (id, label_key, icon, category, genres, sort_order, route, enabled) VALUES
+      ('dashboard',    'sidebar.dashboard',    'LayoutDashboard', 'universal', '',  1,  'page-dashboard',    1),
+      ('characters',   'sidebar.characters',   'Users',           'universal', '',  2,  'page-characters',   1),
+      ('world',        'sidebar.world',        'Globe',           'universal', '',  3,  'page-world',        1),
+      ('science',      'sidebar.science',      'FlaskConical',    'genre', 'sci-fi',  4,  'page-science',      1),
+      ('outline_page', 'sidebar.outline_page', 'ScrollText',      'universal', '',  5,  'page-outline',      1),
+      ('foreshadow',   'sidebar.foreshadow',   'Link2',           'universal', '',  6,  'page-foreshadow',   1),
+      ('memory',       'sidebar.memory',       'Brain',           'universal', '',  7,  'page-memory',       1),
+      ('relations',    'sidebar.relations',    'HeartHandshake',  'universal', '',  8,  'page-relations',    1),
+      ('timeline',     'sidebar.timeline',     'CalendarDays',    'universal', '',  9,  'page-timeline',     1),
+      ('consistency',  'sidebar.consistency',  'ShieldCheck',     'universal', '',  10, 'page-consistency',  1),
+      ('export',       'sidebar.export',       'Download',        'universal', '',  11, 'page-export',       1);
     CREATE TABLE IF NOT EXISTS foreshadows (
       id              TEXT PRIMARY KEY,
       title           TEXT NOT NULL,
@@ -232,16 +245,6 @@ function migrateProject(db) {
       resolved        INTEGER NOT NULL DEFAULT 0,
       resolved_at     TEXT,
       created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS setting_history (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      entity_type TEXT NOT NULL,
-      entity_id   TEXT NOT NULL,
-      field_name  TEXT NOT NULL,
-      old_value   TEXT,
-      new_value   TEXT,
-      changed_by  TEXT DEFAULT 'user',
-      changed_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS token_usage (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -339,6 +342,30 @@ function projectTransaction(projectName, fn) {
   return db.transaction(fn)();
 }
 
+// ─── Shared helpers ───
+function recalculateWordCount(projectName) {
+  const total = projectGet(projectName, 'SELECT SUM(word_count) as total FROM chapters')?.total || 0;
+  projectExecute(projectName, "UPDATE project_meta SET value = ? WHERE key = 'word_count'", [String(total)]);
+  projectExecute(projectName, "UPDATE project_meta SET value = ? WHERE key = 'updated_at'", [new Date().toISOString()]);
+}
+
+function getCoverDir(projectName) {
+  return path.join(PROJECTS_DIR, projectName);
+}
+
+function findCoverPath(projectName) {
+  const coverDir = getCoverDir(projectName);
+  const exts = ['png', 'jpg', 'webp', 'gif'];
+  for (const ext of exts) {
+    const p = path.join(coverDir, `cover.${ext}`);
+    if (require('fs').existsSync(p)) return p;
+  }
+  return null;
+}
+
+const MIME_TO_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
+const EXT_TO_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+
 module.exports = {
   getConfigDb,
   getProjectDb,
@@ -352,4 +379,9 @@ module.exports = {
   projectGet,
   projectExecute,
   projectTransaction,
+  recalculateWordCount,
+  getCoverDir,
+  findCoverPath,
+  MIME_TO_EXT,
+  EXT_TO_MIME,
 };
