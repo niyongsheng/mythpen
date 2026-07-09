@@ -560,12 +560,22 @@ router.get('/:project/stats', (req, res) => {
   const overdueForeshadow = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM foreshadows WHERE status = 'planted' AND expected_resolve_chapter < (SELECT COALESCE(MAX(num), 0) FROM chapters)")?.cnt || 0;
   const worldCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM world_entries')?.cnt || 0;
   const sciCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM science_entries')?.cnt || 0;
+  const relCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM character_relations')?.cnt || 0;
+  const memCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM memories')?.cnt || 0;
+  const tlCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM timeline_events')?.cnt || 0;
+  const volCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM volumes')?.cnt || 0;
+  const clueUnresolved = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM clue_board WHERE resolved = 0")?.cnt || 0;
+  const clueResolved = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM clue_board WHERE resolved = 1")?.cnt || 0;
+  const genres = db.projectQuery(pn, 'SELECT genre FROM project_genres').map(g => g.genre);
   const tokenUsage = db.projectGet(pn, 'SELECT COALESCE(SUM(input_tokens), 0) as input, COALESCE(SUM(output_tokens), 0) as output FROM token_usage') || { input: 0, output: 0 };
 
   // Target words from project mode
   const projectMode = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'mode'")?.value || 'medium-novel';
   const TARGET_WORDS = { 'short-story': 30000, 'medium-novel': 100000, 'long-novel': 200000 };
   const targetWords = TARGET_WORDS[projectMode] || 100000;
+
+  // Volume structure summary
+  const volumes = db.projectQuery(pn, 'SELECT id, title, sort_order, (SELECT COUNT(*) FROM chapters WHERE volume_id = volumes.id) as chapter_count, (SELECT COALESCE(SUM(word_count), 0) FROM chapters WHERE volume_id = volumes.id) as word_count FROM volumes ORDER BY sort_order');
 
   // Daily word counts for sparkline (last 7 days)
   const rawDaily = db.projectQuery(pn,
@@ -584,6 +594,10 @@ router.get('/:project/stats', (req, res) => {
   res.json({
     totalWords, chapterCount: chCount, acceptedCount, characterCount: charCount,
     foreshadowCount, resolvedForeshadow, overdueForeshadow, worldCount, sciCount,
+    relationCount: relCount, memoryCount: memCount, timelineCount: tlCount,
+    volumeCount: volCount, volumes,
+    clueUnresolved, clueResolved,
+    genres,
     tokenInput: tokenUsage.input || 0, tokenOutput: tokenUsage.output || 0,
     targetWords,
     currentChapter: db.projectGet(pn, "SELECT * FROM chapters WHERE status = 'writing' ORDER BY num LIMIT 1"),

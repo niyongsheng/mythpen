@@ -3,15 +3,21 @@ import {
   ArrowRight,
   BarChartHorizontal,
   BookOpenText,
+  Brain,
   Check,
+  Clover,
   FolderOpen,
   LayoutDashboard,
-  Link2,
+  Library,
   List,
   PenLine,
+  ScrollText,
+  Swords,
   Users,
+  Waypoints,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { useProjectName, useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -30,9 +36,33 @@ const PHASE_LABELS: Record<WorkflowPhase, { key: string; num: string }> = {
   export: { key: 'phaseExport', num: '7' },
 }
 
+const GENRE_LABELS: Record<string, { label: string; color: string }> = {
+  'sci-fi': { label: '科幻', color: '#5b8af0' },
+  fantasy: { label: '玄幻', color: '#a855f7' },
+  romance: { label: '言情', color: '#ec4899' },
+  history: { label: '历史', color: '#d97706' },
+  urban: { label: '都市', color: '#14b8a6' },
+  'power-fantasy': { label: '爽文', color: '#f97316' },
+  biography: { label: '传记', color: '#6b7280' },
+  other: { label: '其他', color: '#8b8b8b' },
+}
+
+const statusColors: Record<string, string> = {
+  accepted: 'var(--success)',
+  review: 'var(--warning)',
+  writing: 'var(--info)',
+}
+
+const statusBg: Record<string, string> = {
+  accepted: 'var(--success-soft)',
+  review: 'var(--warning-soft)',
+  writing: 'var(--info-soft)',
+}
+
 export function Dashboard() {
   const { setActivePage } = useSidebarStore()
-  const { data: stats, loading } = useStats()
+  const { data: stats, loading, reload: reloadStats } = useStats()
+  useDataRefresh('stats', reloadStats)
   const { t } = useT()
   const project = useProjectName()
   const workflowPhase = useProjectStore((s) => s.workflowPhase)
@@ -41,7 +71,6 @@ export function Dashboard() {
   const [advancing, setAdvancing] = useState(false)
   const [confirmPhase, setConfirmPhase] = useState<string | null>(null)
 
-  // Load phase on mount
   useEffect(() => {
     if (project) loadPhase(project)
   }, [project])
@@ -50,8 +79,7 @@ export function Dashboard() {
 
   const canAdvance = useCallback((): WorkflowPhase | null => {
     const idx = PHASE_ORDER.indexOf(workflowPhase)
-    const next = PHASE_ORDER[idx + 1]
-    return next || null
+    return PHASE_ORDER[idx + 1] || null
   }, [workflowPhase])
 
   const handleAdvance = async () => {
@@ -59,9 +87,7 @@ export function Dashboard() {
     setAdvancing(true)
     try {
       const next = canAdvance()
-      if (next) {
-        await setPhase(project, next)
-      }
+      if (next) await setPhase(project, next)
     } finally {
       setAdvancing(false)
     }
@@ -87,11 +113,19 @@ export function Dashboard() {
     chapterCount: 0,
     acceptedCount: 0,
     characterCount: 0,
+    relationCount: 0,
     foreshadowCount: 0,
     resolvedForeshadow: 0,
     overdueForeshadow: 0,
     worldCount: 0,
     sciCount: 0,
+    memoryCount: 0,
+    timelineCount: 0,
+    volumeCount: 0,
+    volumes: [],
+    clueUnresolved: 0,
+    clueResolved: 0,
+    genres: [],
     tokenInput: 0,
     tokenOutput: 0,
     chapters: [],
@@ -100,6 +134,9 @@ export function Dashboard() {
   }
 
   const progressPct = s.chapterCount > 0 ? Math.round((s.acceptedCount / s.chapterCount) * 100) : 0
+  const wordProgressPct = s.targetWords > 0 ? Math.min((s.totalWords / s.targetWords) * 100, 100) : 0
+  const totalClues = (s.clueUnresolved || 0) + (s.clueResolved || 0)
+  const totalTokens = (s.tokenInput || 0) + (s.tokenOutput || 0)
 
   return (
     <>
@@ -118,7 +155,8 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="flex items-center gap-1 px-6 h-[54px] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] shrink-0 overflow-x-auto">
+      {/* ── Phase Bar ── */}
+      <div className="flex items-center gap-1 px-6 h-[54px] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] shrink-0 overflow-x-auto custom-scrollbar">
         {PHASE_ORDER.map((phase, i) => (
           <span key={phase} className="inline-flex items-center">
             <PhaseStep
@@ -138,7 +176,9 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 p-6 overflow-y-auto flex-1">
+      {/* ── Grid ── */}
+      <div className="grid grid-cols-3 gap-3 p-6 overflow-y-auto flex-1 auto-rows-min custom-scrollbar">
+        {/* ── 写作进度 ── */}
         <DashCard icon={BarChartHorizontal} title={t('pages.cardProgress')}>
           <div className="font-mono text-[28px] text-[var(--accent-gold)]">
             {s.acceptedCount} / {s.chapterCount}
@@ -152,27 +192,173 @@ export function Dashboard() {
           </div>
         </DashCard>
 
+        {/* ── 总字数 ── */}
         <DashCard icon={BookOpenText} title={t('pages.cardTotalWords')}>
           <div className="font-mono text-[28px] text-[var(--accent-gold)]">{s.totalWords?.toLocaleString() || '0'}</div>
-          <div className="text-[12px] text-[var(--ink-tertiary)] mt-1">共 {s.chapterCount} 章</div>
-        </DashCard>
-
-        <DashCard icon={Users} title={t('pages.cardCharacters')}>
-          <div className="text-lg text-[var(--ink)] mb-1">{s.characterCount || 0} 个角色</div>
-        </DashCard>
-
-        <DashCard icon={Link2} title={t('pages.cardForeshadows')}>
-          <div className="text-lg text-[var(--ink)] mb-1">
-            {s.foreshadowCount || 0} 个{s.overdueForeshadow > 0 ? ` · ${s.overdueForeshadow} 个逾期` : ''}
+          <div className="h-1.5 bg-[var(--canvas-mid)] rounded-full my-3 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${wordProgressPct}%`, background: 'var(--info)' }}
+            />
           </div>
-          <div className="text-[12px] text-[var(--ink-tertiary)]">已回收 {s.resolvedForeshadow || 0} 个</div>
+          <div className="flex justify-between text-[12px] text-[var(--ink-tertiary)]">
+            <span>目标 {s.targetWords?.toLocaleString() || '0'} 字</span>
+            <span>{wordProgressPct.toFixed(1)}%</span>
+          </div>
         </DashCard>
 
-        <DashCard icon={FolderOpen} title="设定">
-          <div className="text-lg text-[var(--ink)] mb-1">{s.worldCount || 0} 条世界观</div>
-          <div className="text-[12px] text-[var(--ink-tertiary)]">{s.sciCount || 0} 条科学设定</div>
+        {/* ── 创作类型 ── */}
+        <DashCard icon={Library} title={t('pages.cardGenre')}>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {(s.genres || []).length > 0 ? (
+              s.genres!.map((g) => {
+                const info = GENRE_LABELS[g] || { label: g, color: '#8b8b8b' }
+                return (
+                  <span
+                    key={g}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-medium"
+                    style={{ background: `${info.color}18`, color: info.color, border: `1px solid ${info.color}40` }}
+                  >
+                    {info.label}
+                  </span>
+                )
+              })
+            ) : (
+              <span className="text-[13px] text-[var(--ink-tertiary)]">未设定</span>
+            )}
+          </div>
+          <div className="text-[12px] text-[var(--ink-tertiary)] mt-2.5">
+            共 {s.volumeCount || 0} 卷 · {s.chapterCount} 章
+          </div>
         </DashCard>
 
+        {/* ── 角色与关系 ── */}
+        <DashCard icon={Users} title={t('pages.cardCharRelation')}>
+          <div className="flex items-baseline gap-4 mt-1">
+            <div>
+              <div className="font-mono text-[22px] text-[var(--ink)]">{s.characterCount || 0}</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">角色</div>
+            </div>
+            {(s.relationCount || 0) > 0 && (
+              <>
+                <div className="text-[var(--ink-mute)] text-[20px]">+</div>
+                <div>
+                  <div className="font-mono text-[22px] text-[var(--ink)]">{s.relationCount}</div>
+                  <div className="text-[11px] text-[var(--ink-tertiary)]">关系</div>
+                </div>
+              </>
+            )}
+          </div>
+        </DashCard>
+
+        {/* ── 世界观与设定 ── */}
+        <DashCard icon={FolderOpen} title={t('pages.cardWorldSetting')}>
+          <div className="flex items-baseline gap-4 mt-1">
+            <div>
+              <div className="font-mono text-[22px] text-[var(--ink)]">{s.worldCount || 0}</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">世界观</div>
+            </div>
+            <div>
+              <div className="font-mono text-[22px] text-[var(--ink)]">{s.sciCount || 0}</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">科学设定</div>
+            </div>
+          </div>
+        </DashCard>
+
+        {/* ── 伏笔管理 ── */}
+        <DashCard icon={Swords} title={t('pages.cardForeshadowManage')}>
+          <div className="flex items-baseline gap-4 mt-1">
+            <div>
+              <div className="font-mono text-[22px] text-[var(--ink)]">{s.foreshadowCount || 0}</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">总伏笔</div>
+            </div>
+            <div>
+              <div className="font-mono text-[22px] text-[var(--success)]">{s.resolvedForeshadow || 0}</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">已回收</div>
+            </div>
+            {(s.overdueForeshadow || 0) > 0 && (
+              <div>
+                <div className="font-mono text-[22px] text-[var(--error)]">{s.overdueForeshadow}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">逾期</div>
+              </div>
+            )}
+          </div>
+        </DashCard>
+
+        {/* ── 卷结构 ── */}
+        {(s.volumes || []).length > 0 && (
+          <DashCard icon={ScrollText} title={t('pages.cardVolumes')}>
+            <div className="space-y-1.5 mt-1">
+              {s.volumes!.map((v) => (
+                <div key={v.id} className="flex items-center justify-between text-[12px]">
+                  <span className="text-[var(--ink)] truncate mr-2">{v.title}</span>
+                  <span className="text-[var(--ink-tertiary)] shrink-0 font-mono">
+                    {v.chapter_count} 章 · {(v.word_count || 0).toLocaleString()} 字
+                  </span>
+                </div>
+              ))}
+            </div>
+          </DashCard>
+        )}
+
+        {/* ── 线索板 ── */}
+        {totalClues > 0 && (
+          <DashCard icon={Clover} title={t('pages.cardClueBoard')}>
+            <div className="flex items-baseline gap-4 mt-1">
+              <div>
+                <div className="font-mono text-[22px] text-[var(--warning)]">{s.clueUnresolved || 0}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">待解</div>
+              </div>
+              <div>
+                <div className="font-mono text-[22px] text-[var(--success)]">{s.clueResolved || 0}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">已解</div>
+              </div>
+            </div>
+          </DashCard>
+        )}
+
+        {/* ── 创作记忆与时间线 ── */}
+        <DashCard icon={Waypoints} title={t('pages.cardNarrative')}>
+          <div className="flex items-baseline gap-4 mt-1">
+            {(s.memoryCount || 0) > 0 && (
+              <div>
+                <div className="font-mono text-[22px] text-[var(--ink)]">{s.memoryCount}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">创作记忆</div>
+              </div>
+            )}
+            {(s.timelineCount || 0) > 0 && (
+              <div>
+                <div className="font-mono text-[22px] text-[var(--ink)]">{s.timelineCount}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">时间线事件</div>
+              </div>
+            )}
+            {!s.memoryCount && !s.timelineCount && (
+              <span className="text-[13px] text-[var(--ink-tertiary)]">暂无记录</span>
+            )}
+          </div>
+        </DashCard>
+
+        {/* ── Token 消耗 ── */}
+        {totalTokens > 0 && (
+          <DashCard icon={Brain} title={t('pages.cardAiUsage')}>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
+              <div className="min-w-0">
+                <div className="font-mono text-[16px] text-[var(--ink)]">{fmtTokens(s.tokenInput || 0)}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">输入</div>
+              </div>
+              <div className="min-w-0">
+                <div className="font-mono text-[16px] text-[var(--ink)]">{fmtTokens(s.tokenOutput || 0)}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">输出</div>
+              </div>
+              <div className="min-w-0">
+                <div className="font-mono text-[16px] text-[var(--ink)]">{fmtTokens(totalTokens)}</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">总计</div>
+              </div>
+            </div>
+          </DashCard>
+        )}
+
+        {/* ── 章节列表 (全宽) ── */}
         <div className="col-span-3 bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-5">
           <div className="dash-card-title flex items-center gap-1.5">
             <List className="w-4 h-4" /> {t('pages.cardChapterList')}
@@ -191,7 +377,6 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* Phase confirm dialog */}
       {confirmPhase && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200]"
@@ -224,6 +409,11 @@ export function Dashboard() {
       )}
     </>
   )
+}
+
+function fmtTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
 }
 
 function PhaseStep({
@@ -302,16 +492,8 @@ function DashCard({ icon: Icon, title, children }: { icon?: LucideIcon; title: s
 }
 
 function ChapterListItem({ num, title, status, words }: { num: number; title: string; status: string; words: string }) {
-  const badgeColors: Record<string, string> = {
-    accepted: 'var(--success)',
-    review: 'var(--warning)',
-    writing: 'var(--info)',
-  }
-  const badgeBg: Record<string, string> = {
-    accepted: 'var(--success-soft)',
-    review: 'var(--warning-soft)',
-    writing: 'var(--info-soft)',
-  }
+  const badgeColor = statusColors[status] || 'var(--ink-mute)'
+  const bgColor = statusBg[status] || 'var(--canvas-pop)'
   const statusIcon: Record<string, React.ReactNode> = {
     accepted: <Check className="w-2.5 h-2.5" />,
     review: (
@@ -327,7 +509,7 @@ function ChapterListItem({ num, title, status, words }: { num: number; title: st
     <div className="flex items-center gap-2.5 py-1.5 border-b border-[var(--hairline)] last:border-none text-[13px]">
       <span
         className="text-[10px] font-medium px-[6px] py-[1px] rounded-full flex items-center gap-0.5"
-        style={{ background: badgeBg[status] || 'var(--canvas-pop)', color: badgeColors[status] || 'var(--ink-mute)' }}
+        style={{ background: bgColor, color: badgeColor }}
       >
         {statusIcon[status] || (
           <span

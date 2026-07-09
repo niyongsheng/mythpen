@@ -68,7 +68,7 @@ export function Characters() {
       )}
 
       <div className="flex flex-1 min-h-0">
-        <div className="w-[240px] shrink-0 border-r border-[var(--hairline)] overflow-y-auto py-3">
+        <div className="w-[240px] shrink-0 border-r border-[var(--hairline)] overflow-y-auto py-3 custom-scrollbar">
           {(characters || []).map((c, idx) => (
             <div
               key={c.id}
@@ -106,7 +106,7 @@ export function Characters() {
 
         {selected && (
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            <div className="max-w-[600px]">
+            <div>
               <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 mb-5">
                 <div className="flex gap-5">
                   <div className="text-center">
@@ -120,10 +120,10 @@ export function Characters() {
                 <FormField label={t('pages.name')} full>
                   <input type="text" value={selected.name} className="form-input" readOnly />
                 </FormField>
-                <FormField label={t('pages.age')}>
+                <FormField label={t('pages.age')} full>
                   <input type="text" value={selected.age || ''} className="form-input" readOnly />
                 </FormField>
-                <FormField label={t('pages.gender')}>
+                <FormField label={t('pages.gender')} full>
                   <input type="text" value={selected.gender || ''} className="form-input" readOnly />
                 </FormField>
               </div>

@@ -20,6 +20,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { projectsApi } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
@@ -50,10 +51,21 @@ export function Sidebar() {
   const { activePage, setActivePage } = useSidebarStore()
   const currentProject = useProjectStore((s) => s.currentProject)
   const projectLoading = useProjectStore((s) => s.loading)
-  const { data: stats } = useStats()
+  const { data: stats, reload: reloadStats } = useStats()
+  useDataRefresh('stats', reloadStats)
   const { t } = useT()
   const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([])
   const [spinKey, setSpinKey] = useState(0)
+  const [collapsedVols, setCollapsedVols] = useState<Set<number>>(new Set())
+
+  const toggleVolume = (volId: number) => {
+    setCollapsedVols((prev) => {
+      const next = new Set(prev)
+      if (next.has(volId)) next.delete(volId)
+      else next.add(volId)
+      return next
+    })
+  }
 
   // Load sidebar items filtered by project genre
   const loadSidebarItems = useCallback(async () => {
@@ -88,221 +100,226 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-[var(--sidebar-w)] bg-[var(--canvas-soft)] border-r border-[var(--hairline)] shrink-0 flex flex-col overflow-y-auto custom-scrollbar">
-      {/* Outline Section */}
-      <div className="py-3">
-        <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
-          <BookOpen className="w-3.5 h-3.5" />
-          {t('sidebar.outline')}
-          <button
-            className="ml-auto flex items-center gap-1 px-1.5 py-[2px] rounded text-[var(--ink-mute)] cursor-pointer border-none bg-transparent hover:text-[var(--accent-gold)] hover:bg-[var(--accent-gold-soft-bg)] transition-colors"
-            onClick={handleRefresh}
-            title="手动刷新所有数据（快捷键 ⌘⇧R）"
-          >
-            <RefreshCw key={spinKey} className="w-3 h-3 animate-spin-once" />
-          </button>
-        </div>
-
-        {volumes.map((vol) => (
-          <div key={vol.id}>
-            <div
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--ink)] text-lg font-display font-medium cursor-pointer"
-              onClick={() => setActivePage('page-writing')}
-            >
-              <span className="text-[10px] text-[var(--ink-mute)]">▼</span>
-              {vol.title.startsWith('第') && vol.title.endsWith('卷')
-                ? vol.title
-                : `第${vol.sortOrder}卷 · ${vol.title}`}
-            </div>
-            {vol.chapters.map((ch) => (
-              <div
-                key={ch.id}
-                className={`flex items-center gap-1.5 px-4 pl-5 py-1 text-[13px] cursor-pointer relative transition-colors
-                  ${currentChapter?.id === ch.id && activePage === 'page-writing' ? 'text-[var(--ink)] bg-[var(--canvas-elevated)]' : 'text-[var(--ink-secondary)]'}
-                  hover:bg-[var(--canvas-card)]`}
-                onClick={() => {
-                  setActivePage('page-writing')
-                  setCurrentChapter(ch)
-                  if (currentProject) loadChapterContent(currentProject, ch.num).catch(() => {})
-                }}
-              >
-                {currentChapter?.id === ch.id && activePage === 'page-writing' && (
-                  <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
-                )}
-                <FileText className="w-3.5 h-3.5 shrink-0" />
-                <span className="flex-1 truncate">
-                  {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
-                </span>
-                <StatusBadge
-                  status={ch.status}
-                  t={t}
-                  onCycle={() => {
-                    const next = NEXT_STATUS[ch.status] || 'writing'
-                    useChapterStore
-                      .getState()
-                      .updateChapter(currentProject!, ch.num, { status: next })
-                      .catch(() => {})
-                    // Update local state immediately for UI responsiveness
-                    ch.status = next
-                    useChapterStore
-                      .getState()
-                      .loadChapters(currentProject!)
-                      .catch(() => {})
-                  }}
-                />
-              </div>
-            ))}
-            {/* Per-volume new chapter button */}
-            <div
-              className="flex items-center gap-1.5 px-4 pl-5 py-1 text-[13px] text-[var(--accent-gold)] cursor-pointer transition-colors hover:bg-[var(--canvas-card)]"
-              onClick={() => handleNewChapter(vol.id)}
-            >
-              <Plus className="w-3.5 h-3.5 shrink-0" />
-              <span className="flex-1">{t('editor.newChapter')}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="h-px bg-[var(--hairline)] mx-3" />
-
-      {/* Creative Section — dynamically loaded by project genre */}
-      {sidebarItems.length > 0 && (
+    <aside className="w-[var(--sidebar-w)] bg-[var(--canvas-soft)] border-r border-[var(--hairline)] shrink-0 flex flex-col">
+      {/* Scrollable top section */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
+        {/* Outline Section */}
         <div className="py-3">
           <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
-            <PenSquare className="w-3.5 h-3.5" />
-            {t('sidebar.creative')}
+            <BookOpen className="w-3.5 h-3.5" />
+            {t('sidebar.outline')}
+            <button
+              className="ml-auto flex items-center gap-1 px-1.5 py-[2px] rounded text-[var(--ink-mute)] cursor-pointer border-none bg-transparent hover:text-[var(--accent-gold)] hover:bg-[var(--accent-gold-soft-bg)] transition-colors"
+              onClick={handleRefresh}
+              title="手动刷新所有数据（快捷键 ⌘⇧R）"
+            >
+              <RefreshCw key={spinKey} className="w-3 h-3 animate-spin-once" />
+            </button>
           </div>
-          {sidebarItems.map((item) => {
-            const Icon = ICON_MAP[item.icon]
-            if (!Icon || !item.labelKey) return null
-            return (
+
+          {volumes.map((vol) => (
+            <div key={vol.id}>
               <div
-                key={item.id}
-                className={`flex items-center gap-2 px-4 pl-5 py-1 text-[13px] cursor-pointer transition-colors relative
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[var(--ink)] text-lg font-display font-medium cursor-pointer select-none"
+                onClick={() => toggleVolume(vol.id)}
+              >
+                <span
+                  className={`text-[10px] text-[var(--ink-mute)] transition-transform duration-200 ${collapsedVols.has(vol.id) ? '-rotate-90' : ''}`}
+                >
+                  ▼
+                </span>
+                <span
+                  className="flex-1"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setActivePage('page-writing')
+                  }}
+                >
+                  {vol.title.startsWith('第') && vol.title.endsWith('卷')
+                    ? vol.title
+                    : `第${vol.sortOrder}卷 · ${vol.title}`}
+                </span>
+              </div>
+              {!collapsedVols.has(vol.id) &&
+                vol.chapters.map((ch) => (
+                  <div
+                    key={ch.id}
+                    className={`flex items-center gap-1.5 px-4 pl-5 py-1 text-[13px] cursor-pointer relative transition-colors
+                  ${currentChapter?.id === ch.id && activePage === 'page-writing' ? 'text-[var(--ink)] bg-[var(--canvas-elevated)]' : 'text-[var(--ink-secondary)]'}
+                  hover:bg-[var(--canvas-card)]`}
+                    onClick={() => {
+                      setActivePage('page-writing')
+                      setCurrentChapter(ch)
+                      if (currentProject) loadChapterContent(currentProject, ch.num).catch(() => {})
+                    }}
+                  >
+                    {currentChapter?.id === ch.id && activePage === 'page-writing' && (
+                      <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
+                    )}
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span className="flex-1 truncate">
+                      {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
+                    </span>
+                    <StatusBadge
+                      status={ch.status}
+                      t={t}
+                      onCycle={() => {
+                        const next = NEXT_STATUS[ch.status] || 'writing'
+                        useChapterStore
+                          .getState()
+                          .updateChapter(currentProject!, ch.num, { status: next })
+                          .catch(() => {})
+                        // Update local state immediately for UI responsiveness
+                        ch.status = next
+                        useChapterStore
+                          .getState()
+                          .loadChapters(currentProject!)
+                          .catch(() => {})
+                      }}
+                    />
+                  </div>
+                ))}
+              {/* Per-volume new chapter button */}
+              <div
+                className="flex items-center gap-1.5 px-4 pl-5 py-1 text-[13px] text-[var(--accent-gold)] cursor-pointer transition-colors hover:bg-[var(--canvas-card)]"
+                onClick={() => handleNewChapter(vol.id)}
+              >
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                <span className="flex-1">{t('editor.newChapter')}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="h-px bg-[var(--hairline)] mx-3" />
+
+        {/* Creative Section — dynamically loaded by project genre */}
+        {sidebarItems.length > 0 && (
+          <div className="py-3">
+            <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
+              <PenSquare className="w-3.5 h-3.5" />
+              {t('sidebar.creative')}
+            </div>
+            {sidebarItems.map((item) => {
+              const Icon = ICON_MAP[item.icon]
+              if (!Icon || !item.labelKey) return null
+              return (
+                <div
+                  key={item.id}
+                  className={`flex items-center gap-2 px-4 pl-5 py-1 text-[13px] cursor-pointer transition-colors relative
                   ${activePage === item.route ? 'text-[var(--ink)] bg-[var(--canvas-card)]' : 'text-[var(--ink-secondary)]'}
                   hover:bg-[var(--canvas-mid)] hover:text-[var(--ink)]`}
-                onClick={() => setActivePage(item.route)}
-              >
-                {activePage === item.route && (
-                  <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
-                )}
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className="flex-1">{t(item.labelKey)}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <div className="h-px bg-[var(--hairline)] mx-3" />
-
-      {/* Writing Stats */}
-      <div className="py-3">
-        <div className="px-4 pb-2 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase flex items-center gap-1.5">
-          <BarChart3 className="w-3.5 h-3.5" />
-          {t('sidebar.stats')}
-        </div>
-        <div className="px-4">
-          {/* Completion progress */}
-          {stats?.targetWords &&
-            stats.targetWords > 0 &&
-            (() => {
-              const pct = Math.min((stats.totalWords / stats.targetWords) * 100, 100)
-              const remaining = Math.max(stats.targetWords - stats.totalWords, 0)
-              const color = pct >= 75 ? 'var(--success)' : pct >= 40 ? 'var(--accent-gold)' : 'var(--ink-mute)'
-              return (
-                <div className="mb-3 pb-3 border-b border-[var(--hairline-light)]">
-                  <div className="flex items-center gap-2.5">
-                    <svg width="36" height="36" viewBox="0 0 36 36" className="shrink-0">
-                      <circle cx="18" cy="18" r="14" fill="none" stroke="var(--canvas-mid)" strokeWidth="3" />
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="14"
-                        fill="none"
-                        stroke={color}
-                        strokeWidth="3"
-                        strokeDasharray={2 * Math.PI * 14}
-                        strokeDashoffset={2 * Math.PI * 14 * (1 - pct / 100)}
-                        strokeLinecap="round"
-                        transform="rotate(-90 18 18)"
-                        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
-                      />
-                      <text
-                        x="18"
-                        y="18"
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fill="var(--ink)"
-                        fontSize="9"
-                        fontWeight="600"
-                        fontFamily="monospace"
-                      >
-                        {Math.round(pct)}%
-                      </text>
-                    </svg>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex justify-between text-[11px] text-[var(--ink-tertiary)]">
-                        <span>{t('sidebar.completion')}</span>
-                        <span className="font-mono">
-                          {stats.totalWords.toLocaleString()} / {stats.targetWords.toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="h-1 bg-[var(--canvas-mid)] rounded-full mt-1 overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
-                      </div>
-                      {remaining > 0 && (
-                        <div className="text-[10px] text-[var(--ink-mute)] mt-[2px]">
-                          {t('sidebar.remaining', { n: remaining.toLocaleString() })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  onClick={() => setActivePage(item.route)}
+                >
+                  {activePage === item.route && (
+                    <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
+                  )}
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="flex-1">{t(item.labelKey)}</span>
                 </div>
               )
-            })()}
+            })}
+          </div>
+        )}
+      </div>
+      {/* end scrollable top */}
 
-          {/* Sparkline — last 7 days */}
-          <div className="flex items-end gap-[2px] h-7 my-1 mb-2.5">
+      {/* Writing Stats — fixed at bottom, compact */}
+      <div className="py-2 px-4 border-t border-[var(--hairline)] bg-[var(--canvas-soft)] shrink-0 text-[12px]">
+        <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase">
+          <BarChart3 className="w-3 h-3" />
+          {t('sidebar.stats')}
+        </div>
+
+        {/* Compact completion bar */}
+        {stats?.targetWords &&
+          stats.targetWords > 0 &&
+          (() => {
+            const pct = Math.min((stats.totalWords / stats.targetWords) * 100, 100)
+            const remaining = Math.max(stats.targetWords - stats.totalWords, 0)
+            return (
+              <div className="mb-2">
+                <div className="flex justify-between text-[11px] leading-none mb-1">
+                  <span className="text-[var(--ink-tertiary)]">{t('sidebar.completion')}</span>
+                  <span className="font-mono text-[var(--ink-mute)]">
+                    {stats.totalWords.toLocaleString()} / {stats.targetWords.toLocaleString()}
+                  </span>
+                </div>
+                <div className="h-[5px] bg-[var(--canvas-mid)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${pct}%`,
+                      background: pct >= 75 ? 'var(--success)' : pct >= 40 ? 'var(--accent-gold)' : 'var(--ink-mute)',
+                    }}
+                  />
+                </div>
+                {remaining > 0 && (
+                  <div className="text-[10px] text-[var(--ink-mute)] mt-[1px]">
+                    {t('sidebar.remaining', { n: remaining.toLocaleString() })}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+        {/* Sparkline — last 7 days */}
+        <div className="mb-1.5">
+          <div className="flex items-end gap-[1.5px] h-[24px]">
             {(() => {
               const dw = stats?.dailyWords || []
               const mx = Math.max(...dw, 1)
               return dw.map((v: number, i: number) => (
                 <div
                   key={i}
-                  className="flex-1 rounded-[1px] transition-opacity relative group"
+                  className="flex-1 rounded-[1px] relative group"
                   style={{
-                    height: `${Math.max((v / mx) * 28, v > 0 ? 3 : 0)}px`,
+                    height: `${Math.max((v / mx) * 22, v > 0 ? 2 : 0)}px`,
                     background: v > 0 ? 'var(--accent-gold)' : 'var(--canvas-mid)',
-                    opacity: v > 0 ? 0.5 : 0.3,
+                    opacity: v > 0 ? 0.55 : 0.25,
                   }}
                 >
-                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-mono text-[var(--ink-mute)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-[var(--ink-mute)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                     {v.toLocaleString()}
                   </span>
                 </div>
               ))
             })()}
           </div>
-          <div className="flex justify-between items-center py-[3px] text-[13px]">
-            <span className="text-[12px] text-[var(--ink-mute)]">{t('editor.characters_zh')}</span>
-            <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
-              {currentChapter?.wordCount.toLocaleString()} {t('editor.words')}
-            </span>
+          <div className="flex gap-[1.5px] mt-[2px]">
+            {(() => {
+              const dw = stats?.dailyWords || []
+              const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+              const today = new Date()
+              return dw.map((_, i) => {
+                const d = new Date(today)
+                d.setDate(d.getDate() - (6 - i))
+                return (
+                  <div key={i} className="flex-1 text-center text-[7px] text-[var(--ink-mute)] leading-none">
+                    {days[d.getDay()].slice(0, 2)}
+                  </div>
+                )
+              })
+            })()}
           </div>
-          <div className="flex justify-between items-center py-[3px] text-[13px]">
-            <span className="text-[12px] text-[var(--ink-mute)]">{t('sidebar.totalWords')}</span>
-            <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
-              {(stats?.totalWords || 0).toLocaleString()} {t('editor.words')}
-            </span>
-          </div>
-          <div className="flex justify-between items-center py-[3px] text-[13px]">
-            <span className="text-[12px] text-[var(--ink-mute)]">{t('sidebar.today')}</span>
-            <span className="font-mono text-[12px] text-[var(--ink-tertiary)]">
-              {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} {t('editor.words')}
-            </span>
-          </div>
+        </div>
+
+        {/* Stats rows — compact */}
+        <div className="flex justify-between py-[2px]">
+          <span className="text-[var(--ink-mute)]">当前章</span>
+          <span className="font-mono text-[var(--ink-tertiary)]">
+            {currentChapter?.wordCount?.toLocaleString() || '0'} 字
+          </span>
+        </div>
+        <div className="flex justify-between py-[2px]">
+          <span className="text-[var(--ink-mute)]">总字数</span>
+          <span className="font-mono text-[var(--ink-tertiary)]">{(stats?.totalWords || 0).toLocaleString()} 字</span>
+        </div>
+        <div className="flex justify-between py-[2px]">
+          <span className="text-[var(--ink-mute)]">今日</span>
+          <span className="font-mono text-[var(--ink-tertiary)]">
+            {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} 字
+          </span>
         </div>
       </div>
     </aside>

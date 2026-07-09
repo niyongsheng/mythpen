@@ -191,6 +191,7 @@ app.post('/api/ai/chat/stream', async (req, res) => {
       }
     }
 
+
     // Record token usage
     try {
       const db = require('./db');

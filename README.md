@@ -4,7 +4,7 @@
 
 AI-assisted novel writing desktop app — manage characters, world-building, chapters, foreshadowing, timelines, with integrated AI writing assistant.
 
-[![爱发电](https://img.shields.io/badge/爱发电-Afdian-946ce6?style=for-the-badge&logo=github&logoColor=white)](https://ifdian.net/a/nico2026)
+<img alt="demo" src="https://github.com/user-attachments/assets/87ba980c-492b-4bd2-af75-e14faa3cec68" />
 
 ## Quick Start
 

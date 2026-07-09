@@ -1,6 +1,7 @@
-import { Bot, Eye, EyeOff, Folder, Globe, Palette, Pen, X, Zap } from 'lucide-react'
+import { Bot, Eye, EyeOff, Globe, Palette, Pen, RotateCw, SwatchBook, X, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { refreshAllData } from '@/lib/dataEvents'
 import { useEditorStore } from '@/stores/useEditorStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
@@ -196,7 +197,7 @@ export function SettingsDrawer() {
           {/* ── Accent Color ── */}
           <div className="mb-7">
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
-              🎨 {t('settings.accentColor')}
+              <SwatchBook className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.accentColor')}
             </div>
             <div className="flex gap-2 flex-wrap mb-2">
               {ACCENT_COLORS.map((c) => (
@@ -283,7 +284,13 @@ export function SettingsDrawer() {
                   {testStatus === 'testing' ? t('settings.testing') : t('settings.testConnection')}
                 </button>
                 <a
-                  href="https://platform.deepseek.com/api_keys"
+                  href={
+                    settings.apiType === 'claude'
+                      ? 'https://console.anthropic.com/'
+                      : settings.apiBaseUrl.includes('openai')
+                        ? 'https://platform.openai.com/api-keys'
+                        : 'https://platform.deepseek.com/api_keys'
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-auto text-[12px] text-[var(--accent-gold)] no-underline hover:underline"
@@ -302,20 +309,18 @@ export function SettingsDrawer() {
             </div>
           </div>
 
-          {/* ── Project ── */}
+          {/* ── Force Refresh ── */}
           <div className="mb-7">
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
-              <Folder className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.project')}
+              <RotateCw className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.forceRefresh')}
             </div>
-            <SettingRow label={t('settings.autoBackup')} desc={t('settings.autoBackupDesc')}>
+            <SettingRow label={t('settings.forceRefresh')} desc={t('settings.forceRefreshDesc')}>
               <button
-                className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
-                  ${settings.backupEnabled ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
-                onClick={() => updateSetting('backupEnabled', !settings.backupEnabled)}
+                className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] hover:text-[var(--accent-ember)] flex items-center gap-1.5"
+                onClick={() => refreshAllData()}
               >
-                <span
-                  className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-[var(--ink)] transition-transform ${settings.backupEnabled ? 'translate-x-4' : ''}`}
-                />
+                <RotateCw className="w-3.5 h-3.5" />
+                {t('settings.forceRefresh')}
               </button>
             </SettingRow>
           </div>

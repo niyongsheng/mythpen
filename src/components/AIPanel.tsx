@@ -38,6 +38,7 @@ export function AIPanel() {
   const [showConsistency, setShowConsistency] = useState(() => !localStorage.getItem('mythpen-hide-consistency'))
   const abortRef = useRef<AbortController | null>(null)
   const msgEndRef = useRef<HTMLDivElement | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const streamRef = useRef('')
   const runningRef = useRef(false)
   const msgIdCounter = useRef(0)
@@ -112,25 +113,44 @@ export function AIPanel() {
   const nextMsgId = () => `${Date.now()}-${++msgIdCounter.current}`
 
   // Helper: save message scoped to current session
-  const saveMsg = (data: { role: 'user' | 'ai' | 'system'; content: string }) =>
-    chatApi.save(project!, { ...data, session_id: currentSessionId || undefined }).catch(() => {})
+  const saveMsg = (data: { role: 'user' | 'ai' | 'system'; content: string }) => {
+    if (!currentSessionId) {
+      console.warn('[AIPanel] No session to save message to')
+      return Promise.resolve()
+    }
+    return chatApi
+      .save(project!, { ...data, session_id: currentSessionId })
+      .catch((e) => console.warn('[AIPanel] Failed to save message:', e))
+  }
 
+  // Auto-scroll to bottom when messages or stream text changes
   useEffect(() => {
-    msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamText])
+    if (msgEndRef.current && scrollContainerRef.current) {
+      // Use direct scrollTop for reliable scrolling (scrollIntoView can fail in nested scroll contexts)
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
+    }
+  }, [messages, streamText, toolCalls])
 
   // Load sessions and messages when project changes, auto-create session if none exists
   useEffect(() => {
     if (!project) return
     sessionsLoadedRef.current = false
+    // Reset stale session from previous project before loading
+    useAgentStore.setState({ currentSessionId: null, messages: [] })
     loadSessions(project).then(() => {
+      // Guard: ignore stale completions — captured project must match the current real project
+      const currentProject = useProjectStore.getState().currentProject
+      if (project !== currentProject) return
       sessionsLoadedRef.current = true
-      // Eagerly create a session if none exists (avoids race with handleSend)
       const state = useAgentStore.getState()
-      if (!state.currentSessionId && state.sessions.length === 0) {
+      if (state.sessions.length === 0) {
+        // No sessions exist — create one
         const now = new Date()
         const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-        void createSession(project, `对话 ${ts}`)
+        void createSession(currentProject, `新会话 ${ts}`)
+      } else if (state.messages.length === 0) {
+        // Session already selected (by loadSessions) — load messages
+        useAgentStore.getState().loadMessages(project)
       }
     })
   }, [project])
@@ -186,6 +206,7 @@ export function AIPanel() {
   const handleSend = () => {
     if (!project || runningRef.current || !input.trim()) return
     if (loading) return // wait for messages to finish loading
+    if (!currentSessionId) return // wait for session to be created
     runningRef.current = true
     const userMsg = input.trim()
     const isChat = mode === 'collab'
@@ -298,7 +319,7 @@ export function AIPanel() {
           const fullText = streamRef.current
           const aiMsg = {
             role: 'ai' as const,
-            content: fullText || '创作完成',
+            content: fullText || '执行完成',
             toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
           }
           addMessage({ id: nextMsgId(), ...aiMsg })
@@ -438,7 +459,7 @@ export function AIPanel() {
       </div>
 
       {/* Scrollable messages area */}
-      <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
         {/* Task runner */}
         {isRunning && (
           <div className="mx-4 mb-2.5 p-3 bg-[var(--accent-gold-soft-bg)] border border-[rgba(201,169,110,0.3)] rounded-lg">
@@ -447,10 +468,11 @@ export function AIPanel() {
               <div className="flex-1 min-w-0">
                 <div className="text-[12px] text-[var(--ink)] font-medium flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 inline-block mr-1" />
-                  {taskName} · {currentChapter?.title || ''}
+                  {taskName}
+                  {currentChapter?.title ? ` · ${currentChapter.title}` : ''}
                 </div>
                 <div className="text-[11px] text-[var(--ink-tertiary)] mt-0.5 font-mono">
-                  {t('ai.generatedTokens', { count: genTokens })}
+                  {genTokens > 0 ? t('ai.generatedTokens', { count: genTokens }) : t('ai.running')}
                 </div>
                 <div className="h-[3px] bg-[var(--canvas-mid)] rounded-full mt-1.5 overflow-hidden">
                   <div

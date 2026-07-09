@@ -10,6 +10,7 @@ export function Outline() {
   const { volumes, updateChapter, createChapter, loadChapters } = useChapterStore()
   const currentProject = useProjectStore((s) => s.currentProject)
   const [activeChapterId, setActiveChapterId] = useState<number | null>(null)
+  const [collapsedVolumes, setCollapsedVolumes] = useState<Set<number>>(new Set())
   const [outlineText, setOutlineText] = useState('')
   const [dimensions, setDimensions] = useState({
     cognitiveFrame: '',
@@ -61,6 +62,18 @@ export function Outline() {
       console.error('Save failed:', e)
     }
     setSaving(false)
+  }
+
+  const toggleVolumeCollapse = (volumeId: number) => {
+    setCollapsedVolumes((prev) => {
+      const next = new Set(prev)
+      if (next.has(volumeId)) {
+        next.delete(volumeId)
+      } else {
+        next.add(volumeId)
+      }
+      return next
+    })
   }
 
   const handleNewChapter = async (volumeId: number) => {
@@ -199,56 +212,72 @@ export function Outline() {
       </div>
       <div className="flex flex-1 min-h-0">
         {/* Chapter list */}
-        <div className="w-[320px] shrink-0 border-r border-[var(--hairline)] overflow-y-auto py-3">
-          {volumes.map((vol) => (
-            <div key={vol.id}>
-              <div className="px-4 pb-2 pt-1 font-display text-sm font-medium text-[var(--ink)] flex items-center gap-1">
-                <span className="text-[10px] text-[var(--ink-mute)]">▼</span>
-                {vol.title.startsWith('第') && vol.title.endsWith('卷')
-                  ? vol.title
-                  : `第${vol.sortOrder}卷 · ${vol.title}`}
-              </div>
-              {vol.chapters.map((ch) => (
+        <div className="w-[320px] shrink-0 border-r border-[var(--hairline)] overflow-y-auto py-3 custom-scrollbar">
+          {volumes.map((vol) => {
+            const collapsed = collapsedVolumes.has(vol.id)
+            return (
+              <div key={vol.id}>
                 <div
-                  key={ch.id}
-                  className={`p-3 mx-3 mb-1.5 rounded-lg border cursor-pointer transition-colors
-                    ${
-                      activeChapterId === ch.id
-                        ? 'bg-[var(--accent-gold-soft-bg)] border-[var(--accent-gold)]'
-                        : 'bg-[var(--canvas-card)] border-[var(--hairline)] hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]'
-                    }`}
-                  onClick={() => setActiveChapterId(ch.id)}
+                  className="px-4 pb-2 pt-1 font-display text-sm font-medium text-[var(--ink)] flex items-center gap-1 cursor-pointer select-none hover:opacity-80 transition-opacity"
+                  onClick={() => toggleVolumeCollapse(vol.id)}
                 >
-                  <div className="text-[13px] text-[var(--ink)] flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-medium px-[6px] py-[1px] rounded-full
-                      ${
-                        ch.status === 'accepted'
-                          ? 'bg-[var(--success-soft)] text-[var(--success)]'
-                          : ch.status === 'review'
-                            ? 'bg-[var(--warning-soft)] text-[var(--warning)]'
-                            : ch.status === 'writing'
-                              ? 'bg-[var(--info-soft)] text-[var(--info)]'
-                              : 'bg-[var(--canvas-pop)] text-[var(--ink-mute)]'
-                      }`}
-                    >
-                      {statusIcon[ch.status]}
-                    </span>
-                    {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
-                  </div>
-                  <div className="text-[12px] text-[var(--ink-tertiary)] mt-1 line-clamp-2">{ch.outline}</div>
+                  <span
+                    className="text-[10px] text-[var(--ink-mute)] transition-transform duration-200 inline-block"
+                    style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+                  >
+                    ▼
+                  </span>
+                  {vol.title.startsWith('第') && vol.title.endsWith('卷')
+                    ? vol.title
+                    : `第${vol.sortOrder}卷 · ${vol.title}`}
+                  <span className="text-[10px] text-[var(--ink-tertiary)] ml-auto">{vol.chapters.length}章</span>
                 </div>
-              ))}
-              {/* Per-volume new chapter */}
-              <div
-                className="flex items-center gap-1 mx-3 mb-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--accent-gold)] cursor-pointer transition-colors hover:bg-[var(--canvas-card)]"
-                onClick={() => handleNewChapter(vol.id)}
-              >
-                <Plus className="w-3 h-3" />
-                {t('pages.newChapter')}
+                {!collapsed && (
+                  <>
+                    {vol.chapters.map((ch) => (
+                      <div
+                        key={ch.id}
+                        className={`p-3 mx-3 mb-1.5 rounded-lg border cursor-pointer transition-colors
+                          ${
+                            activeChapterId === ch.id
+                              ? 'bg-[var(--accent-gold-soft-bg)] border-[var(--accent-gold)]'
+                              : 'bg-[var(--canvas-card)] border-[var(--hairline)] hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]'
+                          }`}
+                        onClick={() => setActiveChapterId(ch.id)}
+                      >
+                        <div className="text-[13px] text-[var(--ink)] flex items-center gap-2">
+                          <span
+                            className={`text-[10px] font-medium px-[6px] py-[1px] rounded-full
+                            ${
+                              ch.status === 'accepted'
+                                ? 'bg-[var(--success-soft)] text-[var(--success)]'
+                                : ch.status === 'review'
+                                  ? 'bg-[var(--warning-soft)] text-[var(--warning)]'
+                                  : ch.status === 'writing'
+                                    ? 'bg-[var(--info-soft)] text-[var(--info)]'
+                                    : 'bg-[var(--canvas-pop)] text-[var(--ink-mute)]'
+                            }`}
+                          >
+                            {statusIcon[ch.status]}
+                          </span>
+                          {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
+                        </div>
+                        <div className="text-[12px] text-[var(--ink-tertiary)] mt-1 line-clamp-2">{ch.outline}</div>
+                      </div>
+                    ))}
+                    {/* Per-volume new chapter */}
+                    <div
+                      className="flex items-center gap-1 mx-3 mb-2 px-3 py-1.5 rounded-lg text-[12px] text-[var(--accent-gold)] cursor-pointer transition-colors hover:bg-[var(--canvas-card)]"
+                      onClick={() => handleNewChapter(vol.id)}
+                    >
+                      <Plus className="w-3 h-3" />
+                      {t('pages.newChapter')}
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Editor panel */}

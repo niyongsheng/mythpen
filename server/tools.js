@@ -661,6 +661,14 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_project_meta',
+      description: '获取当前项目的完整元信息：名称、创作类型（genres）、篇幅模式、写作语言、当前阶段、总字数等。用于了解项目的基本定位和设定。',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'update_project_phase',
       description: '推进项目创作阶段。阶段流转：选题(idea) → 设定(setting) → 大纲(outline) → 写作(writing) → 审阅(review) → 一致性(consistency) → 导出(export)。当当前阶段的创作要素讨论完成并写入数据库后，调用此工具推进到下一阶段。',
       parameters: {
@@ -1073,6 +1081,26 @@ function executeTool(projectName, toolName, args) {
     }
     case 'delete_clue': {
       return deleteById(args.id, 'clue_board', 'id', '线索');
+    }
+
+    // ── Project Meta ──
+    case 'get_project_meta': {
+      const meta = {};
+      pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
+      const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
+      const genreLabels = { 'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情', 'history': '历史', 'urban': '都市', 'power-fantasy': '爽文', 'biography': '传记', 'other': '其他' };
+      return {
+        name: meta.name || '',
+        genres: genres,
+        genreLabels: genres.map(g => genreLabels[g] || g),
+        mode: meta.mode || 'medium-novel',
+        language: meta.language || 'zh',
+        phase: meta.workflow_phase || 'idea',
+        phaseLabel: ({idea:'选题',setting:'设定',outline:'大纲',writing:'写作',review:'审阅',consistency:'一致性',export:'导出'})[meta.workflow_phase] || '选题',
+        wordCount: meta.word_count || 0,
+        authorName: meta.author_name || '',
+        description: meta.description || '',
+      };
     }
 
     // ── Project Phase ──

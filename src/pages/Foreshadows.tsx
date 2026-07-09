@@ -161,7 +161,7 @@ export function Foreshadows() {
         ))}
       </div>
 
-      <div className="flex gap-4 flex-1 px-6 py-4 overflow-x-auto min-h-0">
+      <div className="flex gap-4 flex-1 px-6 py-4 overflow-x-auto min-h-0 custom-scrollbar">
         {COLUMNS.map((col) => {
           const ColIcon = col.icon
           return (
@@ -172,7 +172,7 @@ export function Foreshadows() {
                 </span>
                 <span>{list.filter((f: any) => f.status === col.key).length}</span>
               </div>
-              <div className="flex-1 overflow-y-auto p-2">
+              <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
                 {list
                   .filter((f: any) => f.status === col.key)
                   .map((f: any) => (

@@ -201,11 +201,19 @@ export interface ProjectStats {
   chapterCount: number
   acceptedCount: number
   characterCount: number
+  relationCount?: number
   foreshadowCount: number
   resolvedForeshadow: number
   overdueForeshadow: number
   worldCount: number
   sciCount: number
+  memoryCount?: number
+  timelineCount?: number
+  volumeCount?: number
+  volumes?: { id: number; title: string; sort_order: number; chapter_count: number; word_count: number }[]
+  clueUnresolved?: number
+  clueResolved?: number
+  genres?: string[]
   tokenInput: number
   tokenOutput: number
   currentChapter?: { id: number; num: number; title: string; word_count: number; status: string; content: string }

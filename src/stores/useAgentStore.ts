@@ -39,9 +39,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   loadMessages: async (project) => {
     if (!project) return
     const sid = get().currentSessionId
+    if (!sid) return // nothing to load
     set({ loading: true })
     try {
-      const msgs = await chatApi.list(project, sid || undefined)
+      const msgs = await chatApi.list(project, sid)
+      // Guard: currentSessionId changed (project switch / new session) — discard stale result
+      if (get().currentSessionId !== sid) return
       set({ messages: msgs, loading: false })
     } catch {
       set({ messages: [], loading: false })
@@ -53,10 +56,9 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     try {
       const sessions = await chatApi.listSessions(project)
       set({ sessions })
-      // Auto-select first session if none selected, then load messages
+      // Auto-select first session if none selected (AIPanel will load messages)
       if (!get().currentSessionId && sessions.length > 0) {
         set({ currentSessionId: sessions[0].id })
-        get().loadMessages(project)
       }
     } catch {
       set({ sessions: [] })

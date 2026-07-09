@@ -22,7 +22,7 @@ export function ProjectList() {
 
   return (
     <>
-      <div className="flex-1 overflow-y-auto px-16 py-12 flex justify-center">
+      <div className="flex-1 overflow-y-auto px-16 py-12 flex justify-center custom-scrollbar">
         <div className="w-full max-w-[800px]">
           <div className="flex items-center justify-between mb-8">
             <div>

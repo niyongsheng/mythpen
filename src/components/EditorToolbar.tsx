@@ -4,6 +4,27 @@ import { aiApi } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 
+/** Walk from `node` up to `editor`, return first ancestor matching `predicate`. */
+function findAncestor(node: Node | null, editor: HTMLElement, predicate: (el: Element) => boolean): Element | null {
+  while (node && node !== editor) {
+    if ((node as Element).tagName && predicate(node as Element)) return node as Element
+    node = node.parentNode
+  }
+  return null
+}
+
+/** Replace a heading element with a `<p>` keeping its children, restore cursor. */
+function unwrapToParagraph(el: Element, sel: Selection): void {
+  const p = document.createElement('p')
+  p.innerHTML = (el as HTMLElement).innerHTML
+  el.replaceWith(p)
+  const range = document.createRange()
+  range.selectNodeContents(p)
+  range.collapse()
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
 export function EditorToolbar() {
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const loadChapterContent = useChapterStore((s) => s.loadChapterContent)
@@ -50,9 +71,46 @@ export function EditorToolbar() {
   )
 
   const handleBlock = useCallback((tag: string) => {
-    document.execCommand('formatBlock', false, `<${tag}>`)
-    const editor = document.querySelector('[contenteditable]')
-    if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }))
+    const editor = document.querySelector('[contenteditable]') as HTMLElement | null
+    if (!editor) return
+    if (document.activeElement !== editor) editor.focus()
+
+    const sel = window.getSelection()
+    if (!sel || !sel.rangeCount) return
+    const range = sel.getRangeAt(0)
+
+    // Toggle: if inside same heading type, unwrap to paragraph
+    const existing = findAncestor(range.startContainer, editor, (el) => el.tagName.toLowerCase() === tag)
+    if (existing) {
+      unwrapToParagraph(existing, sel)
+      editor.dispatchEvent(new Event('input', { bubbles: true }))
+      return
+    }
+
+    // Wrap the current block in the heading tag
+    let node: Node | null = range.startContainer
+    while (node && node.parentNode !== editor) node = node.parentNode
+    if (!node || node === editor) {
+      // Fallback: insert a new heading at cursor
+      const el = document.createElement(tag)
+      el.textContent = ' '
+      range.insertNode(el)
+      range.setStart(el, 0)
+      range.collapse(true)
+      sel.removeAllRanges()
+      sel.addRange(range)
+    } else {
+      const heading = document.createElement(tag)
+      heading.innerHTML = (node as HTMLElement).innerHTML
+      ;(node as HTMLElement).replaceWith(heading)
+      const newRange = document.createRange()
+      newRange.selectNodeContents(heading)
+      newRange.collapse()
+      sel.removeAllRanges()
+      sel.addRange(newRange)
+    }
+
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
   }, [])
 
   const handleInsertQuote = useCallback(() => {
@@ -119,9 +177,21 @@ export function EditorToolbar() {
 
   // Clear formatting on selected text
   const handleClearFormat = useCallback(() => {
+    const editor = document.querySelector('[contenteditable]') as HTMLElement | null
+    if (!editor) return
+    if (document.activeElement !== editor) editor.focus()
+
+    // Unwrap headings (h1/h2/h3) back to paragraphs
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) {
+      const heading = findAncestor(sel.getRangeAt(0).startContainer, editor, (el) =>
+        ['h1', 'h2', 'h3'].includes(el.tagName.toLowerCase()),
+      )
+      if (heading) unwrapToParagraph(heading, sel)
+    }
+
     document.execCommand('removeFormat')
-    const editor = document.querySelector('[contenteditable]')
-    if (editor) editor.dispatchEvent(new Event('input', { bubbles: true }))
+    editor.dispatchEvent(new Event('input', { bubbles: true }))
   }, [])
 
   // Start AI polish

@@ -55,7 +55,7 @@ export function Timeline() {
       )}
 
       <div className="page-body" style={{ padding: 0 }}>
-        <div className="relative px-8 pb-8 pt-6 max-w-[820px]">
+        <div className="relative px-8 pb-8 pt-6">
           <div className="absolute left-12 top-6 bottom-0 w-[2px] bg-[var(--hairline-light)]" />
           {(events || []).map((ev, i) => (
             <div key={ev.id} className="flex gap-[18px] pb-[18px] relative">
