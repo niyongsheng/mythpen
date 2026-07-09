@@ -154,7 +154,15 @@
     "autoSaveEnabled": "Auto-save every {seconds} seconds",
     "autoSaveDisabled": "Auto-save disabled",
     "forceRefresh": "Force Refresh",
-    "forceRefreshDesc": "Reload the entire app and re-fetch all data"
+    "forceRefreshDesc": "Reload the entire app and re-fetch all data",
+    "checkUpdates": "Check for Updates",
+    "checkForUpdates": "Check for Updates",
+    "checkingUpdates": "Checking...",
+    "currentVersion": "Current version: {version}",
+    "upToDate": "You're up to date!",
+    "updateAvailable": "New version {version} available",
+    "downloadUpdate": "Open Releases Page",
+    "updateCheckFailed": "Check failed. Check your connection."
   },
   "pages": {
     "characters": "Characters",

@@ -154,7 +154,15 @@
     "autoSaveEnabled": "每 {seconds} 秒自动保存当前章节",
     "autoSaveDisabled": "自动保存已关闭",
     "forceRefresh": "强制刷新",
-    "forceRefreshDesc": "刷新整个应用页面，重载所有数据"
+    "forceRefreshDesc": "刷新整个应用页面，重载所有数据",
+    "checkUpdates": "检查更新",
+    "checkForUpdates": "检查更新",
+    "checkingUpdates": "检查中...",
+    "currentVersion": "当前版本：{version}",
+    "upToDate": "已是最新版本！",
+    "updateAvailable": "发现新版本 {version}",
+    "downloadUpdate": "打开下载页面",
+    "updateCheckFailed": "检查失败，请检查网络连接"
   },
   "pages": {
     "characters": "角色管理",
