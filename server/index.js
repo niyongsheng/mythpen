@@ -40,7 +40,7 @@ function getAiConfig() {
   const DEFAULTS = {
     apiBaseUrl: 'https://api.deepseek.com/v1',
     apiKey: process.env.DEEPSEEK_KEY || '',
-    apiModel: 'deepseek-chat',
+    apiModel: 'deepseek-v4-flash',
     apiType: '',
   };
   try {
@@ -307,13 +307,21 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ─── Start ───
-app.listen(PORT, () => {
-  const cfg = getAiConfig();
-  console.log(`\n  🖋️  Mythpen API Server`);
-  console.log(`  ─────────────────────`);
-  console.log(`  Local:   http://localhost:${PORT}`);
-  console.log(`  Health:  http://localhost:${PORT}/api/health`);
-  console.log(`  AI:      ${cfg.apiModel} @ ${cfg.apiBaseUrl}`);
-  console.log(`\n  Ready.\n`);
-});
+// ─── Start (async — init DB then listen) ───
+const { initDatabase } = require('./db');
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      const cfg = getAiConfig();
+      console.log(`\n  🖋️  Mythpen API Server`);
+      console.log(`  ─────────────────────`);
+      console.log(`  Local:   http://localhost:${PORT}`);
+      console.log(`  Health:  http://localhost:${PORT}/api/health`);
+      console.log(`  AI:      ${cfg.apiModel} @ ${cfg.apiBaseUrl}`);
+      console.log(`\n  Ready.\n`);
+    });
+  })
+  .catch(err => {
+    console.error('❌ Failed to initialise database:', err);
+    process.exit(1);
+  });

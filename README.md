@@ -17,11 +17,11 @@ pnpm tauri build    # Build desktop installer (.dmg/.msi/.AppImage)
 
 ## Tech Stack
 
-**Frontend**: React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 4 + Zustand  
-**Desktop**: Tauri v2 (Rust shell, no business logic)  
-**Backend**: Express 5 + better-sqlite3  
-**AI**: OpenAI-compatible (DeepSeek) + Anthropic Claude via adapter
+**Frontend**: React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 4 + Zustand 
+**Backend**: Express 5 + better-sqlite3 
+**Desktop**: Tauri v2 
+**AI**: OpenAI-compatible 
 
 ## License
 
-[MIT](./LICENSE)
+[GPLv3](./LICENSE)

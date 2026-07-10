@@ -346,7 +346,7 @@ CREATE TABLE editor_snapshots (
 |---|---|
 | `api_key` | `''`（空，由环境变量 DEEPSEEK_KEY 兜底） |
 | `api_base_url` | `https://api.deepseek.com/v1` |
-| `api_model` | `deepseek-chat` |
+| `api_model` | `deepseek-v4-flash` |
 | `ui_language` | `zh` |
 | `theme` | `dark` |
 | `editor_font_size` | `17` |

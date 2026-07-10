@@ -5,11 +5,7 @@
   "author": "Nico",
   "license": "CC BY-NC-SA 4.0",
   "packageManager": "pnpm@10.10.0",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3"
-    ]
-  },
+  "pnpm": {},
   "type": "module",
   "repository": {
     "type": "git",
@@ -31,7 +27,7 @@
     "format": "biome format --write src/",
     "prepare": "simple-git-hooks",
     "preview": "vite preview",
-    "build:sidecar": "bun build --compile ./server/index.js --outfile src-tauri/binaries/mythpen-server"
+    "build:sidecar": "bun build --compile --assets node_modules/sql.js/dist/sql-wasm.wasm ./server/index.js --outfile src-tauri/binaries/mythpen-server"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -43,7 +39,6 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
     "epub-gen": "^0.1.0",
     "express": "^5.2.1",
@@ -53,6 +48,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.1",
     "remark-gfm": "^4.0.1",
+    "sql.js": "^1.13.0",
     "uuid": "^14.0.1",
     "zustand": "^5.0.14"
   },

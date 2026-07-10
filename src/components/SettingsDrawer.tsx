@@ -273,7 +273,7 @@ export function SettingsDrawer() {
                   className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
                   value={settings.apiModel}
                   onChange={(e) => updateSetting('apiModel', e.target.value)}
-                  placeholder="deepseek-chat"
+                  placeholder="deepseek-v4-flash"
                 />
               </div>
             </SettingRow>

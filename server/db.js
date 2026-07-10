@@ -1,4 +1,7 @@
-const Database = require('better-sqlite3');
+// ─── SQL.js-based database layer (replaces better-sqlite3) ───
+// Uses sql.js (pure JS/WASM SQLite) instead of better-sqlite3 (native addon)
+// so that bun build --compile can produce a standalone binary without native .node files.
+
 const path = require('path');
 const fs = require('fs');
 
@@ -10,16 +13,168 @@ const PROJECTS_DIR = path.join(DB_DIR, 'projects');
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 if (!fs.existsSync(PROJECTS_DIR)) fs.mkdirSync(PROJECTS_DIR, { recursive: true });
 
-// ─── Config DB ───
-let configDb;
+let SQL;         // set by initDatabase()
+let configDb;    // wrapped config database
+
+// ═══════════════════════════════════════════════════════════════
+// sql.js wrapper — provides a better-sqlite3-compatible API
+// ═══════════════════════════════════════════════════════════════
+
+function _loadDb(filePath) {
+  if (fs.existsSync(filePath)) {
+    const buf = fs.readFileSync(filePath);
+    return new SQL.Database(buf);
+  }
+  return new SQL.Database();
+}
+
+function _flushDb(db, filePath) {
+  const data = db.export();
+  fs.writeFileSync(filePath, Buffer.from(data));
+}
+
+// ─── Named-param helper ───
+// sql.js 1.13+ has a bug where binding named params via object (e.g. {id:1})
+// doesn't work — values come through as NULL.
+// We work around it by converting @param / :param / $param → ? at the JS level.
+const NAMED_PARAM_RE = /[$@:](\w+)/g;
+
+function _normalizeParams(params) {
+  if (params.length === 0) return null;
+  // Single plain object = named params (e.g. {id: 1, name: 'test'})
+  if (params.length === 1 && typeof params[0] === 'object' && params[0] !== null && !Array.isArray(params[0])) {
+    return { named: true, values: params[0] };
+  }
+  return { named: false, values: params };
+}
+
+function _buildSql(sqlText, bindMeta) {
+  if (!bindMeta) return { sql: sqlText, args: null };
+  if (!bindMeta.named) {
+    // Positional params — convert undefined → null for sql.js compatibility
+    return { sql: sqlText, args: bindMeta.values.map(v => v === undefined ? null : v) };
+  }
+  // Named params — convert to positional ? and collect values in SQL order
+  const args = [];
+  const converted = sqlText.replace(NAMED_PARAM_RE, (_, name) => {
+    if (bindMeta.values[name] !== undefined) {
+      args.push(bindMeta.values[name] === undefined ? null : bindMeta.values[name]);
+      return '?';
+    }
+    // Keep unknown named params as-is (unbound → SQLite treats as NULL)
+    return '@' + name;
+  });
+  return { sql: converted, args };
+}
+
+/**
+ * Wrap a raw sql.js Database instance so it quacks like better-sqlite3.
+ * Supports: .pragma(), .prepare(sql).{all,get,run}(), .exec(), .run(), .transaction(), .close()
+ *
+ * IMPORTANT: Each .run()/.all()/.get() creates its own fresh prepared statement
+ * because sql.js's db.export() (called by _flushDb) invalidates ALL existing statements.
+ * The statement is freed before _flushDb() so export() never hits a stale handle.
+ */
+function _wrapDb(db, filePath) {
+  return {
+    _db: db,
+    _path: filePath,
+
+    pragma(sql) {
+      db.run('PRAGMA ' + sql);
+    },
+
+    prepare(sql) {
+      return {
+        all(...params) {
+          const { sql: sql2, args } = _buildSql(sql, _normalizeParams(params));
+          const s = db.prepare(sql2);
+          if (args) s.bind(args);
+          const rows = [];
+          while (s.step()) rows.push(s.getAsObject());
+          s.free();
+          return rows;
+        },
+        get(...params) {
+          const { sql: sql2, args } = _buildSql(sql, _normalizeParams(params));
+          const s = db.prepare(sql2);
+          if (args) s.bind(args);
+          let row = null;
+          if (s.step()) row = s.getAsObject();
+          s.free();
+          return row;
+        },
+        run(...params) {
+          const { sql: sql2, args } = _buildSql(sql, _normalizeParams(params));
+          const s = db.prepare(sql2);
+          if (args) s.bind(args);
+          s.step();
+          const changes = db.getRowsModified();
+          s.free();
+          _flushDb(db, filePath);
+          return { changes };
+        },
+      };
+    },
+
+    exec(sql) {
+      const results = db.exec(sql);
+      _flushDb(db, filePath);
+      return results;
+    },
+
+    run(sql, params) {
+      db.run(sql, params || []);
+      _flushDb(db, filePath);
+    },
+
+    transaction(fn) {
+      return (...args) => {
+        db.run('BEGIN');
+        try {
+          const result = fn(...args);
+          db.run('COMMIT');
+          _flushDb(db, filePath);
+          return result;
+        } catch (e) {
+          db.run('ROLLBACK');
+          throw e;
+        }
+      };
+    },
+
+    close() {
+      _flushDb(db, filePath);
+      db.close();
+    },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Initialisation (MUST be called before any other db function)
+// ═══════════════════════════════════════════════════════════════
+
+async function initDatabase() {
+  const initSqlJs = require('sql.js');
+  SQL = await initSqlJs();
+  configDb = _openConfig();
+  return true;
+}
+
+function _openConfig() {
+  const db = _loadDb(CONFIG_DB);
+  db.run('PRAGMA foreign_keys = ON');
+  const wrapped = _wrapDb(db, CONFIG_DB);
+  migrateConfig(wrapped);
+  return wrapped;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Config DB
+// ═══════════════════════════════════════════════════════════════
 
 function getConfigDb() {
-  if (!configDb) {
-    configDb = new Database(CONFIG_DB);
-    configDb.pragma('journal_mode = WAL');
-    configDb.pragma('foreign_keys = ON');
-    migrateConfig(configDb);
-  }
+  if (!configDb) throw new Error('Database not initialised – call initDatabase() first');
   return configDb;
 }
 
@@ -51,7 +206,7 @@ function migrateConfig(db) {
     const defaults = [
       ['api_key', ''],
       ['api_base_url', 'https://api.deepseek.com/v1'],
-      ['api_model', 'deepseek-chat'],
+      ['api_model', 'deepseek-v4-flash'],
       ['ui_language', 'zh'],
       ['theme', 'dark'],
       ['editor_font_size', '17'],
@@ -67,7 +222,10 @@ function migrateConfig(db) {
   }
 }
 
-// ─── Project DB Management ───
+// ═══════════════════════════════════════════════════════════════
+// Project DB Management
+// ═══════════════════════════════════════════════════════════════
+
 const projectConnections = new Map();
 
 function getProjectDbPath(name) {
@@ -78,13 +236,12 @@ function openProjectDb(filePath) {
   if (projectConnections.has(filePath)) {
     return projectConnections.get(filePath);
   }
-  const db = new Database(filePath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  db.pragma('busy_timeout = 5000');
-  migrateProject(db);
-  projectConnections.set(filePath, db);
-  return db;
+  const db = _loadDb(filePath);
+  db.run('PRAGMA foreign_keys = ON');
+  const wrapped = _wrapDb(db, filePath);
+  migrateProject(wrapped);
+  projectConnections.set(filePath, wrapped);
+  return wrapped;
 }
 
 function closeProjectDb(filePath) {
@@ -281,18 +438,21 @@ function migrateProject(db) {
   // Migrate existing chat_messages: add session_id column if missing
   try {
     db.exec("ALTER TABLE chat_messages ADD COLUMN session_id TEXT NOT NULL DEFAULT '' REFERENCES chat_sessions(id) ON DELETE CASCADE");
-  } catch(e) {
+  } catch (e) {
     // column already exists — ignore
   }
   // Index on session_id (must be after ALTER TABLE for existing DBs)
   try {
     db.exec("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)");
-  } catch(e) {
+  } catch (e) {
     // ignore
   }
 }
 
-// ─── Helpers ───
+// ═══════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════
+
 function rowToObject(row) {
   if (!row) return null;
   return { ...row };
@@ -302,11 +462,13 @@ function rowsToArray(rows) {
   return rows || [];
 }
 
-// ─── Query wrappers ───
+// ═══════════════════════════════════════════════════════════════
+// Config DB query wrappers
+// ═══════════════════════════════════════════════════════════════
+
 function dbQuery(sql, params = []) {
   const db = getConfigDb();
-  const rows = db.prepare(sql).all(...params);
-  return rows;
+  return db.prepare(sql).all(...params);
 }
 
 function dbGet(sql, params = []) {
@@ -320,7 +482,10 @@ function dbExecute(sql, params = []) {
   return result.changes;
 }
 
-// ─── Project-specific queries ───
+// ═══════════════════════════════════════════════════════════════
+// Project-specific query wrappers
+// ═══════════════════════════════════════════════════════════════
+
 function projectQuery(projectName, sql, params = []) {
   const db = getProjectDb(projectName);
   return db.prepare(sql).all(...params);
@@ -342,7 +507,10 @@ function projectTransaction(projectName, fn) {
   return db.transaction(fn)();
 }
 
-// ─── Shared helpers ───
+// ═══════════════════════════════════════════════════════════════
+// Shared helpers
+// ═══════════════════════════════════════════════════════════════
+
 function recalculateWordCount(projectName) {
   const total = projectGet(projectName, 'SELECT SUM(word_count) as total FROM chapters')?.total || 0;
   projectExecute(projectName, "UPDATE project_meta SET value = ? WHERE key = 'word_count'", [String(total)]);
@@ -367,6 +535,7 @@ const MIME_TO_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'we
 const EXT_TO_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
 
 module.exports = {
+  initDatabase,
   getConfigDb,
   getProjectDb,
   getProjectDbPath,

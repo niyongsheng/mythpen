@@ -1,4 +1,4 @@
-const { getProjectDb, getProjectDbPath, getConfigDb } = require('./db');
+const { initDatabase, getProjectDb, getProjectDbPath, getConfigDb } = require('./db');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 
@@ -139,8 +139,11 @@ function seedProject(name) {
 
 // ─── Run ───
 if (require.main === module) {
-  seedProject('我的科幻小说');
-  console.log('✅ Seed complete.');
+  (async () => {
+    await initDatabase();
+    seedProject('我的科幻小说');
+    console.log('✅ Seed complete.');
+  })().catch(err => { console.error('❌ Seed failed:', err); process.exit(1); });
 }
 
 module.exports = { seedProject };
