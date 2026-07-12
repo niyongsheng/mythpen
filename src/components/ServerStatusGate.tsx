@@ -39,12 +39,12 @@ export function ServerStatusGate({ children }: Props) {
       }
 
       if (cancelled) return
-      if (retryCount >= 30) {
+      if (retryCount >= 5) {
         setStatus('error')
         return
       }
-      // Exponential backoff: 1s → 2s → 4s … capped at 5s
-      const delay = Math.min(1000 * Math.pow(1.15, retryCount), 5000)
+      // Exponential backoff: 1s → 1.5s → 2.25s
+      const delay = Math.min(1000 * Math.pow(1.5, retryCount), 3000)
       timer = setTimeout(() => setRetryCount((c) => c + 1), delay)
     }
 

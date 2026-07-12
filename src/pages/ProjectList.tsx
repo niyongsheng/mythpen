@@ -4,6 +4,18 @@ import { ProjectIcon } from '@/components/ProjectIcon'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return dateStr
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  } catch {
+    return dateStr
+  }
+}
+
 export function ProjectList() {
   const { projects, setCurrentProject, showProjectList, deleteProject } = useProjectStore()
   const { setProjectDialogOpen } = useUIStore()
@@ -36,59 +48,74 @@ export function ProjectList() {
             </button>
           </div>
 
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-            {projects.map((p) => (
-              <div
-                key={p.id}
-                className="group relative bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-5 cursor-pointer transition-all hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)] hover:-translate-y-px"
-                onClick={() => setCurrentProject(p.name)}
-              >
-                {/* Delete button — visible on hover */}
-                <button
-                  className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] hover:text-red-500 transition-all"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setDeleteTarget(p.name)
-                  }}
-                  title="删除项目"
-                >
-                  <Trash2 size={14} />
-                </button>
-
-                <div className="mb-2.5">
-                  <ProjectIcon name={p.iconName} className="w-7 h-7" />
-                </div>
-                <div className="font-display text-lg font-medium text-[var(--ink)] mb-1">{p.name}</div>
-                <div className="flex gap-1 flex-wrap mb-2.5">
-                  {p.genres.map((g) => (
-                    <span
-                      key={g}
-                      className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)]"
-                    >
-                      {g}
-                    </span>
-                  ))}
-                </div>
-                <div className="flex gap-3 mb-2 pt-2 border-t border-[var(--hairline)] text-[11px] text-[var(--ink-tertiary)]">
-                  <span>{p.wordCount.toLocaleString()} 字</span>
-                  <span>{p.chapterCount} 章</span>
-                  <span>更新于 {p.lastOpened}</span>
-                </div>
-                <div className="text-[11px] text-[var(--ink-mute)]">
-                  {p.mode === 'long-novel' ? '长篇' : p.mode === 'medium-novel' ? '中篇' : '短篇'} · {p.status}
-                </div>
+          {projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-16 h-16 mb-6 rounded-2xl bg-[var(--canvas-card)] border border-[var(--hairline)] flex items-center justify-center text-[32px] text-[var(--ink-tertiary)]">
+                📖
               </div>
-            ))}
-
-            {/* New project card */}
-            <div
-              className="border border-dashed border-[var(--hairline-light)] rounded-lg flex items-center justify-center min-h-[160px] text-[var(--ink-tertiary)] text-[13px] gap-1.5 flex-col cursor-pointer hover:border-[var(--accent-gold)] hover:text-[var(--accent-gold)] hover:bg-[var(--canvas-card)] transition-colors"
-              onClick={() => setProjectDialogOpen(true)}
-            >
-              <span className="text-[28px] leading-none">+</span>
-              <span>新建项目</span>
+              <h2 className="font-display text-[22px] font-semibold text-[var(--ink)] mb-2">还没有项目</h2>
+              <p className="text-[var(--ink-tertiary)] text-[14px] max-w-[320px] leading-relaxed mb-8">
+                创建一个新项目，开始你的创作之旅吧
+              </p>
+              <button className="btn-primary h-[36px] px-6 text-[14px]" onClick={() => setProjectDialogOpen(true)}>
+                + 新建项目
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+              {projects.map((p) => (
+                <div
+                  key={p.id}
+                  className="group relative bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-5 cursor-pointer transition-all hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)] hover:-translate-y-px"
+                  onClick={() => setCurrentProject(p.name)}
+                >
+                  {/* Delete button — visible on hover */}
+                  <button
+                    className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] hover:text-red-500 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setDeleteTarget(p.name)
+                    }}
+                    title="删除项目"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+
+                  <div className="mb-2.5">
+                    <ProjectIcon name={p.iconName} className="w-7 h-7" />
+                  </div>
+                  <div className="font-display text-lg font-medium text-[var(--ink)] mb-1">{p.name}</div>
+                  <div className="flex gap-1 flex-wrap mb-2.5">
+                    {p.genres.map((g) => (
+                      <span
+                        key={g}
+                        className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)]"
+                      >
+                        {g}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-3 mb-2 pt-2 border-t border-[var(--hairline)] text-[11px] text-[var(--ink-tertiary)]">
+                    <span>{p.wordCount.toLocaleString()} 字</span>
+                    <span>{p.chapterCount} 章</span>
+                    <span>更新于 {formatDate(p.lastOpened)}</span>
+                  </div>
+                  <div className="text-[11px] text-[var(--ink-mute)]">
+                    {p.mode === 'long-novel' ? '长篇' : p.mode === 'medium-novel' ? '中篇' : '短篇'} · {p.status}
+                  </div>
+                </div>
+              ))}
+
+              {/* New project card */}
+              <div
+                className="border border-dashed border-[var(--hairline-light)] rounded-lg flex items-center justify-center min-h-[160px] text-[var(--ink-tertiary)] text-[13px] gap-1.5 flex-col cursor-pointer hover:border-[var(--accent-gold)] hover:text-[var(--accent-gold)] hover:bg-[var(--canvas-card)] transition-colors"
+                onClick={() => setProjectDialogOpen(true)}
+              >
+                <span className="text-[28px] leading-none">+</span>
+                <span>新建项目</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

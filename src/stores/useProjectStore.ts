@@ -58,7 +58,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // Restore last selected project
       const saved = localStorage.getItem('mythpen-current-project')
       const currentProject = projects.find((p: any) => p.name === saved) ? saved : projects[0]?.name || null
-      set({ projects, currentProject, loading: false })
+      // No projects → show the project list (new user / all deleted)
+      const showProjectList = projects.length === 0
+      set({ projects, currentProject, showProjectList, loading: false })
       // Load phase for the current project
       if (currentProject) {
         const { phase } = await projectsApi.getPhase(currentProject)

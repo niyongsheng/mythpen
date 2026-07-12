@@ -1,7 +1,7 @@
 {
   "name": "Mythpen",
   "private": true,
-  "version": "0.0.5",
+  "version": "0.0.6",
   "author": "Nico",
   "license": "CC BY-NC-SA 4.0",
   "packageManager": "pnpm@10.10.0",
