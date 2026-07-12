@@ -27,7 +27,7 @@
     "format": "biome format --write src/",
     "prepare": "simple-git-hooks",
     "preview": "vite preview",
-    "build:sidecar": "bun build --compile --assets node_modules/sql.js/dist/sql-wasm.wasm ./server/index.js --outfile src-tauri/binaries/mythpen-server"
+    "build:sidecar": "node scripts/copy-wasm.mjs && bun build --compile --assets server/sql-wasm.wasm ./server/index.js --outfile src-tauri/binaries/mythpen-server"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

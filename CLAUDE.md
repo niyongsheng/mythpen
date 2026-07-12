@@ -21,32 +21,6 @@
 
 ---
 
-## 项目结构
-
-```
-mythpen/
-├── server/              # Express 后端
-│   ├── index.js         # 入口 + AI 路由
-│   ├── db.js            # SQLite 层
-│   ├── routes/api.js    # 全部 REST CRUD
-│   ├── tools.js         # 25+ AI 工具 + executeTool
-│   ├── ai-adapter.js    # OpenAI / Claude 适配
-│   └── prompts/         # 写作/共创/上下文 提示词
-├── src/                 # React 前端
-│   ├── components/      # UI 组件
-│   ├── pages/           # 各功能页面
-│   ├── stores/          # Zustand 状态管理 (7 stores)
-│   ├── lib/             # API 客户端 + 数据 hooks
-│   ├── hooks/           # 通用 hooks
-│   ├── types/index.ts   # 类型定义
-│   └── i18n/            # 中英文翻译
-├── src-tauri/           # Tauri 桌面壳
-├── .github/workflows/   # CI
-└── CLAUDE.md
-```
-
----
-
 ## 后端 (server/)
 
 Express 5，`/api` 路由在 `routes/api.js`。
@@ -72,20 +46,6 @@ Express 5，`/api` 路由在 `routes/api.js`。
 - **路径别名**：`@/` → `src/`
 - **i18n**：自实现 `t(path, params)`，`zh.json` / `en.json`
 - **富文本编辑器**：contentEditable + document.execCommand，标记 `**粗体**` `*斜体*` `__下划线__`
-
-### SSE 事件（AI 流式）
-
-```json
-event: content_chunk   data: {"text":"..."}
-event: tool_call       data: {"id":"...","name":"...","arguments":{}}
-event: tool_result     data: {"id":"...","name":"...","result":...}
-event: task_end        data: {"success":true,...}
-```
-
-### 设计系统 (`src/index.css`)
-
-暗/亮双主题 CSS 变量。暗色默认，`html[data-theme="light"]` 切换。
-核心令牌：`--canvas` `--ink` `--accent-gold` `--hairline` `--radius-*` `--font-*`
 
 ---
 
@@ -141,22 +101,4 @@ pnpm biome check --write --unsafe src/
 
 ## 发布新版本
 
-```bash
-# 1. 更新版本号（三处保持一致）
-#    package.json → "version"
-#    src-tauri/tauri.conf.json → "version"
-#    doc/index.html → const APP_VERSION = 'X.Y.Z'
-
-# 2. 提交并打 tag
-git add .
-git commit -m "chore: bump version to vX.Y.Z"
-git push origin main
-git tag vX.Y.Z
-git push origin vX.Y.Z        # ← 触发 CI 自动构建+Release
-
-# 3. 等 CI 跑完（~15min），编辑 Release 说明
-#    https://github.com/niyongsheng/mythpen/releases
-```
-
-**注意：** Tag 必须 `v*` 格式（如 `v0.0.2`）；推送后不要删除重推，会残留空 Release。
-产物：macOS → `.dmg` / Windows → `.msi` + `.exe`
+通过 `/mythpen-release` 技能执行发布流程。

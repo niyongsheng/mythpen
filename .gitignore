@@ -27,3 +27,6 @@ dist-ssr
 src-tauri/target/
 src-tauri/binaries/
 *.dmg
+
+# WASM copied by scripts/copy-wasm.mjs for bun --compile --assets
+server/sql-wasm.wasm

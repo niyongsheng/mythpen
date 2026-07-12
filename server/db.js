@@ -17,6 +17,13 @@ let SQL;         // set by initDatabase()
 let configDb;    // wrapped config database
 
 // ═══════════════════════════════════════════════════════════════
+// Schema versioning — bump these when adding migrations
+// ═══════════════════════════════════════════════════════════════
+
+const CONFIG_SCHEMA_VERSION = 1;
+const PROJECT_SCHEMA_VERSION = 2;
+
+// ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
 // ═══════════════════════════════════════════════════════════════
 
@@ -58,7 +65,7 @@ function _buildSql(sqlText, bindMeta) {
   const args = [];
   const converted = sqlText.replace(NAMED_PARAM_RE, (_, name) => {
     if (bindMeta.values[name] !== undefined) {
-      args.push(bindMeta.values[name] === undefined ? null : bindMeta.values[name]);
+      args.push(bindMeta.values[name]);
       return '?';
     }
     // Keep unknown named params as-is (unbound → SQLite treats as NULL)
@@ -156,7 +163,22 @@ function _wrapDb(db, filePath) {
 
 async function initDatabase() {
   const initSqlJs = require('sql.js');
-  SQL = await initSqlJs();
+
+  // Explicitly load sql-wasm.wasm binary so sql.js doesn't try to locate it
+  // from the original node_modules path at runtime (fails in bun --compile binary).
+  let wasmBinary;
+  try {
+    const wasmPath = path.join(__dirname, 'sql-wasm.wasm');
+    if (fs.existsSync(wasmPath)) {
+      wasmBinary = fs.readFileSync(wasmPath);
+      console.log('[DB] Loaded sql-wasm.wasm from bundled asset');
+    }
+  } catch (e) {
+    // Fallback: let sql.js locate the WASM itself (works in dev/pnpm)
+    console.log('[DB] No bundled WASM found, using sql.js default loader');
+  }
+
+  SQL = await initSqlJs({ wasmBinary });
   configDb = _openConfig();
   return true;
 }
@@ -178,48 +200,91 @@ function getConfigDb() {
   return configDb;
 }
 
-function migrateConfig(db) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS app_settings (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS recent_projects (
-      id          TEXT PRIMARY KEY,
-      name        TEXT NOT NULL,
-      file_path   TEXT NOT NULL UNIQUE,
-      last_opened TEXT NOT NULL DEFAULT (datetime('now')),
-      word_count  INTEGER DEFAULT 0
-    );
-    CREATE TABLE IF NOT EXISTS editor_snapshots (
-      project_path TEXT PRIMARY KEY,
-      chapter_num  INTEGER NOT NULL,
-      content      TEXT NOT NULL,
-      cursor_pos   INTEGER,
-      updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `);
-  // Seed default settings if empty
-  const count = db.prepare('SELECT COUNT(*) as c FROM app_settings').get().c;
-  if (count === 0) {
-    const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
-    const defaults = [
-      ['api_key', ''],
-      ['api_base_url', 'https://api.deepseek.com/v1'],
-      ['api_model', 'deepseek-v4-flash'],
-      ['ui_language', 'zh'],
-      ['theme', 'dark'],
-      ['editor_font_size', '17'],
-      ['editor_font_family', "'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif"],
-      ['auto_save_interval', '30'],
-      ['backup_enabled', 'true'],
-      ['accent_color', '#c9a96e'],
-    ];
-    const tx = db.transaction(() => {
-      for (const [k, v] of defaults) insert.run(k, v);
-    });
-    tx();
+// ═══════════════════════════════════════════════════════════════
+// Generic migration runner
+// ═══════════════════════════════════════════════════════════════
+
+function runMigrations(db, migrations, targetVersion, getVersionFn, setVersionFn) {
+  let currentVersion = getVersionFn(db);
+  if (currentVersion >= targetVersion) return;
+  for (let v = currentVersion; v < targetVersion; v++) {
+    if (migrations[v]) migrations[v](db);
+    setVersionFn(db, v + 1);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Config DB migrations
+// ═══════════════════════════════════════════════════════════════
+
+const configMigrations = [
+  // v0 → v1: initial schema + defaults
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS recent_projects (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        file_path   TEXT NOT NULL UNIQUE,
+        last_opened TEXT NOT NULL DEFAULT (datetime('now')),
+        word_count  INTEGER DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS editor_snapshots (
+        project_path TEXT PRIMARY KEY,
+        chapter_num  INTEGER NOT NULL,
+        content      TEXT NOT NULL,
+        cursor_pos   INTEGER,
+        updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    // Seed default settings if empty
+    const count = db.prepare('SELECT COUNT(*) as c FROM app_settings').get().c;
+    if (count === 0) {
+      const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
+      const defaults = [
+        ['api_key', ''],
+        ['api_base_url', 'https://api.deepseek.com/v1'],
+        ['api_model', 'deepseek-v4-flash'],
+        ['ui_language', 'zh'],
+        ['theme', 'dark'],
+        ['editor_font_size', '17'],
+        ['editor_font_family', "'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif"],
+        ['auto_save_interval', '30'],
+        ['backup_enabled', 'true'],
+        ['accent_color', '#c9a96e'],
+      ];
+      const innerTx = db.transaction(() => {
+        for (const [k, v] of defaults) insert.run(k, v);
+      });
+      innerTx();
+    }
+  },
+];
+
+function makeVersionGetter(tableName) {
+  return (db) => {
+    db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+    try {
+      const row = db.prepare(`SELECT value FROM ${tableName} WHERE key = 'schema_version'`).get();
+      return row ? parseInt(row.value, 10) || 0 : 0;
+    } catch { return 0; }
+  };
+}
+
+function makeVersionSetter(tableName) {
+  return (db, version) => {
+    db.prepare(`INSERT OR REPLACE INTO ${tableName} (key, value) VALUES ('schema_version', ?)`).run(String(version));
+  };
+}
+
+const getConfigVersion = makeVersionGetter('app_settings');
+const setConfigVersion = makeVersionSetter('app_settings');
+
+function migrateConfig(db) {
+  runMigrations(db, configMigrations, CONFIG_SCHEMA_VERSION, getConfigVersion, setConfigVersion);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -255,212 +320,217 @@ function getProjectDb(name) {
   return openProjectDb(getProjectDbPath(name));
 }
 
-function migrateProject(db) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS project_meta (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS volumes (
-      id        INTEGER PRIMARY KEY AUTOINCREMENT,
-      sort_order INTEGER NOT NULL,
-      title     TEXT NOT NULL,
-      summary   TEXT DEFAULT '',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS chapters (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      volume_id   INTEGER REFERENCES volumes(id) ON DELETE CASCADE,
-      num         INTEGER NOT NULL,
-      title       TEXT NOT NULL,
-      outline     TEXT DEFAULT '',
-      content     TEXT DEFAULT '',
-      summary     TEXT DEFAULT '',
-      word_count  INTEGER DEFAULT 0,
-      status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','review','accepted')),
-      cognitive_frame   TEXT DEFAULT '',
-      emotional_anchor  TEXT DEFAULT '',
-      world_texture     TEXT DEFAULT '',
-      concrete_mystery  TEXT DEFAULT '',
-      interpersonal_tension TEXT DEFAULT '',
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      UNIQUE(volume_id, num)
-    );
-    CREATE TABLE IF NOT EXISTS characters (
-      id          TEXT PRIMARY KEY,
-      name        TEXT NOT NULL UNIQUE,
-      age         TEXT DEFAULT '',
-      gender      TEXT DEFAULT '',
-      appearance  TEXT DEFAULT '',
-      personality TEXT DEFAULT '',
-      background  TEXT DEFAULT '',
-      motivation  TEXT DEFAULT '',
-      arc         TEXT DEFAULT '',
-      ext_markers TEXT DEFAULT '',
-      avatar      TEXT DEFAULT '',
-      notes       TEXT DEFAULT '',
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS chapter_characters (
-      chapter_id  INTEGER REFERENCES chapters(id) ON DELETE CASCADE,
-      character_id TEXT REFERENCES characters(id) ON DELETE CASCADE,
-      role        TEXT DEFAULT 'appears' CHECK (role IN ('appears','speaks','pov','mentioned')),
-      PRIMARY KEY (chapter_id, character_id)
-    );
-    CREATE TABLE IF NOT EXISTS world_entries (
-      id          TEXT PRIMARY KEY,
-      category    TEXT NOT NULL,
-      name        TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      tags        TEXT DEFAULT '',
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS project_genres (
-      genre TEXT PRIMARY KEY
-    );
-    CREATE TABLE IF NOT EXISTS sidebar_items (
-      id          TEXT PRIMARY KEY,
-      label_key   TEXT NOT NULL,
-      icon        TEXT NOT NULL,
-      category    TEXT NOT NULL CHECK (category IN ('universal','genre','optional')),
-      genres      TEXT DEFAULT '',
-      sort_order  INTEGER NOT NULL,
-      route       TEXT NOT NULL,
-      enabled     INTEGER NOT NULL DEFAULT 1
-    );
-    -- Seed default sidebar items
-    INSERT OR IGNORE INTO sidebar_items (id, label_key, icon, category, genres, sort_order, route, enabled) VALUES
-      ('dashboard',    'sidebar.dashboard',    'LayoutDashboard', 'universal', '',  1,  'page-dashboard',    1),
-      ('characters',   'sidebar.characters',   'Users',           'universal', '',  2,  'page-characters',   1),
-      ('world',        'sidebar.world',        'Globe',           'universal', '',  3,  'page-world',        1),
-      ('science',      'sidebar.science',      'FlaskConical',    'genre', 'sci-fi',  4,  'page-science',      1),
-      ('outline_page', 'sidebar.outline_page', 'ScrollText',      'universal', '',  5,  'page-outline',      1),
-      ('foreshadow',   'sidebar.foreshadow',   'Link2',           'universal', '',  6,  'page-foreshadow',   1),
-      ('memory',       'sidebar.memory',       'Brain',           'universal', '',  7,  'page-memory',       1),
-      ('relations',    'sidebar.relations',    'HeartHandshake',  'universal', '',  8,  'page-relations',    1),
-      ('timeline',     'sidebar.timeline',     'CalendarDays',    'universal', '',  9,  'page-timeline',     1),
-      ('consistency',  'sidebar.consistency',  'ShieldCheck',     'universal', '',  10, 'page-consistency',  1),
-      ('export',       'sidebar.export',       'Download',        'universal', '',  11, 'page-export',       1);
-    CREATE TABLE IF NOT EXISTS foreshadows (
-      id              TEXT PRIMARY KEY,
-      title           TEXT NOT NULL,
-      description     TEXT DEFAULT '',
-      status          TEXT NOT NULL DEFAULT 'planted' CHECK (status IN ('planted','progressing','resolved','abandoned')),
-      planted_chapter_id    INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
-      expected_resolve_chapter INTEGER,
-      resolved_chapter_id   INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
-      priority        TEXT DEFAULT 'normal' CHECK (priority IN ('low','normal','high')),
-      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS memories (
-      id          TEXT PRIMARY KEY,
-      category    TEXT NOT NULL CHECK (category IN ('character','location','item','event','promise','other')),
-      content     TEXT NOT NULL,
-      source_chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS character_relations (
-      id              TEXT PRIMARY KEY,
-      character_a_id  TEXT REFERENCES characters(id) ON DELETE CASCADE,
-      character_b_id  TEXT REFERENCES characters(id) ON DELETE CASCADE,
-      relation_type   TEXT NOT NULL,
-      description     TEXT DEFAULT '',
-      intensity       INTEGER DEFAULT 3,
-      started_at      TEXT DEFAULT '',
-      ended_at        TEXT DEFAULT '',
-      layout_x        REAL,
-      layout_y        REAL,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS science_entries (
-      id          TEXT PRIMARY KEY,
-      label       TEXT NOT NULL CHECK (label IN ('known','extrapolation','hypothesis')),
-      name        TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      "references"  TEXT DEFAULT '',
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS timeline_events (
-      id          TEXT PRIMARY KEY,
-      year        TEXT NOT NULL,
-      title       TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      importance  INTEGER DEFAULT 3,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS clue_board (
-      id              TEXT PRIMARY KEY,
-      title           TEXT NOT NULL,
-      description     TEXT DEFAULT '',
-      kind            TEXT DEFAULT '' CHECK (kind IN ('clue','red-herring','deduction','question')),
-      related_chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
-      resolved        INTEGER NOT NULL DEFAULT 0,
-      resolved_at     TEXT,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS token_usage (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      task_name       TEXT NOT NULL,
-      chapter_num     INTEGER,
-      input_tokens    INTEGER NOT NULL DEFAULT 0,
-      output_tokens   INTEGER NOT NULL DEFAULT 0,
-      context_tokens  INTEGER,
-      model           TEXT DEFAULT '',
-      created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS chat_sessions (
-      id          TEXT PRIMARY KEY,
-      title       TEXT NOT NULL DEFAULT '新对话',
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id          TEXT PRIMARY KEY,
-      session_id  TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
-      role        TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
-      content     TEXT NOT NULL,
-      tool_calls  TEXT DEFAULT '[]',
-      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_chapters_status ON chapters(status);
-    CREATE INDEX IF NOT EXISTS idx_chapters_volume ON chapters(volume_id, num);
-    CREATE INDEX IF NOT EXISTS idx_chapters_order ON chapters(num);
-    CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name);
-    CREATE INDEX IF NOT EXISTS idx_foreshadows_status ON foreshadows(status);
-    CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
-  `);
+// ═══════════════════════════════════════════════════════════════
+// Project DB migrations
+// ═══════════════════════════════════════════════════════════════
 
-  // Migrate existing chat_messages: add session_id column if missing
-  try {
-    db.exec("ALTER TABLE chat_messages ADD COLUMN session_id TEXT NOT NULL DEFAULT '' REFERENCES chat_sessions(id) ON DELETE CASCADE");
-  } catch (e) {
-    // column already exists — ignore
-  }
-  // Index on session_id (must be after ALTER TABLE for existing DBs)
-  try {
-    db.exec("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)");
-  } catch (e) {
-    // ignore
-  }
+const projectMigrations = [
+  // v0 → v1: initial schema
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_meta (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS volumes (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        sort_order INTEGER NOT NULL,
+        title     TEXT NOT NULL,
+        summary   TEXT DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS chapters (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        volume_id   INTEGER REFERENCES volumes(id) ON DELETE CASCADE,
+        num         INTEGER NOT NULL,
+        title       TEXT NOT NULL,
+        outline     TEXT DEFAULT '',
+        content     TEXT DEFAULT '',
+        summary     TEXT DEFAULT '',
+        word_count  INTEGER DEFAULT 0,
+        status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','writing','review','accepted')),
+        cognitive_frame   TEXT DEFAULT '',
+        emotional_anchor  TEXT DEFAULT '',
+        world_texture     TEXT DEFAULT '',
+        concrete_mystery  TEXT DEFAULT '',
+        interpersonal_tension TEXT DEFAULT '',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(volume_id, num)
+      );
+      CREATE TABLE IF NOT EXISTS characters (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL UNIQUE,
+        age         TEXT DEFAULT '',
+        gender      TEXT DEFAULT '',
+        appearance  TEXT DEFAULT '',
+        personality TEXT DEFAULT '',
+        background  TEXT DEFAULT '',
+        motivation  TEXT DEFAULT '',
+        arc         TEXT DEFAULT '',
+        ext_markers TEXT DEFAULT '',
+        avatar      TEXT DEFAULT '',
+        notes       TEXT DEFAULT '',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS chapter_characters (
+        chapter_id  INTEGER REFERENCES chapters(id) ON DELETE CASCADE,
+        character_id TEXT REFERENCES characters(id) ON DELETE CASCADE,
+        role        TEXT DEFAULT 'appears' CHECK (role IN ('appears','speaks','pov','mentioned')),
+        PRIMARY KEY (chapter_id, character_id)
+      );
+      CREATE TABLE IF NOT EXISTS world_entries (
+        id          TEXT PRIMARY KEY,
+        category    TEXT NOT NULL,
+        name        TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        tags        TEXT DEFAULT '',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS project_genres (
+        genre TEXT PRIMARY KEY
+      );
+      CREATE TABLE IF NOT EXISTS sidebar_items (
+        id          TEXT PRIMARY KEY,
+        label_key   TEXT NOT NULL,
+        icon        TEXT NOT NULL,
+        category    TEXT NOT NULL CHECK (category IN ('universal','genre','optional')),
+        genres      TEXT DEFAULT '',
+        sort_order  INTEGER NOT NULL,
+        route       TEXT NOT NULL,
+        enabled     INTEGER NOT NULL DEFAULT 1
+      );
+      -- Seed default sidebar items
+      INSERT OR IGNORE INTO sidebar_items (id, label_key, icon, category, genres, sort_order, route, enabled) VALUES
+        ('dashboard',    'sidebar.dashboard',    'LayoutDashboard', 'universal', '',  1,  'page-dashboard',    1),
+        ('characters',   'sidebar.characters',   'Users',           'universal', '',  2,  'page-characters',   1),
+        ('world',        'sidebar.world',        'Globe',           'universal', '',  3,  'page-world',        1),
+        ('science',      'sidebar.science',      'FlaskConical',    'genre', 'sci-fi',  4,  'page-science',      1),
+        ('outline_page', 'sidebar.outline_page', 'ScrollText',      'universal', '',  5,  'page-outline',      1),
+        ('foreshadow',   'sidebar.foreshadow',   'Link2',           'universal', '',  6,  'page-foreshadow',   1),
+        ('memory',       'sidebar.memory',       'Brain',           'universal', '',  7,  'page-memory',       1),
+        ('relations',    'sidebar.relations',    'HeartHandshake',  'universal', '',  8,  'page-relations',    1),
+        ('timeline',     'sidebar.timeline',     'CalendarDays',    'universal', '',  9,  'page-timeline',     1),
+        ('consistency',  'sidebar.consistency',  'ShieldCheck',     'universal', '',  10, 'page-consistency',  1),
+        ('export',       'sidebar.export',       'Download',        'universal', '',  11, 'page-export',       1);
+      CREATE TABLE IF NOT EXISTS foreshadows (
+        id              TEXT PRIMARY KEY,
+        title           TEXT NOT NULL,
+        description     TEXT DEFAULT '',
+        status          TEXT NOT NULL DEFAULT 'planted' CHECK (status IN ('planted','progressing','resolved','abandoned')),
+        planted_chapter_id    INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
+        expected_resolve_chapter INTEGER,
+        resolved_chapter_id   INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
+        priority        TEXT DEFAULT 'normal' CHECK (priority IN ('low','normal','high')),
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS memories (
+        id          TEXT PRIMARY KEY,
+        category    TEXT NOT NULL CHECK (category IN ('character','location','item','event','promise','other')),
+        content     TEXT NOT NULL,
+        source_chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS character_relations (
+        id              TEXT PRIMARY KEY,
+        character_a_id  TEXT REFERENCES characters(id) ON DELETE CASCADE,
+        character_b_id  TEXT REFERENCES characters(id) ON DELETE CASCADE,
+        relation_type   TEXT NOT NULL,
+        description     TEXT DEFAULT '',
+        intensity       INTEGER DEFAULT 3,
+        started_at      TEXT DEFAULT '',
+        ended_at        TEXT DEFAULT '',
+        layout_x        REAL,
+        layout_y        REAL,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS science_entries (
+        id          TEXT PRIMARY KEY,
+        label       TEXT NOT NULL CHECK (label IN ('known','extrapolation','hypothesis')),
+        name        TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        "references"  TEXT DEFAULT '',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS timeline_events (
+        id          TEXT PRIMARY KEY,
+        year        TEXT NOT NULL,
+        title       TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        importance  INTEGER DEFAULT 3,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS clue_board (
+        id              TEXT PRIMARY KEY,
+        title           TEXT NOT NULL,
+        description     TEXT DEFAULT '',
+        kind            TEXT DEFAULT '' CHECK (kind IN ('clue','red-herring','deduction','question')),
+        related_chapter_id INTEGER REFERENCES chapters(id) ON DELETE SET NULL,
+        resolved        INTEGER NOT NULL DEFAULT 0,
+        resolved_at     TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS token_usage (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_name       TEXT NOT NULL,
+        chapter_num     INTEGER,
+        input_tokens    INTEGER NOT NULL DEFAULT 0,
+        output_tokens   INTEGER NOT NULL DEFAULT 0,
+        context_tokens  INTEGER,
+        model           TEXT DEFAULT '',
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id          TEXT PRIMARY KEY,
+        title       TEXT NOT NULL DEFAULT '新对话',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id          TEXT PRIMARY KEY,
+        session_id  TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        role        TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
+        content     TEXT NOT NULL,
+        tool_calls  TEXT DEFAULT '[]',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_chapters_status ON chapters(status);
+      CREATE INDEX IF NOT EXISTS idx_chapters_volume ON chapters(volume_id, num);
+      CREATE INDEX IF NOT EXISTS idx_chapters_order ON chapters(num);
+      CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name);
+      CREATE INDEX IF NOT EXISTS idx_foreshadows_status ON foreshadows(status);
+      CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+    `);
+  },
+  // v1 → v2: add session_id column to chat_messages (legacy DBs) + index
+  (db) => {
+    try {
+      db.exec("ALTER TABLE chat_messages ADD COLUMN session_id TEXT NOT NULL DEFAULT '' REFERENCES chat_sessions(id) ON DELETE CASCADE");
+    } catch (e) {
+      // column already exists — ignore
+    }
+    try {
+      db.exec("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)");
+    } catch (e) {
+      // ignore
+    }
+  },
+];
+
+const getProjectVersion = makeVersionGetter('project_meta');
+const setProjectVersion = makeVersionSetter('project_meta');
+
+function migrateProject(db) {
+  runMigrations(db, projectMigrations, PROJECT_SCHEMA_VERSION, getProjectVersion, setProjectVersion);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════
-
-function rowToObject(row) {
-  if (!row) return null;
-  return { ...row };
-}
-
-function rowsToArray(rows) {
-  return rows || [];
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Config DB query wrappers
@@ -526,7 +596,7 @@ function findCoverPath(projectName) {
   const exts = ['png', 'jpg', 'webp', 'gif'];
   for (const ext of exts) {
     const p = path.join(coverDir, `cover.${ext}`);
-    if (require('fs').existsSync(p)) return p;
+    if (fs.existsSync(p)) return p;
   }
   return null;
 }

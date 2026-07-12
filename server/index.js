@@ -26,9 +26,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── Health check (used by Tauri sidecar startup) ───
-app.get('/api/health', (req, res) => res.json({ ok: true }));
-
 // ─── API Routes ───
 app.use('/api', apiRoutes);
 
