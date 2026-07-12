@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Mythpen",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "identifier": "com.mythpen.desktop",
   "build": {
     "frontendDist": "../dist",
