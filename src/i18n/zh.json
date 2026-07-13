@@ -28,6 +28,7 @@
     "timeline": "年表/大事记",
     "consistency": "一致性检查",
     "export": "导出",
+    "about": "关于",
     "refreshTooltip": "手动刷新所有数据（快捷键 ⌘⇧R）",
     "currentChapter": "当前章",
     "wordUnit": "字",
@@ -245,6 +246,7 @@
     "timeline": "年表 / 大事记",
     "newEvent": "新建事件",
     "consistencyCheck": "一致性检查",
+    "about": "关于",
     "quickScan": "快速扫描",
     "deepCheck": "深度语义检查",
     "phaseIdea": "选题",
@@ -562,5 +564,12 @@
     "category": "分类",
     "name": "名称",
     "description": "描述"
+  },
+  "about": {
+    "version": "版本号",
+    "sourceCode": "源代码",
+    "contact": "联系作者",
+    "techStack": "技术栈",
+    "openLink": "打开"
   }
 }

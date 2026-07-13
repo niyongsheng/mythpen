@@ -9,6 +9,7 @@ import { ToastContainer } from '@/components/ToastContainer'
 import { useToast } from '@/hooks/useToast'
 import { t } from '@/i18n'
 import { refreshAllData } from '@/lib/dataEvents'
+import { About } from '@/pages/About'
 import { Characters } from '@/pages/Characters'
 import { Consistency } from '@/pages/Consistency'
 import { Dashboard } from '@/pages/Dashboard'
@@ -41,6 +42,7 @@ const PAGES: Record<string, React.ReactNode> = {
   'page-memory': <Memory />,
   'page-timeline': <Timeline />,
   'page-consistency': <Consistency />,
+  'page-about': <About />,
 }
 
 function App() {

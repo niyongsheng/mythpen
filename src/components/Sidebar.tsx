@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Globe,
   HeartHandshake,
+  Info,
   LayoutDashboard,
   Link2,
   PenSquare,
@@ -44,6 +45,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   CalendarDays,
   ShieldCheck,
   Download,
+  Info,
 }
 
 export function Sidebar() {
@@ -223,6 +225,21 @@ export function Sidebar() {
             })}
           </div>
         )}
+
+        {/* About Section */}
+        <div className="h-px bg-[var(--hairline)] mx-3" />
+        <div className="py-3">
+          <div
+            className="px-4 pb-2 flex items-center gap-2 cursor-pointer transition-colors
+            text-[var(--ink-secondary)] hover:text-[var(--ink)] hover:bg-[var(--canvas-mid)]"
+            onClick={() => setActivePage('page-about')}
+          >
+            <div className={`flex items-center gap-2 flex-1 ${activePage === 'page-about' ? 'text-[var(--ink)]' : ''}`}>
+              <Info className="w-4 h-4 shrink-0" />
+              <span className="text-[13px]">{t('sidebar.about')}</span>
+            </div>
+          </div>
+        </div>
       </div>
       {/* end scrollable top */}
 

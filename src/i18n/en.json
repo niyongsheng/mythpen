@@ -33,7 +33,8 @@
     "wordUnit": "words",
     "switchToStatus": "Switch to {status}",
     "volumeTitle": "Volume {order} · {title}",
-    "chapterTitle": "Ch. {num} {title}"
+    "chapterTitle": "Ch. {num} {title}",
+    "about": "About"
   },
   "editor": {
     "continue": "Continue",
@@ -245,6 +246,7 @@
     "timeline": "Timeline",
     "newEvent": "New Event",
     "consistencyCheck": "Consistency Check",
+    "about": "About",
     "quickScan": "Quick Scan",
     "deepCheck": "Deep Check",
     "phaseIdea": "Idea",
@@ -562,5 +564,12 @@
     "category": "Category",
     "name": "Name",
     "description": "Description"
+  },
+  "about": {
+    "version": "Version",
+    "sourceCode": "Source Code",
+    "contact": "Contact",
+    "techStack": "Tech Stack",
+    "openLink": "Open"
   }
 }
