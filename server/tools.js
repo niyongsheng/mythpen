@@ -681,7 +681,7 @@ const TOOLS = [
     },
   },
 ];
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 function executeTool(projectName, toolName, args) {
   const db = require('./db');
@@ -783,7 +783,7 @@ function executeTool(projectName, toolName, args) {
       return { ...row, appears_in: chapters };
     }
     case 'create_character': {
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare(`INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, args.name, args.age || '', args.gender || '', args.appearance || '', args.personality || '',
@@ -812,7 +812,7 @@ function executeTool(projectName, toolName, args) {
       return pdb.prepare('SELECT id, category, name, description, tags FROM world_entries ORDER BY category, name').all();
     }
     case 'create_world_entry': {
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare('INSERT INTO world_entries (id, category, name, description, tags) VALUES (?, ?, ?, ?, ?)')
         .run(id, args.category, args.name, args.description, args.tags || '');
       return { created: true, id, category: args.category, name: args.name };
@@ -827,7 +827,7 @@ function executeTool(projectName, toolName, args) {
       return pdb.prepare(sql).all(...params);
     }
     case 'create_foreshadow': {
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare(`INSERT INTO foreshadows (id, title, description, status, priority, expected_resolve_chapter)
         VALUES (?, ?, ?, 'planted', ?, ?)`)
         .run(id, args.title, args.description, args.priority || 'normal', args.expected_resolve_chapter || 0);
@@ -861,7 +861,7 @@ function executeTool(projectName, toolName, args) {
       const b = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_b);
       if (!a) return { error: `角色 "${args.character_a}" 不存在，请先创建` };
       if (!b) return { error: `角色 "${args.character_b}" 不存在，请先创建` };
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare(`INSERT INTO character_relations (id, character_a_id, character_b_id, relation_type, description, intensity)
         VALUES (?, ?, ?, ?, ?, ?)`)
         .run(id, a.id, b.id, args.relation_type, args.description || '', args.intensity || 3);
@@ -873,7 +873,7 @@ function executeTool(projectName, toolName, args) {
       return pdb.prepare('SELECT * FROM memories ORDER BY created_at DESC').all();
     }
     case 'create_memory': {
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare('INSERT INTO memories (id, category, content, source_chapter_id) VALUES (?, ?, ?, ?)')
         .run(id, args.category, args.content, args.source_chapter_num || null);
       return { created: true, id, category: args.category };
@@ -884,7 +884,7 @@ function executeTool(projectName, toolName, args) {
       return pdb.prepare('SELECT * FROM timeline_events ORDER BY year').all();
     }
     case 'create_timeline_event': {
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare('INSERT INTO timeline_events (id, year, title, description, importance) VALUES (?, ?, ?, ?, ?)')
         .run(id, args.year, args.title, args.description, args.importance || 3);
       return { created: true, id, year: args.year, title: args.title };
@@ -942,7 +942,7 @@ function executeTool(projectName, toolName, args) {
       return pdb.prepare('SELECT * FROM science_entries ORDER BY label, name').all();
     }
     case 'create_science_entry': {
-      const id = uuidv4();
+      const id = randomUUID();
       pdb.prepare('INSERT INTO science_entries (id, label, name, description, "references") VALUES (?, ?, ?, ?, ?)')
         .run(id, args.label, args.name, args.description, args.references || '');
       return { created: true, id, label: args.label, name: args.name };
@@ -1052,7 +1052,7 @@ function executeTool(projectName, toolName, args) {
       return pdb.prepare(sql).all();
     }
     case 'create_clue': {
-      const id = uuidv4();
+      const id = randomUUID();
       let relatedChapterId = null;
       if (args.related_chapter_num) {
         const ch = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.related_chapter_num);

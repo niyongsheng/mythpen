@@ -228,144 +228,82 @@ export function AIPanel() {
 
     const ch = currentChapter
 
-    if (isChat) {
-      // ── 共创模式 ──
-      setToolCalls([])
-      toolCallsRef.current = []
-      const context = t('ai.collabPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
-      // Build conversation history from stored messages.
-      const chatHistory: any[] = []
-      for (const msg of messages) {
-        chatHistory.push({
-          role: msg.role === 'ai' ? 'assistant' : (msg.role as 'user' | 'system'),
-          content: msg.content,
-        })
-      }
-      abortRef.current = aiApi.chatStream(
-        [...chatHistory, { role: 'user', content: context }],
-        project,
-        (text: string) => {
-          streamRef.current += text
-          setStreamText(streamRef.current)
-          setGenTokens((prev) => prev + 1)
-        },
-        async () => {
-          setTask({ status: 'completed' })
-          const fullText = streamRef.current
-          const aiMsg = {
-            role: 'ai' as const,
-            content: fullText || t('ai.dialogComplete'),
-            toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
+    // Build chat history from stored messages.
+    const chatHistory: any[] = messages.map((msg) => ({
+      role: msg.role === 'ai' ? 'assistant' : (msg.role as 'user' | 'system'),
+      content: msg.content,
+    }))
+
+    const context = isChat
+      ? t('ai.collabPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
+      : t('ai.writingPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
+
+    abortRef.current = aiApi.chatStream(
+      [...chatHistory, { role: 'user', content: context }],
+      project,
+      // onChunk
+      (text: string) => {
+        streamRef.current += text
+        setStreamText(streamRef.current)
+        setGenTokens((prev) => prev + 1)
+      },
+      // onComplete
+      async () => {
+        setTask({ status: 'completed' })
+        const fullText = streamRef.current
+        const defaultMsg = isChat ? t('ai.dialogComplete') : t('ai.execComplete')
+        const aiMsg = {
+          role: 'ai' as const,
+          content: fullText || defaultMsg,
+          toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
+        }
+        addMessage({ id: nextMsgId(), ...aiMsg })
+        saveMsg(aiMsg).catch(() => {})
+        const hadToolCalls = toolCallsRef.current.length > 0
+        done()
+        if (fullText) {
+          showToast(t('ai.responseComplete'), 'success')
+        }
+        generateAITitle(userMsg, fullText || undefined)
+        if (hadToolCalls) {
+          const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
+          const entities = getModifiedEntities(toolNames)
+          for (const entity of entities) {
+            notifyDataChanged(entity)
           }
-          addMessage({ id: nextMsgId(), ...aiMsg })
-          saveMsg(aiMsg).catch(() => {})
-          const hadToolCalls = toolCallsRef.current.length > 0
-          done()
-          showToast(fullText ? t('ai.responseComplete') : t('ai.dialogComplete'), 'success')
-          generateAITitle(userMsg, fullText || undefined)
-          if (hadToolCalls) {
-            const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
-            const entities = getModifiedEntities(toolNames)
-            // Broadcast each modified entity type so all stores can react
-            for (const entity of entities) {
-              notifyDataChanged(entity)
-            }
-            // Legacy: still reload critical data immediately for responsiveness
+          if (isChat) {
+            // Collab mode: reload all data for immediate responsiveness
             useChapterStore.getState().loadChapters(project!)
             useProjectStore.getState().loadProjects()
-          }
-        },
-        (err: any) => {
-          setTask({ status: 'error' })
-          const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
-          addMessage({ id: nextMsgId(), ...errMsg })
-          saveMsg(errMsg).catch(() => {})
-          done()
-        },
-        'collab',
-        (tc: any) => {
-          const updated = [...toolCallsRef.current, { ...tc, status: 'running' }]
-          toolCallsRef.current = updated
-          setToolCalls(updated)
-        },
-        (tr: any) => {
-          const updated = toolCallsRef.current.map((tc) =>
-            tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc,
-          )
-          toolCallsRef.current = updated
-          setToolCalls(updated)
-        },
-      )
-    } else {
-      // ── 写作模式 ──
-      setToolCalls([])
-      toolCallsRef.current = []
-      const context = t('ai.writingPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
-      // Build chat history (same as chat mode for context continuity)
-      const chatHistory: any[] = []
-      for (const msg of messages) {
-        chatHistory.push({
-          role: msg.role === 'ai' ? 'assistant' : (msg.role as 'user' | 'system'),
-          content: msg.content,
-        })
-      }
-      abortRef.current = aiApi.chatStream(
-        [...chatHistory, { role: 'user', content: context }],
-        project,
-        (text: string) => {
-          streamRef.current += text
-          setStreamText(streamRef.current)
-          setGenTokens((prev) => prev + 1)
-        },
-        async () => {
-          setTask({ status: 'completed' })
-          const fullText = streamRef.current
-          const aiMsg = {
-            role: 'ai' as const,
-            content: fullText || t('ai.execComplete'),
-            toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
-          }
-          addMessage({ id: nextMsgId(), ...aiMsg })
-          saveMsg(aiMsg).catch(() => {})
-          const hadToolCalls = toolCallsRef.current.length > 0
-          done()
-          generateAITitle(userMsg, fullText || undefined)
-          // Broadcast data change events to all stores
-          if (hadToolCalls) {
-            const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
-            const entities = getModifiedEntities(toolNames)
-            for (const entity of entities) {
-              notifyDataChanged(entity)
-            }
-          }
-          // Reload chapter content if tool calls were made (content was saved to DB)
-          if (hadToolCalls && ch?.num) {
+          } else if (ch?.num) {
+            // Writing mode: reload chapter content that was written
             await loadChapterContent(project, ch.num, ch.volumeId)
           }
-        },
-        (err: any) => {
-          setTask({ status: 'error' })
-          showToast(t('ai.chatError'), 'error')
-          const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
-          addMessage({ id: nextMsgId(), ...errMsg })
-          saveMsg(errMsg).catch(() => {})
-          done()
-        },
-        'writing',
-        (tc: any) => {
-          const updated = [...toolCallsRef.current, { ...tc, status: 'running' }]
-          toolCallsRef.current = updated
-          setToolCalls(updated)
-        },
-        (tr: any) => {
-          const updated = toolCallsRef.current.map((tc) =>
-            tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc,
-          )
-          toolCallsRef.current = updated
-          setToolCalls(updated)
-        },
-      )
-    }
+        }
+      },
+      // onError
+      (err: any) => {
+        setTask({ status: 'error' })
+        if (!isChat) showToast(t('ai.chatError'), 'error')
+        const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
+        addMessage({ id: nextMsgId(), ...errMsg })
+        saveMsg(errMsg).catch(() => {})
+        done()
+      },
+      mode,
+      (tc: any) => {
+        const updated = [...toolCallsRef.current, { ...tc, status: 'running' }]
+        toolCallsRef.current = updated
+        setToolCalls(updated)
+      },
+      (tr: any) => {
+        const updated = toolCallsRef.current.map((tc) =>
+          tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc,
+        )
+        toolCallsRef.current = updated
+        setToolCalls(updated)
+      },
+    )
   }
 
   return (

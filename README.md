@@ -22,6 +22,10 @@ pnpm tauri build    # Build desktop installer (.dmg/.msi/.AppImage)
 **Desktop**: Tauri v2 
 **AI**: OpenAI-compatible 
 
+> [!TIP]
+> 
+> Prefer Claude Code's workflow? Check out [clark-typer](https://github.com/niyongsheng/clark-typer).
+
 ## License
 
 [GPLv3](./LICENSE)

@@ -82,7 +82,29 @@ function _buildSql(sqlText, bindMeta) {
  * because sql.js's db.export() (called by _flushDb) invalidates ALL existing statements.
  * The statement is freed before _flushDb() so export() never hits a stale handle.
  */
+const DB_FLUSH_DELAY = 250; // ms — batch writes up to this interval
+
 function _wrapDb(db, filePath) {
+  let dirty = false;
+  let flushTimer = null;
+
+  function _flushSync() {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (!dirty) return;
+    dirty = false;
+    _flushDb(db, filePath);
+  }
+
+  function _scheduleFlush() {
+    dirty = true;
+    if (!flushTimer) {
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        _flushSync();
+      }, DB_FLUSH_DELAY);
+    }
+  }
+
   return {
     _db: db,
     _path: filePath,
@@ -118,7 +140,7 @@ function _wrapDb(db, filePath) {
           s.step();
           const changes = db.getRowsModified();
           s.free();
-          _flushDb(db, filePath);
+          _scheduleFlush();
           return { changes };
         },
       };
@@ -126,13 +148,13 @@ function _wrapDb(db, filePath) {
 
     exec(sql) {
       const results = db.exec(sql);
-      _flushDb(db, filePath);
+      _scheduleFlush();
       return results;
     },
 
     run(sql, params) {
       db.run(sql, params || []);
-      _flushDb(db, filePath);
+      _scheduleFlush();
     },
 
     transaction(fn) {
@@ -141,7 +163,7 @@ function _wrapDb(db, filePath) {
         try {
           const result = fn(...args);
           db.run('COMMIT');
-          _flushDb(db, filePath);
+          _flushSync(); // flush immediately after commit for data safety
           return result;
         } catch (e) {
           db.run('ROLLBACK');
@@ -151,7 +173,7 @@ function _wrapDb(db, filePath) {
     },
 
     close() {
-      _flushDb(db, filePath);
+      _flushSync();
       db.close();
     },
   };
@@ -568,7 +590,7 @@ const projectMigrations = [
     try {
       db.exec("CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id)");
     } catch (e) {
-      // ignore
+      console.warn("[DB] Migration v1→v2 (index) skipped:", e.message)
     }
   },
 ];

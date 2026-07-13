@@ -215,12 +215,17 @@ export const aiApi = {
       signal: controller.signal,
     })
       .then(async (response) => {
+        let gotError = false
         await readSSEStream(response, {
           content_chunk: (data) => onChunk(data.text || ''),
           tool_call: (data) => onToolCall?.(data),
           tool_result: (data) => onToolResult?.(data),
+          error: (data) => {
+            gotError = true
+            onError(data)
+          },
         })
-        onEnd()
+        if (!gotError) onEnd()
       })
       .catch((e) => onError(e))
     return controller
@@ -243,11 +248,17 @@ export const aiApi = {
       signal: controller.signal,
     })
       .then(async (response) => {
+        let gotError = false
         await readSSEStream(response, {
           content_chunk: (data) => onChunk(data.text || ''),
           done: (data) => {
             finished = true
             onEnd(data)
+          },
+          error: (data) => {
+            gotError = true
+            finished = true
+            onError(data)
           },
         })
         if (!finished) onEnd()

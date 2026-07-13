@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
@@ -269,7 +269,7 @@ router.get('/:project/characters/:id', (req, res) => {
 router.post('/:project/characters', (req, res) => {
   const { name, age = '', gender = '', appearance = '', personality = '', background = '', motivation = '', arc = '', ext_markers = '' } = req.body || {};
   if (!name) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '角色名不能为空', recoverable: true } });
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, ext_markers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [id, name, age, gender, appearance, personality, background, motivation, arc, ext_markers]
@@ -307,7 +307,7 @@ router.get('/:project/world', (req, res) => {
 
 router.post('/:project/world', (req, res) => {
   const { category, name, description = '', tags = '[]' } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO world_entries (id, category, name, description, tags) VALUES (?, ?, ?, ?, ?)',
     [id, category, name, description, tags]
@@ -339,7 +339,7 @@ router.get('/:project/science', (req, res) => {
 
 router.post('/:project/science', (req, res) => {
   const { label, name, description = '', references = '' } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO science_entries (id, label, name, description, "references") VALUES (?, ?, ?, ?, ?)',
     [id, label, name, description, references]
@@ -369,7 +369,7 @@ router.get('/:project/foreshadows', (req, res) => {
 
 router.post('/:project/foreshadows', (req, res) => {
   const { title, description = '', status = 'planted', priority = 'normal', expected_resolve_chapter = 0 } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO foreshadows (id, title, description, status, priority, expected_resolve_chapter) VALUES (?, ?, ?, ?, ?, ?)',
     [id, title, description, status, priority, expected_resolve_chapter]
@@ -388,7 +388,7 @@ router.get('/:project/relations', (req, res) => {
 
 router.post('/:project/relations', (req, res) => {
   const { character_a_id, character_b_id, relation_type, description = '', intensity = 3 } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO character_relations (id, character_a_id, character_b_id, relation_type, description, intensity) VALUES (?, ?, ?, ?, ?, ?)',
     [id, character_a_id, character_b_id, relation_type, description, intensity]
@@ -420,7 +420,7 @@ router.get('/:project/memories', (req, res) => {
 
 router.post('/:project/memories', (req, res) => {
   const { category, content, source_chapter_id } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO memories (id, category, content, source_chapter_id) VALUES (?, ?, ?, ?)',
     [id, category, content, source_chapter_id || null]
@@ -464,7 +464,7 @@ router.get('/:project/timeline', (req, res) => {
 
 router.post('/:project/timeline', (req, res) => {
   const { year, title, description = '', importance = 3 } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO timeline_events (id, year, title, description, importance) VALUES (?, ?, ?, ?, ?)',
     [id, year, title, description, importance]
@@ -510,6 +510,8 @@ router.put('/settings', (req, res) => {
   const { key, value } = req.body || {};
   if (!key) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '缺少key', recoverable: true } });
   db.dbExecute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, String(value)]);
+  // Invalidate AI config cache so next AI request picks up the change
+  if (db.invalidateAiConfigCache) db.invalidateAiConfigCache();
   res.json({ success: true });
 });
 
@@ -827,7 +829,7 @@ ${chapters.map(ch => `<div class="chapter"><h1>第${ch.num}章 ${ch.title}</h1>$
   try {
     db.projectExecute(pn,
       'INSERT OR REPLACE INTO exports (id, format, file_path, word_count, exported_at) VALUES (?, ?, ?, ?, datetime(\'now\'))',
-      [uuidv4(), ext, filePath, totalWords]
+      [randomUUID(), ext, filePath, totalWords]
     );
   } catch(e) {}
 
@@ -861,7 +863,7 @@ router.get('/:project/chat/sessions', (req, res) => {
 
 router.post('/:project/chat/sessions', (req, res) => {
   const { title } = req.body || {};
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO chat_sessions (id, title) VALUES (?, ?)',
     [id, title || '新对话']
@@ -921,7 +923,7 @@ router.post('/:project/chat/messages', (req, res) => {
   if (!['user', 'ai', 'system'].includes(role)) {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: 'role must be user/ai/system', recoverable: true } });
   }
-  const id = uuidv4();
+  const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO chat_messages (id, session_id, role, content, tool_calls) VALUES (?, ?, ?, ?, ?)',
     [id, session_id, role, content, JSON.stringify(toolCalls || [])]

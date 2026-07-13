@@ -33,7 +33,16 @@ app.use('/api', apiRoutes);
 // AI CONFIG — read from config.db
 // ═══════════════════════════════════════════
 
+// ─── AI Config cache (invalidated when settings are updated) ───
+let aiConfigCache = null;
+
+function invalidateAiConfigCache() {
+  aiConfigCache = null;
+}
+
 function getAiConfig() {
+  if (aiConfigCache) return aiConfigCache;
+
   const DEFAULTS = {
     apiBaseUrl: 'https://api.deepseek.com/v1',
     apiKey: process.env.DEEPSEEK_KEY || '',
@@ -45,12 +54,13 @@ function getAiConfig() {
     const rows = db.dbQuery('SELECT key, value FROM app_settings');
     const map = {};
     for (const r of rows) map[r.key] = r.value;
-    return {
+    aiConfigCache = {
       apiBaseUrl: map.api_base_url || DEFAULTS.apiBaseUrl,
       apiKey: map.api_key || DEFAULTS.apiKey,
       apiModel: map.api_model || DEFAULTS.apiModel,
       apiType: map.api_type || DEFAULTS.apiType,
     };
+    return aiConfigCache;
   } catch (e) {
     return { ...DEFAULTS };
   }
@@ -79,7 +89,9 @@ app.post('/api/ai/chat', async (req, res) => {
           'INSERT INTO token_usage (task_name, input_tokens, output_tokens, model) VALUES (?, ?, ?, ?)',
           ['chat', result.usage.inputTokens, result.usage.outputTokens, aiConfig.apiModel]
         );
-      } catch(e) {}
+      } catch(e) {
+          console.warn('[AI Chat] Failed to record token usage:', e.message);
+        }
     }
 
     res.json({
@@ -117,7 +129,7 @@ app.post('/api/ai/chat/stream', async (req, res) => {
     let outputTokens = 0;
     const MAX_TOOL_ROUNDS = 120;
 
-    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       console.log(`[AI Stream] Round ${round}, messages: ${conversation.length}`);
 
       let result;
@@ -196,9 +208,11 @@ app.post('/api/ai/chat/stream', async (req, res) => {
         'INSERT INTO token_usage (task_name, input_tokens, output_tokens, model) VALUES (?, ?, ?, ?)',
         ['stream_chat', inputTokens, outputTokens, aiConfig.apiModel]
       );
-    } catch(e) {}
+        } catch(e) {
+          console.warn('[AI Stream] Failed to record token usage:', e.message);
+        }
 
-    res.write(`event: task_end\ndata: ${JSON.stringify({ success: true, content: fullContent, inputTokens, outputTokens })}\n\n`);
+        res.write(`event: task_end\ndata: ${JSON.stringify({ success: true, content: fullContent, inputTokens, outputTokens })}\n\n`);
     res.end();
 
   } catch (err) {
@@ -279,9 +293,11 @@ app.post('/api/ai/continue', async (req, res) => {
         'INSERT INTO token_usage (task_name, input_tokens, output_tokens, model) VALUES (?, ?, ?, ?)',
         ['continue', inputTokens, outputTokens, aiConfig.apiModel]
       );
-    } catch(e) {}
+      } catch(e) {
+        console.warn('[AI Continue] Failed to record token usage:', e.message);
+      }
 
-    res.write(`event: task_end\ndata: ${JSON.stringify({ success: true, content: fullContent })}\n\n`);
+      res.write(`event: task_end\ndata: ${JSON.stringify({ success: true, content: fullContent })}\n\n`);
     res.end();
   } catch (err) {
     console.error('Continue error:', err);
@@ -333,6 +349,10 @@ app.post('/api/shutdown', (req, res) => {
 // Handle SIGTERM from Tauri (sent before SIGKILL on some platforms)
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
+
+// Share cache invalidation with routes (settings updates clear the cache)
+const db = require('./db');
+db.invalidateAiConfigCache = invalidateAiConfigCache;
 
 // ─── Start (async — init DB then listen) ───
 const { initDatabase } = require('./db');
