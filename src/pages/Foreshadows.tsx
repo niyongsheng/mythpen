@@ -14,9 +14,9 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { key: 'planted', icon: Pin, label: '已埋' },
-  { key: 'progressing', icon: RefreshCw, label: '进展中' },
-  { key: 'resolved', icon: CheckCircle2, label: '已回收' },
+  { key: 'planted', icon: Pin, label: 'foreshadow.planted' },
+  { key: 'progressing', icon: RefreshCw, label: 'foreshadow.progressing' },
+  { key: 'resolved', icon: CheckCircle2, label: 'foreshadow.resolved' },
 ]
 
 export function Foreshadows() {
@@ -36,12 +36,9 @@ export function Foreshadows() {
         [
           {
             role: 'system',
-            content:
-              '你是一个小说伏笔设计助手。根据项目中的角色、世界观和已有伏笔，设计3-5个新的伏笔建议。' +
-              '每个伏笔包含：标题、描述、优先级(high/normal/low)。' +
-              '直接返回JSON数组，格式：[{"title":"...","description":"...","priority":"high/normal/low"}]，不要前缀说明。',
+            content: t('foreshadow.aiPrompt'),
           },
-          { role: 'user', content: '请为当前小说设计新的伏笔建议。' },
+          { role: 'user', content: t('foreshadow.aiUserMessage') },
         ],
         project,
       )
@@ -66,17 +63,18 @@ export function Foreshadows() {
     setGenerating(false)
   }
 
-  if (loading) return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+  if (loading)
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
 
   const list = foreshadows || []
   const maxChapterNum = Math.max(0, ...(chapters || []).map((c: any) => c.num))
   const stats = [
-    { label: '总计', value: String(list.length), color: 'var(--accent-gold)' },
-    { label: '已埋', value: String(list.filter((f) => f.status === 'planted').length) },
-    { label: '进展中', value: String(list.filter((f) => f.status === 'progressing').length) },
-    { label: '已回收', value: String(list.filter((f) => f.status === 'resolved').length) },
+    { label: t('foreshadow.statTotal'), value: String(list.length), color: 'var(--accent-gold)' },
+    { label: t('foreshadow.planted'), value: String(list.filter((f) => f.status === 'planted').length) },
+    { label: t('foreshadow.progressing'), value: String(list.filter((f) => f.status === 'progressing').length) },
+    { label: t('foreshadow.resolved'), value: String(list.filter((f) => f.status === 'resolved').length) },
     {
-      label: '逾期',
+      label: t('foreshadow.overdue'),
       value: String(
         list.filter(
           (f: any) =>
@@ -101,7 +99,7 @@ export function Foreshadows() {
             disabled={generating}
           >
             {generating ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Target className="w-3.5 h-3.5" />}
-            {generating ? '生成中...' : t('pages.aiDesign')}
+            {generating ? t('common.generating') : t('pages.aiDesign')}
           </button>
           <button
             className="btn-secondary flex items-center gap-1"
@@ -117,25 +115,35 @@ export function Foreshadows() {
         <SimpleCreateDialog
           title={`+ ${t('pages.manualAdd')}`}
           fields={[
-            { key: 'title', label: '伏笔标题', required: true, placeholder: '伏笔的名称' },
-            { key: 'description', label: '描述', type: 'textarea', placeholder: '伏笔的详细描述...' },
+            {
+              key: 'title',
+              label: t('foreshadow.titleField'),
+              required: true,
+              placeholder: t('foreshadow.titlePlaceholder'),
+            },
+            {
+              key: 'description',
+              label: t('foreshadow.descriptionField'),
+              type: 'textarea',
+              placeholder: t('foreshadow.descriptionPlaceholder'),
+            },
             {
               key: 'priority',
-              label: '优先级',
+              label: t('foreshadow.priorityField'),
               type: 'select',
               options: [
-                { value: 'high', label: '高' },
-                { value: 'normal', label: '普通' },
-                { value: 'low', label: '低' },
+                { value: 'high', label: t('foreshadow.priorityHigh') },
+                { value: 'normal', label: t('foreshadow.priorityNormal') },
+                { value: 'low', label: t('foreshadow.priorityLow') },
               ],
             },
             {
               key: 'status',
-              label: '状态',
+              label: t('foreshadow.statusField'),
               type: 'select',
               options: [
-                { value: 'planted', label: '已埋' },
-                { value: 'progressing', label: '进展中' },
+                { value: 'planted', label: t('foreshadow.planted') },
+                { value: 'progressing', label: t('foreshadow.progressing') },
               ],
             },
           ]}
@@ -168,7 +176,7 @@ export function Foreshadows() {
             <div key={col.key} className="flex-1 min-w-[240px] bg-[var(--canvas-soft)] rounded-lg flex flex-col">
               <div className="px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink-secondary)] border-b border-[var(--hairline)] flex items-center justify-between gap-1.5">
                 <span className="flex items-center gap-1">
-                  <ColIcon className="w-3.5 h-3.5" /> {col.label}
+                  <ColIcon className="w-3.5 h-3.5" /> {t(col.label)}
                 </span>
                 <span>{list.filter((f: any) => f.status === col.key).length}</span>
               </div>
@@ -192,7 +200,7 @@ export function Foreshadows() {
                       )}
                       {f.expected_resolve_chapter > 0 && (
                         <div className="text-[10px] text-[var(--ink-mute)] mt-1 font-mono">
-                          预期回收: 第{f.expected_resolve_chapter}章
+                          {t('foreshadow.expectedResolve', { n: f.expected_resolve_chapter })}
                         </div>
                       )}
                     </div>

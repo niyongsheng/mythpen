@@ -22,6 +22,7 @@ export function SettingsDrawer() {
   const [showApiKey, setShowApiKey] = useState(false)
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
   const [testTime, setTestTime] = useState(0)
+  const [testError, setTestError] = useState('')
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'upToDate' | 'available' | 'error'>('idle')
   const [latestVersion, setLatestVersion] = useState('')
   const [releaseUrl, setReleaseUrl] = useState('')
@@ -46,23 +47,35 @@ export function SettingsDrawer() {
 
   const handleTestConnection = async () => {
     setTestStatus('testing')
+    setTestError('')
     const start = Date.now()
     try {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: 'user', content: '回复"ok"即可' }],
+          messages: [{ role: 'user', content: t('settings.testMessage') }],
           temperature: 0,
           max_tokens: 10,
         }),
       })
       const ms = Date.now() - start
       setTestTime(ms)
-      setTestStatus(res.ok ? 'ok' : 'fail')
-    } catch {
+      if (res.ok) {
+        setTestStatus('ok')
+      } else {
+        setTestStatus('fail')
+        try {
+          const body = await res.json()
+          setTestError(body.error || `HTTP ${res.status}`)
+        } catch {
+          setTestError(`HTTP ${res.status}`)
+        }
+      }
+    } catch (err: any) {
       setTestTime(Date.now() - start)
       setTestStatus('fail')
+      setTestError(err.message || 'Network error')
     }
   }
 
@@ -113,7 +126,7 @@ export function SettingsDrawer() {
                     ${settings.uiLanguage === 'zh' ? 'bg-[var(--accent-gold)] text-[var(--canvas)] border-[var(--accent-gold)] font-medium' : 'bg-[var(--canvas-elevated)] text-[var(--ink-secondary)] hover:bg-[var(--canvas-mid)]'}`}
                   onClick={() => updateSetting('uiLanguage', 'zh')}
                 >
-                  中文
+                  {t('project.chinese')}
                 </button>
                 <button
                   className={`px-3 py-[5px] rounded-[var(--radius-sm)] border border-[var(--hairline)] text-[13px] cursor-pointer transition-colors
@@ -325,7 +338,10 @@ export function SettingsDrawer() {
                 </span>
               )}
               {testStatus === 'fail' && (
-                <span className="text-[12px] text-[var(--error)] pl-1">{t('settings.connectionFailed')}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[12px] text-[var(--error)] pl-1">{t('settings.connectionFailed')}</span>
+                  {testError && <span className="text-[11px] text-[var(--ink-mute)] pl-1">{testError}</span>}
+                </div>
               )}
             </div>
           </div>

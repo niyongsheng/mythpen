@@ -141,9 +141,12 @@ router.get('/:project/chapters', (req, res) => {
 });
 
 router.get('/:project/chapters/:num', (req, res) => {
-  const row = db.projectGet(project(req.params.project),
-    'SELECT c.*, v.title as volume_title FROM chapters c JOIN volumes v ON c.volume_id = v.id WHERE c.num = ?', [parseInt(req.params.num)]
-  );
+  const volId = req.query.volume_id ? parseInt(req.query.volume_id) : null;
+  const sql = volId
+    ? 'SELECT c.*, v.title as volume_title FROM chapters c JOIN volumes v ON c.volume_id = v.id WHERE c.num = ? AND c.volume_id = ?'
+    : 'SELECT c.*, v.title as volume_title FROM chapters c JOIN volumes v ON c.volume_id = v.id WHERE c.num = ?';
+  const params = volId ? [parseInt(req.params.num), volId] : [parseInt(req.params.num)];
+  const row = db.projectGet(project(req.params.project), sql, params);
   if (!row) return res.status(404).json({ error: { code: 'DB_NOT_FOUND', message: `章节 ${req.params.num} 不存在`, recoverable: true } });
   res.json(row);
 });

@@ -8,20 +8,20 @@ interface Format {
   name: string
   label: string
   descKey: string
-  active?: boolean
 }
 
 const FORMATS: Format[] = [
-  { name: 'epub', label: 'EPUB', descKey: '电子书格式，支持封面' },
-  { name: 'html', label: 'HTML', descKey: '网页格式，可打印为 PDF' },
-  { name: 'md', label: 'Markdown', descKey: 'Markdown 文档' },
-  { name: 'txt', label: 'TXT', descKey: '纯文本格式' },
+  { name: 'epub', label: 'EPUB', descKey: 'export.formatEpubDesc' },
+  { name: 'html', label: 'HTML', descKey: 'export.formatHtmlDesc' },
+  { name: 'md', label: 'Markdown', descKey: 'export.formatMdDesc' },
+  { name: 'txt', label: 'TXT', descKey: 'export.formatTxtDesc' },
 ]
 
 export function ExportPage() {
   const [activeFormat, setActiveFormat] = useState('epub')
   const [exporting, setExporting] = useState(false)
   const [exportMsg, setExportMsg] = useState('')
+  const [exportStatus, setExportStatus] = useState<'success' | 'error' | ''>('')
   const [coverUrl, setCoverUrl] = useState('')
   const [coverMime, setCoverMime] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -54,7 +54,8 @@ export function ExportPage() {
         setCoverUrl(`/api/${encodeURIComponent(project)}/cover?t=${Date.now()}`)
         setCoverMime(file.type)
       } catch (err: any) {
-        setExportMsg(`封面上传失败: ${err.message}`)
+        setExportMsg(t('export.coverUploadError', { msg: err.message }))
+        setExportStatus('error')
       }
     }
     reader.readAsDataURL(file)
@@ -68,7 +69,8 @@ export function ExportPage() {
       setCoverMime('')
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err: any) {
-      setExportMsg(`封面删除失败: ${err.message}`)
+      setExportMsg(t('export.coverDeleteError', { msg: err.message }))
+      setExportStatus('error')
     }
   }
 
@@ -85,10 +87,12 @@ export function ExportPage() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      setExportMsg(`正在下载${fmt.toUpperCase()}文件...`)
+      setExportMsg(t('export.downloadingFile', { fmt: fmt.toUpperCase() }))
+      setExportStatus('success')
       setTimeout(() => setExportMsg(''), 3000)
     } catch (err: any) {
-      setExportMsg(`导出失败: ${err.message}`)
+      setExportMsg(t('export.exportError', { msg: err.message }))
+      setExportStatus('error')
     } finally {
       setExporting(false)
     }
@@ -107,14 +111,14 @@ export function ExportPage() {
             onClick={handleExport}
             disabled={exporting}
           >
-            {exporting ? '导出中...' : t('pages.exportAll')}
+            {exporting ? t('export.exporting') : t('pages.exportAll')}
           </button>
         </div>
       </div>
       {exportMsg && (
         <div
           className="px-6 py-2 text-[13px]"
-          style={{ color: exportMsg.startsWith('导出成功') ? 'var(--success)' : 'var(--error)' }}
+          style={{ color: exportStatus === 'success' ? 'var(--success)' : 'var(--error)' }}
         >
           {exportMsg}
         </div>
@@ -140,7 +144,7 @@ export function ExportPage() {
               })()}
             </div>
             <div className="text-[15px] text-[var(--ink)] mb-1">{f.label}</div>
-            <div className="text-[12px] text-[var(--ink-tertiary)]">{f.descKey}</div>
+            <div className="text-[12px] text-[var(--ink-tertiary)]">{t(f.descKey)}</div>
           </div>
         ))}
       </div>
@@ -157,14 +161,14 @@ export function ExportPage() {
             style={coverUrl ? {} : { borderStyle: 'dashed' }}
           >
             {coverUrl ? (
-              <img src={coverUrl} alt="封面" className="w-full h-full object-cover" />
+              <img src={coverUrl} alt={t('export.noCover')} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-[11px] text-[var(--ink-tertiary)]">无封面</span>
+              <span className="text-[11px] text-[var(--ink-tertiary)]">{t('export.noCover')}</span>
             )}
           </div>
           <div className="flex flex-col gap-2">
             <div className="setting-label" style={{ marginBottom: 0 }}>
-              包含封面
+              {t('pages.exportCover')}
             </div>
             <input
               ref={fileInputRef}
@@ -179,7 +183,7 @@ export function ExportPage() {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-3 h-3" />
-                {coverUrl ? '更换' : '上传'}
+                {coverUrl ? t('export.changeCover') : t('export.uploadCover')}
               </button>
               {coverUrl && (
                 <button
@@ -187,7 +191,7 @@ export function ExportPage() {
                   onClick={handleCoverDelete}
                 >
                   <Trash2 className="w-3 h-3" />
-                  删除
+                  {t('export.deleteCover')}
                 </button>
               )}
             </div>
@@ -197,7 +201,12 @@ export function ExportPage() {
 
         <div className="flex items-center justify-between py-2.5 border-t border-[var(--hairline)] max-w-[500px]">
           <div className="setting-label">{t('pages.exportAuthor')}</div>
-          <input type="text" className="setting-input" style={{ width: 150, textAlign: 'left' }} defaultValue="佚名" />
+          <input
+            type="text"
+            className="setting-input"
+            style={{ width: 150, textAlign: 'left' }}
+            defaultValue={t('export.defaultAuthor')}
+          />
         </div>
       </div>
 
@@ -205,7 +214,7 @@ export function ExportPage() {
         <div className="text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2">
           {t('pages.exportRecords')}
         </div>
-        <div className="text-[13px] text-[var(--ink-tertiary)] py-4 text-center">暂无导出记录</div>
+        <div className="text-[13px] text-[var(--ink-tertiary)] py-4 text-center">{t('export.noExportRecords')}</div>
       </div>
     </>
   )

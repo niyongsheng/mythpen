@@ -162,24 +162,76 @@ function _wrapDb(db, filePath) {
 // ═══════════════════════════════════════════════════════════════
 
 async function initDatabase() {
-  const initSqlJs = require('sql.js');
+  console.log('[DB] Initialising database...');
+  console.log('[DB] DB_DIR:', DB_DIR, '| CONFIG_DB:', CONFIG_DB);
+  const t0 = Date.now();
 
-  // Explicitly load sql-wasm.wasm binary so sql.js doesn't try to locate it
-  // from the original node_modules path at runtime (fails in bun --compile binary).
+  // ─── Load sql.js library ───
+  const initSqlJs = require('sql.js');
+  console.log('[DB] sql.js library loaded');
+
+  // ─── Load sql-wasm.wasm ───
+  // In bun --compile binaries there's no node_modules, so sql.js cannot
+  // locate its WASM file via module resolution. We must provide the WASM
+  // binary explicitly via initSqlJs({ wasmBinary }).
+  //
+  // Multiple strategies tried in order:
+  //   1. require('./sql-wasm.wasm')  — works in bun --compile --assets
+  //   2. fs.readFileSync(__dirname + sql-wasm.wasm) — dev mode (file on disk)
+  //   3. fs.readFileSync(CWD/server/...) — fallback for bun if __dirname differs
   let wasmBinary;
+
+  // Strategy 1: require() — bun --compile makes embedded .wasm assets
+  // resolvable via require() (returns Buffer). Also works in bun for dev mode.
   try {
-    const wasmPath = path.join(__dirname, 'sql-wasm.wasm');
-    if (fs.existsSync(wasmPath)) {
-      wasmBinary = fs.readFileSync(wasmPath);
-      console.log('[DB] Loaded sql-wasm.wasm from bundled asset');
-    }
-  } catch (e) {
-    // Fallback: let sql.js locate the WASM itself (works in dev/pnpm)
-    console.log('[DB] No bundled WASM found, using sql.js default loader');
+    wasmBinary = require('./sql-wasm.wasm');
+    console.log('[DB] WASM loaded via require()');
+  } catch {
+    // strategy 1 failed, try next
   }
 
+  // Strategy 2: fs.readFileSync relative to this file (dev mode, file on disk)
+  if (!wasmBinary) {
+    try {
+      const wasmPath = path.join(__dirname, 'sql-wasm.wasm');
+      if (fs.existsSync(wasmPath)) {
+        wasmBinary = fs.readFileSync(wasmPath);
+        console.log('[DB] WASM loaded from:', wasmPath);
+      }
+    } catch {
+      // strategy 2 failed
+    }
+  }
+
+  // Strategy 3: fs.readFileSync from CWD (fallback for bun compiled binary)
+  if (!wasmBinary) {
+    try {
+      const wasmPath = path.join(process.cwd(), 'server', 'sql-wasm.wasm');
+      if (fs.existsSync(wasmPath)) {
+        wasmBinary = fs.readFileSync(wasmPath);
+        console.log('[DB] WASM loaded from:', wasmPath);
+      }
+    } catch {
+      // strategy 3 failed
+    }
+  }
+
+  if (!wasmBinary) {
+    console.log('[DB] WASM not found via any strategy — initSqlJs will use its own loader');
+  }
+
+  // ─── Init sql.js runtime ───
+  console.log('[DB] Calling initSqlJs()...');
   SQL = await initSqlJs({ wasmBinary });
+  console.log('[DB] initSqlJs() OK');
+
+  // ─── Open / create config database ───
+  console.log('[DB] Opening config database...');
   configDb = _openConfig();
+  console.log('[DB] Config database ready, schema version:', CONFIG_SCHEMA_VERSION);
+
+  const t1 = Date.now();
+  console.log(`[DB] Database initialised in ${t1 - t0}ms`);
   return true;
 }
 

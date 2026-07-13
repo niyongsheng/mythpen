@@ -943,7 +943,7 @@ function executeTool(projectName, toolName, args) {
     }
     case 'create_science_entry': {
       const id = uuidv4();
-      pdb.prepare('INSERT INTO science_entries (id, label, name, description, references) VALUES (?, ?, ?, ?, ?)')
+      pdb.prepare('INSERT INTO science_entries (id, label, name, description, "references") VALUES (?, ?, ?, ?, ?)')
         .run(id, args.label, args.name, args.description, args.references || '');
       return { created: true, id, label: args.label, name: args.name };
     }

@@ -1,8 +1,11 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { useT } from '@/hooks/useT'
 
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
 const HEALTH_URL = `${API_BASE}/health`
+
+const MAX_RETRIES = 20
 
 type Status = 'checking' | 'ready' | 'error'
 
@@ -13,7 +16,9 @@ interface Props {
 export function ServerStatusGate({ children }: Props) {
   const [status, setStatus] = useState<Status>('checking')
   const [retryCount, setRetryCount] = useState(0)
+  const { t } = useT()
   const [detail, setDetail] = useState('')
+  const startTime = useRef(Date.now())
 
   useEffect(() => {
     let cancelled = false
@@ -27,24 +32,23 @@ export function ServerStatusGate({ children }: Props) {
           setStatus('ready')
           return
         }
-        // Server responded but not ok — unusual
         setDetail(`HTTP ${res.status}`)
       } catch (err: any) {
         if (cancelled) return
         if (err.name === 'AbortError') {
-          setDetail('连接超时')
+          setDetail(t('serverStatus.timeout'))
         } else {
           setDetail(err.message || String(err))
         }
       }
 
       if (cancelled) return
-      if (retryCount >= 5) {
+      if (retryCount >= MAX_RETRIES) {
         setStatus('error')
         return
       }
-      // Exponential backoff: 1s → 1.5s → 2.25s
-      const delay = Math.min(1000 * Math.pow(1.5, retryCount), 3000)
+      // Exponential backoff: 1s → 1.5s → 2.25s (capped at 3s)
+      const delay = Math.min(1000 * 1.5 ** retryCount, 3000)
       timer = setTimeout(() => setRetryCount((c) => c + 1), delay)
     }
 
@@ -111,7 +115,7 @@ export function ServerStatusGate({ children }: Props) {
             ))}
           </div>
           <p style={{ fontSize: 14, color: 'var(--ink-tertiary, #8a8880)', margin: 0 }}>
-            Service Loading{retryCount > 5 ? `（${Math.round(retryCount * 1.5)}s）` : ''}
+            {t('serverStatus.starting')}（{Math.round((Date.now() - startTime.current) / 1000)}s）
           </p>
           {detail && <p style={{ fontSize: 12, color: 'var(--ink-mute, #5e5c56)', marginTop: 6 }}>{detail}</p>}
         </div>
@@ -132,7 +136,9 @@ export function ServerStatusGate({ children }: Props) {
           >
             ✕
           </div>
-          <p style={{ fontSize: 14, color: 'var(--ink-secondary, #c8c6be)', margin: 0 }}>服务器启动失败</p>
+          <p style={{ fontSize: 14, color: 'var(--ink-secondary, #c8c6be)', margin: 0 }}>
+            {t('serverStatus.startFailed')}
+          </p>
           {detail && <p style={{ fontSize: 12, color: 'var(--ink-mute, #5e5c56)', marginTop: 4 }}>{detail}</p>}
           <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
             <button
@@ -152,7 +158,7 @@ export function ServerStatusGate({ children }: Props) {
                 cursor: 'pointer',
               }}
             >
-              重试
+              {t('serverStatus.retry')}
             </button>
             <button
               onClick={() => window.close()}
@@ -167,7 +173,7 @@ export function ServerStatusGate({ children }: Props) {
                 cursor: 'pointer',
               }}
             >
-              退出
+              {t('serverStatus.quit')}
             </button>
           </div>
         </div>

@@ -90,7 +90,7 @@ export function Sidebar() {
 
   const handleNewChapter = async (volumeId: number) => {
     if (!currentProject) return
-    await createChapter(currentProject, '新章节', '', volumeId)
+    await createChapter(currentProject, t('chapter.defaultTitle'), '', volumeId)
     setActivePage('page-writing')
   }
 
@@ -111,7 +111,7 @@ export function Sidebar() {
             <button
               className="ml-auto flex items-center gap-1 px-1.5 py-[2px] rounded text-[var(--ink-mute)] cursor-pointer border-none bg-transparent hover:text-[var(--accent-gold)] hover:bg-[var(--accent-gold-soft-bg)] transition-colors"
               onClick={handleRefresh}
-              title="手动刷新所有数据（快捷键 ⌘⇧R）"
+              title={t('sidebar.refreshTooltip')}
             >
               <RefreshCw key={spinKey} className="w-3 h-3 animate-spin-once" />
             </button>
@@ -137,7 +137,7 @@ export function Sidebar() {
                 >
                   {vol.title.startsWith('第') && vol.title.endsWith('卷')
                     ? vol.title
-                    : `第${vol.sortOrder}卷 · ${vol.title}`}
+                    : t('sidebar.volumeTitle', { order: vol.sortOrder, title: vol.title })}
                 </span>
               </div>
               {!collapsedVols.has(vol.id) &&
@@ -150,7 +150,7 @@ export function Sidebar() {
                     onClick={() => {
                       setActivePage('page-writing')
                       setCurrentChapter(ch)
-                      if (currentProject) loadChapterContent(currentProject, ch.num).catch(() => {})
+                      if (currentProject) loadChapterContent(currentProject, ch.num, ch.volumeId).catch(() => {})
                     }}
                   >
                     {currentChapter?.id === ch.id && activePage === 'page-writing' && (
@@ -158,7 +158,9 @@ export function Sidebar() {
                     )}
                     <FileText className="w-3.5 h-3.5 shrink-0" />
                     <span className="flex-1 truncate">
-                      {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
+                      {ch.title.startsWith('第')
+                        ? ch.title
+                        : t('sidebar.chapterTitle', { num: ch.num, title: ch.title })}
                     </span>
                     <StatusBadge
                       status={ch.status}
@@ -306,19 +308,21 @@ export function Sidebar() {
 
         {/* Stats rows — compact */}
         <div className="flex justify-between py-[2px]">
-          <span className="text-[var(--ink-mute)]">当前章</span>
+          <span className="text-[var(--ink-mute)]">{t('sidebar.currentChapter')}</span>
           <span className="font-mono text-[var(--ink-tertiary)]">
-            {currentChapter?.wordCount?.toLocaleString() || '0'} 字
+            {currentChapter?.wordCount?.toLocaleString() || '0'} {t('editor.words')}
           </span>
         </div>
         <div className="flex justify-between py-[2px]">
-          <span className="text-[var(--ink-mute)]">总字数</span>
-          <span className="font-mono text-[var(--ink-tertiary)]">{(stats?.totalWords || 0).toLocaleString()} 字</span>
+          <span className="text-[var(--ink-mute)]">{t('sidebar.totalWords')}</span>
+          <span className="font-mono text-[var(--ink-tertiary)]">
+            {(stats?.totalWords || 0).toLocaleString()} {t('editor.words')}
+          </span>
         </div>
         <div className="flex justify-between py-[2px]">
-          <span className="text-[var(--ink-mute)]">今日</span>
+          <span className="text-[var(--ink-mute)]">{t('sidebar.today')}</span>
           <span className="font-mono text-[var(--ink-tertiary)]">
-            {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} 字
+            {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} {t('editor.words')}
           </span>
         </div>
       </div>
@@ -332,7 +336,7 @@ function StatusBadge({
   onCycle,
 }: {
   status: string
-  t: (path: string) => string
+  t: (path: string, params?: Record<string, string | number>) => string
   onCycle?: () => void
 }) {
   const colorMap: Record<string, { bg: string; text: string; label: string; dot?: boolean }> = {
@@ -352,7 +356,11 @@ function StatusBadge({
           onCycle()
         }
       }}
-      title={onCycle ? `切换为 ${translate('status.' + NEXT_STATUS[status] || 'writing')}` : undefined}
+      title={
+        onCycle
+          ? translate('sidebar.switchToStatus', { status: translate('status.' + (NEXT_STATUS[status] || 'writing')) })
+          : undefined
+      }
     >
       {status === 'accepted' && <Check className="w-2.5 h-2.5" />}
       {c.dot && (

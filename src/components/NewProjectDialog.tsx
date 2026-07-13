@@ -1,32 +1,34 @@
 import { useEffect, useState } from 'react'
+import { useT } from '@/hooks/useT'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
 
 const GENRES = [
-  { key: 'sci-fi', icon: '🎭', label: '科幻' },
-  { key: 'fantasy', icon: '🧙', label: '玄幻' },
-  { key: 'romance', icon: '💕', label: '言情' },
-  { key: 'history', icon: '🏛️', label: '历史' },
-  { key: 'urban', icon: '🌆', label: '都市' },
-  { key: 'power-fantasy', icon: '⚡', label: '爽文' },
-  { key: 'biography', icon: '📖', label: '传记' },
-  { key: 'other', icon: '📜', label: '其他' },
+  { key: 'sci-fi', icon: '🎭' },
+  { key: 'fantasy', icon: '🧙' },
+  { key: 'romance', icon: '💕' },
+  { key: 'history', icon: '🏛️' },
+  { key: 'urban', icon: '🌆' },
+  { key: 'power-fantasy', icon: '⚡' },
+  { key: 'biography', icon: '📖' },
+  { key: 'other', icon: '📜' },
 ]
 
 const MODES = [
-  { key: 'short-story', label: '短篇（≤3万字）' },
-  { key: 'medium-novel', label: '中篇（5-10万字）' },
-  { key: 'long-novel', label: '长篇（20万字+）' },
-]
+  { key: 'short-story', labelKey: 'project.shortStory' },
+  { key: 'medium-novel', labelKey: 'project.mediumNovel' },
+  { key: 'long-novel', labelKey: 'project.longNovel' },
+] as const
 
 const LANGUAGES = [
-  { key: 'zh', label: '中文' },
-  { key: 'en', label: 'English' },
-]
+  { key: 'zh', labelKey: 'project.chinese' },
+  { key: 'en', labelKey: 'project.english' },
+] as const
 
 export function NewProjectDialog() {
   const { projectDialogOpen, setProjectDialogOpen } = useUIStore()
   const { createProject, loading, error } = useProjectStore()
+  const { t } = useT()
   const [name, setName] = useState('未曾设想的道路')
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['sci-fi', 'romance'])
   const [mode, setMode] = useState('medium-novel')
@@ -69,8 +71,8 @@ export function NewProjectDialog() {
         className="bg-[var(--canvas-card)] border border-[var(--hairline-light)] rounded-xl p-8 w-[520px] max-w-[90vw] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="font-display text-[28px] font-semibold leading-[1.3] mb-1">新建项目</h2>
-        <p className="text-[var(--ink-tertiary)] text-[13px] mb-6">选择创作类型，mythpen 会自动匹配写作工具</p>
+        <h2 className="font-display text-[28px] font-semibold leading-[1.3] mb-1">{t('project.new')}</h2>
+        <p className="text-[var(--ink-tertiary)] text-[13px] mb-6">{t('project.subtitle')}</p>
 
         {/* Error message */}
         {error && (
@@ -81,12 +83,12 @@ export function NewProjectDialog() {
 
         <div className="mb-5">
           <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1.5">
-            项目名称
+            {t('project.nameLabel')}
           </label>
           <input
             type="text"
             className="w-full h-9 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-lg px-3 font-sans text-[15px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--accent-gold)] focus:shadow-[0_0_0_2px_rgba(201,169,110,0.2)]"
-            placeholder="给小说取个名字..."
+            placeholder={t('project.namePlaceholder')}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -94,7 +96,7 @@ export function NewProjectDialog() {
 
         <div className="mb-5">
           <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1.5">
-            创作类型（可多选）
+            {t('project.genresLabel')}
           </label>
           <div className="flex flex-wrap gap-2">
             {GENRES.map((g) => (
@@ -103,7 +105,7 @@ export function NewProjectDialog() {
                 className={selectedGenres.includes(g.key) ? activeBtn : inactiveBtn}
                 onClick={() => toggleGenre(g.key)}
               >
-                {g.icon} {g.label}
+                {g.icon} {t(`project.genre.${g.key}`)}
               </button>
             ))}
           </div>
@@ -111,12 +113,12 @@ export function NewProjectDialog() {
 
         <div className="mb-5">
           <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1.5">
-            写作模式
+            {t('project.modeLabel')}
           </label>
           <div className="flex gap-2">
             {MODES.map((m) => (
               <button key={m.key} className={mode === m.key ? activeBtn : inactiveBtn} onClick={() => setMode(m.key)}>
-                {m.label}
+                {t(m.labelKey)}
               </button>
             ))}
           </div>
@@ -124,7 +126,7 @@ export function NewProjectDialog() {
 
         <div className="mb-5">
           <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1.5">
-            写作语言
+            {t('project.languageLabel')}
           </label>
           <div className="flex gap-2">
             {LANGUAGES.map((l) => (
@@ -133,7 +135,7 @@ export function NewProjectDialog() {
                 className={language === l.key ? activeBtn : inactiveBtn}
                 onClick={() => setLanguage(l.key)}
               >
-                {l.label}
+                {t(l.labelKey)}
               </button>
             ))}
           </div>
@@ -144,14 +146,14 @@ export function NewProjectDialog() {
             className="h-[34px] px-5 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)]"
             onClick={() => setProjectDialogOpen(false)}
           >
-            取消
+            {t('project.cancel')}
           </button>
           <button
             className="h-[34px] px-5 rounded-lg border-none bg-[var(--accent-gold)] text-[var(--canvas)] font-medium text-[13px] cursor-pointer transition-colors hover:bg-[var(--accent-gold-soft)] disabled:opacity-40 disabled:cursor-not-allowed"
             onClick={handleCreate}
             disabled={loading || !name.trim()}
           >
-            {loading ? '创建中…' : '开始创作'}
+            {loading ? t('project.creating') : t('project.start')}
           </button>
         </div>
       </div>

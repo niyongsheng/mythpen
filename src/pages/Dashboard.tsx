@@ -36,15 +36,15 @@ const PHASE_LABELS: Record<WorkflowPhase, { key: string; num: string }> = {
   export: { key: 'phaseExport', num: '7' },
 }
 
-const GENRE_LABELS: Record<string, { label: string; color: string }> = {
-  'sci-fi': { label: '科幻', color: '#5b8af0' },
-  fantasy: { label: '玄幻', color: '#a855f7' },
-  romance: { label: '言情', color: '#ec4899' },
-  history: { label: '历史', color: '#d97706' },
-  urban: { label: '都市', color: '#14b8a6' },
-  'power-fantasy': { label: '爽文', color: '#f97316' },
-  biography: { label: '传记', color: '#6b7280' },
-  other: { label: '其他', color: '#8b8b8b' },
+const GENRE_LABELS: Record<string, { labelKey: string; color: string }> = {
+  'sci-fi': { labelKey: 'pages.genre.sci-fi', color: '#5b8af0' },
+  fantasy: { labelKey: 'pages.genre.fantasy', color: '#a855f7' },
+  romance: { labelKey: 'pages.genre.romance', color: '#ec4899' },
+  history: { labelKey: 'pages.genre.history', color: '#d97706' },
+  urban: { labelKey: 'pages.genre.urban', color: '#14b8a6' },
+  'power-fantasy': { labelKey: 'pages.genre.power-fantasy', color: '#f97316' },
+  biography: { labelKey: 'pages.genre.biography', color: '#6b7280' },
+  other: { labelKey: 'pages.genre.other', color: '#8b8b8b' },
 }
 
 const statusColors: Record<string, string> = {
@@ -105,7 +105,7 @@ export function Dashboard() {
   }
 
   if (loading) {
-    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
   }
 
   const s: ProjectStats = stats || {
@@ -167,12 +167,13 @@ export function Dashboard() {
               onAdvance={i === currentIdx && currentIdx < PHASE_ORDER.length - 1 ? handleAdvance : undefined}
               onSelect={i !== currentIdx ? () => handlePhaseSelect(phase) : undefined}
               advancing={advancing}
+              advanceTitle={t('dashboard.advancePhase')}
             />
             {i < PHASE_ORDER.length - 1 && <PhaseConnector done={i < currentIdx} />}
           </span>
         ))}
         <div className="ml-auto text-[11px] text-[var(--ink-mute)] font-mono min-w-[140px] text-right">
-          共 {s.chapterCount} 章 · {s.acceptedCount} 章已完成
+          {t('dashboard.phaseSummary', { n: s.chapterCount, m: s.acceptedCount })}
         </div>
       </div>
 
@@ -187,7 +188,7 @@ export function Dashboard() {
             <div className="h-full bg-[var(--accent-gold)] rounded-full" style={{ width: `${progressPct}%` }} />
           </div>
           <div className="flex justify-between text-[12px] text-[var(--ink-tertiary)]">
-            <span>已完成 {s.acceptedCount} 章</span>
+            <span>{t('dashboard.completedChapters', { n: s.acceptedCount })}</span>
             <span>{progressPct}%</span>
           </div>
         </DashCard>
@@ -202,7 +203,7 @@ export function Dashboard() {
             />
           </div>
           <div className="flex justify-between text-[12px] text-[var(--ink-tertiary)]">
-            <span>目标 {s.targetWords?.toLocaleString() || '0'} 字</span>
+            <span>{t('dashboard.targetWords', { n: s.targetWords?.toLocaleString() || '0' })}</span>
             <span>{wordProgressPct.toFixed(1)}%</span>
           </div>
         </DashCard>
@@ -212,23 +213,23 @@ export function Dashboard() {
           <div className="flex flex-wrap gap-1.5 mt-1">
             {(s.genres || []).length > 0 ? (
               s.genres!.map((g) => {
-                const info = GENRE_LABELS[g] || { label: g, color: '#8b8b8b' }
+                const info = GENRE_LABELS[g] || { labelKey: 'pages.genre.other', color: '#8b8b8b' }
                 return (
                   <span
                     key={g}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-medium"
                     style={{ background: `${info.color}18`, color: info.color, border: `1px solid ${info.color}40` }}
                   >
-                    {info.label}
+                    {t(info.labelKey)}
                   </span>
                 )
               })
             ) : (
-              <span className="text-[13px] text-[var(--ink-tertiary)]">未设定</span>
+              <span className="text-[13px] text-[var(--ink-tertiary)]">{t('dashboard.notSet')}</span>
             )}
           </div>
           <div className="text-[12px] text-[var(--ink-tertiary)] mt-2.5">
-            共 {s.volumeCount || 0} 卷 · {s.chapterCount} 章
+            {t('dashboard.volumeChapterCount', { n: s.volumeCount || 0, m: s.chapterCount })}
           </div>
         </DashCard>
 
@@ -237,14 +238,14 @@ export function Dashboard() {
           <div className="flex items-baseline gap-4 mt-1">
             <div>
               <div className="font-mono text-[22px] text-[var(--ink)]">{s.characterCount || 0}</div>
-              <div className="text-[11px] text-[var(--ink-tertiary)]">角色</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.characters')}</div>
             </div>
             {(s.relationCount || 0) > 0 && (
               <>
                 <div className="text-[var(--ink-mute)] text-[20px]">+</div>
                 <div>
                   <div className="font-mono text-[22px] text-[var(--ink)]">{s.relationCount}</div>
-                  <div className="text-[11px] text-[var(--ink-tertiary)]">关系</div>
+                  <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.relations')}</div>
                 </div>
               </>
             )}
@@ -256,11 +257,11 @@ export function Dashboard() {
           <div className="flex items-baseline gap-4 mt-1">
             <div>
               <div className="font-mono text-[22px] text-[var(--ink)]">{s.worldCount || 0}</div>
-              <div className="text-[11px] text-[var(--ink-tertiary)]">世界观</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.worldbuilding')}</div>
             </div>
             <div>
               <div className="font-mono text-[22px] text-[var(--ink)]">{s.sciCount || 0}</div>
-              <div className="text-[11px] text-[var(--ink-tertiary)]">科学设定</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.scienceSettings')}</div>
             </div>
           </div>
         </DashCard>
@@ -270,16 +271,16 @@ export function Dashboard() {
           <div className="flex items-baseline gap-4 mt-1">
             <div>
               <div className="font-mono text-[22px] text-[var(--ink)]">{s.foreshadowCount || 0}</div>
-              <div className="text-[11px] text-[var(--ink-tertiary)]">总伏笔</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.totalForeshadows')}</div>
             </div>
             <div>
               <div className="font-mono text-[22px] text-[var(--success)]">{s.resolvedForeshadow || 0}</div>
-              <div className="text-[11px] text-[var(--ink-tertiary)]">已回收</div>
+              <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.resolvedForeshadows')}</div>
             </div>
             {(s.overdueForeshadow || 0) > 0 && (
               <div>
                 <div className="font-mono text-[22px] text-[var(--error)]">{s.overdueForeshadow}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">逾期</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.overdueForeshadows')}</div>
               </div>
             )}
           </div>
@@ -293,7 +294,7 @@ export function Dashboard() {
                 <div key={v.id} className="flex items-center justify-between text-[12px]">
                   <span className="text-[var(--ink)] truncate mr-2">{v.title}</span>
                   <span className="text-[var(--ink-tertiary)] shrink-0 font-mono">
-                    {v.chapter_count} 章 · {(v.word_count || 0).toLocaleString()} 字
+                    {t('dashboard.volumeStats', { n: v.chapter_count, m: (v.word_count || 0).toLocaleString() })}
                   </span>
                 </div>
               ))}
@@ -307,11 +308,11 @@ export function Dashboard() {
             <div className="flex items-baseline gap-4 mt-1">
               <div>
                 <div className="font-mono text-[22px] text-[var(--warning)]">{s.clueUnresolved || 0}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">待解</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.unresolvedClues')}</div>
               </div>
               <div>
                 <div className="font-mono text-[22px] text-[var(--success)]">{s.clueResolved || 0}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">已解</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.resolvedClues')}</div>
               </div>
             </div>
           </DashCard>
@@ -323,17 +324,17 @@ export function Dashboard() {
             {(s.memoryCount || 0) > 0 && (
               <div>
                 <div className="font-mono text-[22px] text-[var(--ink)]">{s.memoryCount}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">创作记忆</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.narrativeMemory')}</div>
               </div>
             )}
             {(s.timelineCount || 0) > 0 && (
               <div>
                 <div className="font-mono text-[22px] text-[var(--ink)]">{s.timelineCount}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">时间线事件</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.timelineEvents')}</div>
               </div>
             )}
             {!s.memoryCount && !s.timelineCount && (
-              <span className="text-[13px] text-[var(--ink-tertiary)]">暂无记录</span>
+              <span className="text-[13px] text-[var(--ink-tertiary)]">{t('dashboard.noRecords')}</span>
             )}
           </div>
         </DashCard>
@@ -344,15 +345,15 @@ export function Dashboard() {
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
               <div className="min-w-0">
                 <div className="font-mono text-[16px] text-[var(--ink)]">{fmtTokens(s.tokenInput || 0)}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">输入</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.tokenInput')}</div>
               </div>
               <div className="min-w-0">
                 <div className="font-mono text-[16px] text-[var(--ink)]">{fmtTokens(s.tokenOutput || 0)}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">输出</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.tokenOutput')}</div>
               </div>
               <div className="min-w-0">
                 <div className="font-mono text-[16px] text-[var(--ink)]">{fmtTokens(totalTokens)}</div>
-                <div className="text-[11px] text-[var(--ink-tertiary)]">总计</div>
+                <div className="text-[11px] text-[var(--ink-tertiary)]">{t('dashboard.tokenTotal')}</div>
               </div>
             </div>
           </DashCard>
@@ -367,10 +368,9 @@ export function Dashboard() {
             {(s.chapters || []).map((ch: any) => (
               <ChapterListItem
                 key={ch.num}
-                num={ch.num}
-                title={ch.title}
+                formattedTitle={t('dashboard.chapterFormat', { num: ch.num, title: ch.title })}
                 status={ch.status}
-                words={`${(ch.word_count || 0).toLocaleString()}字`}
+                words={`${(ch.word_count || 0).toLocaleString()}${t('dashboard.wordCountSuffix')}`}
               />
             ))}
           </div>
@@ -386,22 +386,24 @@ export function Dashboard() {
             className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-xl p-6 w-[360px] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-[16px] font-medium text-[var(--ink)] mb-2">切换项目阶段</h3>
+            <h3 className="text-[16px] font-medium text-[var(--ink)] mb-2">{t('dashboard.switchPhaseTitle')}</h3>
             <p className="text-[13px] text-[var(--ink-tertiary)] mb-5">
-              将阶段切换到「{t(`pages.${PHASE_LABELS[confirmPhase as keyof typeof PHASE_LABELS]?.key}`)}」？
+              {t('dashboard.switchPhaseBody', {
+                phase: t(`pages.${PHASE_LABELS[confirmPhase as keyof typeof PHASE_LABELS]?.key}`),
+              })}
             </p>
             <div className="flex justify-end gap-2">
               <button
                 className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer hover:bg-[var(--canvas-mid)]"
                 onClick={() => setConfirmPhase(null)}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 className="h-[32px] px-4 rounded-lg bg-[var(--accent-gold)] text-[var(--canvas)] text-[13px] font-medium cursor-pointer border-none hover:brightness-110"
                 onClick={handleConfirmPhase}
               >
-                确认切换
+                {t('dashboard.confirmSwitch')}
               </button>
             </div>
           </div>
@@ -424,6 +426,7 @@ function PhaseStep({
   onAdvance,
   onSelect,
   advancing,
+  advanceTitle,
 }: {
   state: string
   label: string
@@ -432,6 +435,7 @@ function PhaseStep({
   onAdvance?: () => void
   onSelect?: () => void
   advancing?: boolean
+  advanceTitle?: string
 }) {
   return (
     <span
@@ -462,7 +466,7 @@ function PhaseStep({
             onAdvance()
           }}
           disabled={advancing}
-          title="进入下一阶段"
+          title={advanceTitle}
         >
           <ArrowRight className="w-3 h-3" />
         </button>
@@ -491,7 +495,8 @@ function DashCard({ icon: Icon, title, children }: { icon?: LucideIcon; title: s
   )
 }
 
-function ChapterListItem({ num, title, status, words }: { num: number; title: string; status: string; words: string }) {
+function ChapterListItem({ formattedTitle, status, words }: { formattedTitle: string; status: string; words: string }) {
+  const { t } = useT()
   const badgeColor = statusColors[status] || 'var(--ink-mute)'
   const bgColor = statusBg[status] || 'var(--canvas-pop)'
   const statusIcon: Record<string, React.ReactNode> = {
@@ -517,9 +522,7 @@ function ChapterListItem({ num, title, status, words }: { num: number; title: st
           />
         )}
       </span>
-      <span style={{ flex: 1 }}>
-        第{num}章 {title}
-      </span>
+      <span style={{ flex: 1 }}>{formattedTitle}</span>
       <span style={{ color: 'var(--ink-tertiary)', fontSize: 12 }}>{words}</span>
     </div>
   )

@@ -7,8 +7,12 @@
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
 
+// Normalize double slashes (e.g. /api//stats → /api/stats) that happen
+// when a project name is empty. Skip the protocol colon so http:// stays.
+const apiUrl = (path: string) => `${API_BASE}${path}`.replace(/([^:]\/)\/+/g, '$1')
+
 async function request(path: string, options: any = {}) {
-  const url = `${API_BASE}${path}`
+  const url = apiUrl(path)
   const config: any = {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
@@ -57,7 +61,8 @@ export const projectsApi = {
 
 export const chaptersApi = {
   list: (project: string) => request(`/${encodeURIComponent(project)}/chapters`),
-  get: (project: string, num: number) => request(`/${encodeURIComponent(project)}/chapters/${num}`),
+  get: (project: string, num: number, volumeId?: number) =>
+    request(`/${encodeURIComponent(project)}/chapters/${num}${volumeId ? `?volume_id=${volumeId}` : ''}`),
   update: (project: string, num: number, data: any) =>
     request(`/${encodeURIComponent(project)}/chapters/${num}`, { method: 'PUT', body: data }),
   create: (project: string, data: any) =>
@@ -147,7 +152,7 @@ export const settingsApi = {
 // ─── Chat / AI (always uses HTTP) ───
 
 function aiRequest(path: string, options: any = {}) {
-  const url = `${API_BASE}${path}`
+  const url = apiUrl(path)
   const config: any = {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,

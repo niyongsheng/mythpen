@@ -25,11 +25,15 @@ export function Consistency() {
       for (const f of foreshadows || []) {
         if (f.status === 'planted' && f.expected_resolve_chapter && f.expected_resolve_chapter <= maxChapterNum) {
           found.push({
-            tag: '伏笔预警',
+            tag: t('consistency.foreshadowAlert'),
             severity: 'warn',
-            title: `"${f.title}"预期回收章落后于当前进度`,
-            desc: `伏笔埋设于第${f.planted_chapter_id}章，预期第${f.expected_resolve_chapter}章回收，当前已写到第${maxChapterNum}章。`,
-            loc: `伏笔 #${(f.id || '').slice(0, 8)}`,
+            title: t('consistency.foreshadowLate', { title: f.title }),
+            desc: t('consistency.foreshadowDesc', {
+              planted: f.planted_chapter_id,
+              expected: f.expected_resolve_chapter,
+              current: maxChapterNum,
+            }),
+            loc: t('consistency.foreshadowLoc', { id: (f.id || '').slice(0, 8) }),
           })
           warnings++
         }
@@ -38,11 +42,11 @@ export function Consistency() {
       for (const ch of chapters || []) {
         if (ch.status === 'pending' && (ch.word_count || 0) > 0) {
           found.push({
-            tag: '状态异常',
+            tag: t('consistency.statusAbnormal'),
             severity: 'warn',
-            title: `第${ch.num}章 "${ch.title}" 有内容但状态为待办`,
-            desc: `该章节有 ${ch.word_count} 字内容，但状态仍标记为「待办」。`,
-            loc: `第${ch.num}章`,
+            title: t('consistency.chapterAbnormal', { num: ch.num, title: ch.title }),
+            desc: t('consistency.chapterAbnormalDesc', { wordCount: ch.word_count }),
+            loc: t('consistency.chapterLoc', { num: ch.num }),
           })
           warnings++
         }
@@ -52,7 +56,7 @@ export function Consistency() {
       setStats({ passed: Math.max(0, chapters?.length - found.length), conflicts, warnings, sciErrors: 0 })
     } catch (e) {}
     setLoading(false)
-  }, [project])
+  }, [project, t])
 
   const handleDeepCheck = async () => {
     if (!project) return
@@ -61,25 +65,23 @@ export function Consistency() {
       const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project), foreshadowsApi.list(project)])
 
       const chSummary = (chapters || [])
-        .map((c: any) => `第${c.num}章 "${c.title}" 状态:${c.status} 字数:${c.word_count}`)
+        .map((c: any) =>
+          t('consistency.chapterSummary', { num: c.num, title: c.title, status: c.status, wordCount: c.word_count }),
+        )
         .join('\n')
       const fSummary = (foreshadows || [])
-        .map((f: any) => `${f.title} 状态:${f.status} 优先级:${f.priority}`)
+        .map((f: any) => t('consistency.foreshadowSummary', { title: f.title, status: f.status, priority: f.priority }))
         .join('\n')
 
       const res = await aiApi.chat(
         [
           {
             role: 'system',
-            content:
-              '你是一个小说创作一致性检查专家。分析以下章节状态和伏笔数据，找出所有一致性问题。' +
-              '检查项包括：伏笔逾期未回收、章节状态异常、伏笔计划不合理等。' +
-              '直接返回JSON数组，每个问题格式：{"tag":"问题分类","severity":"warn|error","title":"标题","desc":"详细描述"}。' +
-              '不要前缀说明。如果无问题返回空数组[]。',
+            content: t('consistency.systemPrompt'),
           },
           {
             role: 'user',
-            content: `章节概览：\n${chSummary}\n\n伏笔概览：\n${fSummary}\n\n请进行一致性检查。`,
+            content: t('consistency.userPrompt', { chSummary, fSummary }),
           },
         ],
         project,
@@ -118,7 +120,7 @@ export function Consistency() {
             onClick={runCheck}
             disabled={loading}
           >
-            {loading ? '检查中...' : t('pages.quickScan')}
+            {loading ? t('consistency.checking') : t('pages.quickScan')}
           </button>
           <button
             className="btn-primary flex items-center gap-1.5"
@@ -127,26 +129,26 @@ export function Consistency() {
             disabled={deepChecking}
           >
             {deepChecking ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <SearchCheck className="w-3.5 h-3.5" />}
-            {deepChecking ? 'AI 分析中...' : t('pages.deepCheck')}
+            {deepChecking ? t('consistency.aiAnalyzing') : t('pages.deepCheck')}
           </button>
         </div>
       </div>
       <div className="page-body">
         <div className="flex gap-3 pb-4 border-b border-[var(--hairline)] mb-4">
-          <StatCard label="通过检查" value={String(stats.passed)} color="var(--success)" />
-          <StatCard label="冲突" value={String(stats.conflicts)} color="var(--accent-gold)" />
-          <StatCard label="警告" value={String(stats.warnings)} color="var(--warning)" />
-          <StatCard label="科学错误" value={String(stats.sciErrors)} color="var(--ink-tertiary)" />
+          <StatCard label={t('consistency.pass')} value={String(stats.passed)} color="var(--success)" />
+          <StatCard label={t('consistency.conflict')} value={String(stats.conflicts)} color="var(--accent-gold)" />
+          <StatCard label={t('consistency.warning')} value={String(stats.warnings)} color="var(--warning)" />
+          <StatCard label={t('consistency.scienceError')} value={String(stats.sciErrors)} color="var(--ink-tertiary)" />
         </div>
 
         {loading || deepChecking ? (
           <div className="text-center py-10 text-[var(--ink-tertiary)]">
-            {deepChecking ? 'AI 正在分析项目数据...' : '分析中...'}
+            {deepChecking ? t('consistency.aiAnalyzingData') : t('consistency.analyzing')}
           </div>
         ) : issues.length === 0 ? (
           <div className="text-center py-10 text-[var(--ink-tertiary)]">
             <CheckCircle2 className="w-4 h-4 inline-block mr-1" />
-            未发现一致性问题
+            {t('consistency.noIssues')}
           </div>
         ) : (
           <div style={{ maxWidth: 680 }}>

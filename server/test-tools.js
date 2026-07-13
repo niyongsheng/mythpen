@@ -12,6 +12,7 @@ const PROJECT = 'test-tools-project';
 let passed = 0;
 let failed = 0;
 let createdIds = {};
+let dbg = {}; // tool test entity IDs for cleanup
 
 function assert(label, ok, detail) {
   if (ok) {
@@ -291,6 +292,118 @@ async function run() {
 
   const badDelMem = await api('DELETE', `/${e(PROJECT)}/memories/nonexistent-id-99999`);
   assert('Delete non-existent memory returns 404', badDelMem.status === 404, `expected 404 got ${badDelMem.status}`);
+
+  // ═══════════════════════════════════════════
+  // STEP 4.5: AI Tool execution (executeTool)
+  // Tests the actual tool code path that the AI agent calls,
+  // which is separate from the REST API endpoints tested above.
+  // ═══════════════════════════════════════════
+  console.log('\n🔧 Step 4.5: AI Tool execution (executeTool)');
+  const { executeTool } = require('./tools');
+  const { initDatabase } = require('./db');
+  await initDatabase();
+
+  // ── create_science_entry (was broken: "references" is SQL reserved word) ──
+  let r = executeTool(PROJECT, 'create_science_entry', {
+    label: 'extrapolation',
+    name: '纳米神经调控技术',
+    description: '通过纳米级机器人实现情感调控的技术。',
+    references: '参考文献A',
+  });
+  assert('executeTool create_science_entry', r.created === true && r.id, JSON.stringify(r));
+  dbg.sciId = r.id;
+
+  r = executeTool(PROJECT, 'create_science_entry', {
+    label: 'hypothesis',
+    name: '量子意识共振',
+    description: '跨维度意识链接假说。',
+    references: '',
+  });
+  assert('executeTool create_science_entry (no references)', r.created === true && r.id, JSON.stringify(r));
+  dbg.sciId2 = r.id;
+
+  // ── list_science ──
+  r = executeTool(PROJECT, 'list_science', {});
+  assert('executeTool list_science', Array.isArray(r) && r.length >= 2, `expected >=2 got ${r.length}`);
+
+  // ── create_character ──
+  r = executeTool(PROJECT, 'create_character', {
+    name: '工具测试角色', age: '25', gender: '女', appearance: '测试外貌',
+    personality: '测试性格', background: '测试背景', motivation: '测试动机', arc: '测试弧光',
+  });
+  assert('executeTool create_character', r.created === true && r.name === '工具测试角色', JSON.stringify(r));
+  dbg.charId = r.id;
+
+  // ── list_characters ──
+  r = executeTool(PROJECT, 'list_characters', {});
+  assert('executeTool list_characters', Array.isArray(r) && r.length > 0);
+
+  // ── create_world_entry ──
+  r = executeTool(PROJECT, 'create_world_entry', {
+    category: 'location', name: '工具测试地点', description: '测试描述', tags: 'test',
+  });
+  assert('executeTool create_world_entry', r.created === true && r.name === '工具测试地点', JSON.stringify(r));
+  dbg.worldId = r.id;
+
+  // ── list_world ──
+  r = executeTool(PROJECT, 'list_world', {});
+  assert('executeTool list_world', Array.isArray(r) && r.length > 0);
+
+  // ── create_foreshadow ──
+  r = executeTool(PROJECT, 'create_foreshadow', {
+    title: '工具测试伏笔', description: '测试伏笔', priority: 'high', expected_resolve_chapter: 5,
+  });
+  assert('executeTool create_foreshadow', r.created === true && r.title === '工具测试伏笔', JSON.stringify(r));
+  dbg.fsId = r.id;
+
+  // ── list_foreshadows ──
+  r = executeTool(PROJECT, 'list_foreshadows', {});
+  assert('executeTool list_foreshadows', Array.isArray(r) && r.length > 0);
+
+  // ── create_relation ──
+  r = executeTool(PROJECT, 'create_relation', {
+    character_a: '工具测试角色', character_b: '工具测试角色', relation_type: '测试关系', description: '测试', intensity: 3,
+  });
+  assert('executeTool create_relation', r.created === true, JSON.stringify(r));
+  dbg.relId = r.id;
+
+  // ── create_memory ──
+  r = executeTool(PROJECT, 'create_memory', { category: 'event', content: '工具测试记忆' });
+  assert('executeTool create_memory', r.created === true, JSON.stringify(r));
+  dbg.memId = r.id;
+
+  // ── create_timeline_event ──
+  r = executeTool(PROJECT, 'create_timeline_event', {
+    year: '2049', title: '工具测试事件', description: '测试', importance: 3,
+  });
+  assert('executeTool create_timeline_event', r.created === true && r.title === '工具测试事件', JSON.stringify(r));
+  dbg.tlId = r.id;
+
+  // ── list_timeline ──
+  r = executeTool(PROJECT, 'list_timeline', {});
+  assert('executeTool list_timeline', Array.isArray(r) && r.length > 0);
+
+  // ── get_stats ──
+  r = executeTool(PROJECT, 'get_stats', {});
+  assert('executeTool get_stats', r && typeof r.totalWords === 'number', JSON.stringify(r));
+
+  // ── get_project_meta ──
+  r = executeTool(PROJECT, 'get_project_meta', {});
+  assert('executeTool get_project_meta', r && typeof r.wordCount === 'number', JSON.stringify(r));
+
+  // ── Tool-level deletion ──
+  r = executeTool(PROJECT, 'delete_science_entry', { id: dbg.sciId });
+  assert('executeTool delete_science_entry', r && r.deleted === true, JSON.stringify(r));
+
+  r = executeTool(PROJECT, 'delete_science_entry', { id: dbg.sciId2 });
+  assert('executeTool delete_science_entry 2', r && r.deleted === true, JSON.stringify(r));
+
+  // delete_foreshadow uses title (not id) as the lookup key
+  r = executeTool(PROJECT, 'delete_foreshadow', { title: '工具测试伏笔' });
+  assert('executeTool delete_foreshadow', r && r.deleted === true, JSON.stringify(r));
+
+  r = executeTool(PROJECT, 'delete_relation', { id: dbg.relId });
+  assert('executeTool delete_relation', r && r.deleted === true, JSON.stringify(r));
 
   // ═══════════════════════════════════════════
   // STEP 5: Delete & verify

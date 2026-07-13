@@ -29,7 +29,7 @@ export function EditorContent() {
 
   const handleNewChapter = async () => {
     if (!currentProject) return
-    await createChapter(currentProject, '新章节')
+    await createChapter(currentProject, t('chapter.defaultTitle'))
     setActivePage('page-writing')
   }
 
@@ -160,7 +160,7 @@ export function EditorContent() {
     if (editorRef.current.innerHTML) {
       editorRef.current.removeAttribute('data-placeholder')
     } else {
-      editorRef.current.setAttribute('data-placeholder', '开始写作吧...')
+      editorRef.current.setAttribute('data-placeholder', t('editor.startWriting'))
     }
     lastSavedContentRef.current = chapter.content || ''
   }, [chapter])
@@ -270,9 +270,9 @@ export function EditorContent() {
                 ref={titleRef}
                 className="font-display text-[36px] font-semibold leading-[1.25] tracking-[-0.01em] mb-[1.5em] cursor-pointer hover:text-[var(--accent-gold)] transition-colors"
                 onClick={handleTitleClick}
-                title="点击修改标题"
+                title={t('editor.clickToEditTitle')}
               >
-                第{chapter.num}章 {chapter.title}
+                {t('sidebar.chapterTitle', { num: chapter.num, title: chapter.title })}
               </h1>
             )}
             <div

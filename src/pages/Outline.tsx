@@ -79,10 +79,10 @@ export function Outline() {
   const handleNewChapter = async (volumeId: number) => {
     if (!currentProject) return
     try {
-      const created = await createChapter(currentProject, '新章节', '', volumeId)
+      const created = await createChapter(currentProject, t('chapter.defaultTitle'), '', volumeId)
       if (created?.num) {
-        // Find the new chapter's ID from the reloaded store
-        const ch = volumes.flatMap((v) => v.chapters).find((c) => c.num === created.num)
+        // Find the new chapter's ID from the reloaded store (match volume + num to avoid cross-volume collisions)
+        const ch = volumes.flatMap((v) => v.chapters).find((c) => c.num === created.num && c.volumeId === volumeId)
         if (ch) setActiveChapterId(ch.id)
       }
     } catch (e) {
@@ -95,25 +95,20 @@ export function Outline() {
     setGenerating(true)
     setAiSuggestion('')
     try {
-      const contentPreview = activeChapter.content?.slice(0, 1000) || '（暂无正文）'
+      const contentPreview = activeChapter.content?.slice(0, 1000) || t('outline.noContent')
       const res = await aiApi.chat(
         [
           {
             role: 'system',
-            content:
-              '你是一个小说大纲生成器。根据用户提供的章节信息，生成JSON格式的输出，包含：\n' +
-              '1. title: 章节标题建议（若当前标题为"新章节"或"第一章"之类的占位名则给出有吸引力的标题，否则保留原标题）\n' +
-              '2. outline: 章节大纲（150字以内），包含核心事件、角色发展、关键冲突\n' +
-              '3. cognitive_frame: 角色认知框架的变化（30字以内）\n' +
-              '4. emotional_anchor: 本章的情感锚点（30字以内）\n' +
-              '5. world_texture: 世界质感/场景氛围（30字以内）\n' +
-              '6. concrete_mystery: 具体悬念（30字以内）\n' +
-              '7. interpersonal_tension: 人际张力（30字以内）\n' +
-              '直接返回JSON，不要前缀说明。',
+            content: t('outline.generateSystemPrompt'),
           },
           {
             role: 'user',
-            content: `第${activeChapter.num}章「${activeChapter.title}」\n当前正文预览：${contentPreview}\n\n请为这一章生成完整的大纲和五维信息。`,
+            content: t('outline.generateUserPrompt', {
+              num: activeChapter.num,
+              title: activeChapter.title,
+              preview: contentPreview,
+            }),
           },
         ],
         currentProject,
@@ -162,11 +157,15 @@ export function Outline() {
         [
           {
             role: 'system',
-            content: '你是一个小说大纲优化助手。分析用户提供的大纲，给出改进建议。直接返回建议，200字以内。',
+            content: t('outline.optimizeSystemPrompt'),
           },
           {
             role: 'user',
-            content: `第${activeChapter.num}章「${activeChapter.title}」当前大纲：\n${outlineText}\n\n请给出优化建议。`,
+            content: t('outline.optimizeUserPrompt', {
+              num: activeChapter.num,
+              title: activeChapter.title,
+              outline: outlineText,
+            }),
           },
         ],
         currentProject,
@@ -206,7 +205,7 @@ export function Outline() {
             disabled={!activeChapter || generating}
           >
             {generating ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Pen className="w-3.5 h-3.5" />}
-            {generating ? '生成中...' : t('pages.generateOutline')}
+            {generating ? t('common.generating') : t('pages.generateOutline')}
           </button>
         </div>
       </div>
@@ -229,8 +228,10 @@ export function Outline() {
                   </span>
                   {vol.title.startsWith('第') && vol.title.endsWith('卷')
                     ? vol.title
-                    : `第${vol.sortOrder}卷 · ${vol.title}`}
-                  <span className="text-[10px] text-[var(--ink-tertiary)] ml-auto">{vol.chapters.length}章</span>
+                    : t('sidebar.volumeTitle', { order: vol.sortOrder, title: vol.title })}
+                  <span className="text-[10px] text-[var(--ink-tertiary)] ml-auto">
+                    {t('outline.chapterCount', { n: vol.chapters.length })}
+                  </span>
                 </div>
                 {!collapsed && (
                   <>
@@ -260,7 +261,9 @@ export function Outline() {
                           >
                             {statusIcon[ch.status]}
                           </span>
-                          {ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`}
+                          {ch.title.startsWith('第')
+                            ? ch.title
+                            : t('sidebar.chapterTitle', { num: ch.num, title: ch.title })}
                         </div>
                         <div className="text-[12px] text-[var(--ink-tertiary)] mt-1 line-clamp-2">{ch.outline}</div>
                       </div>
@@ -287,7 +290,7 @@ export function Outline() {
               <div className="font-display text-lg font-medium text-[var(--ink)] mb-1">
                 {activeChapter.title.startsWith('第')
                   ? activeChapter.title
-                  : `第${activeChapter.num}章 ${activeChapter.title}`}
+                  : t('sidebar.chapterTitle', { num: activeChapter.num, title: activeChapter.title })}
               </div>
               <div className="text-[12px] text-[var(--ink-tertiary)] mb-4">
                 <span
@@ -313,62 +316,62 @@ export function Outline() {
                           : t('status.pending')}
                   </span>
                 </span>{' '}
-                大纲 · 共 {volumes.flatMap((v) => v.chapters).length} 章
+                {t('outline.outlineInfo', { count: volumes.flatMap((v) => v.chapters).length })}
               </div>
 
               <div className="mb-3">
                 <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1">
-                  章节概要
+                  {t('pages.outlineOverview')}
                 </label>
                 <textarea
                   rows={3}
                   className="w-full bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-2.5 font-sans text-[13px] text-[var(--ink)] outline-none resize-vertical focus:border-[var(--accent-gold)]"
                   value={outlineText}
                   onChange={(e) => setOutlineText(e.target.value)}
-                  placeholder="输入章节大纲..."
+                  placeholder={t('outline.placeholderOutline')}
                 />
               </div>
 
               <div className="text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2">
-                五维大纲锁定
+                {t('outline.lock5D')}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <FiveDimField
                   label={t('pages.dimensionFrame')}
                   value={dimensions.cognitiveFrame}
                   onChange={(v) => updateDimension('cognitiveFrame', v)}
-                  placeholder="角色的认知框架变化"
+                  placeholder={t('outline.placeholderFrame')}
                 />
                 <FiveDimField
                   label={t('pages.dimensionAnchor')}
                   value={dimensions.emotionalAnchor}
                   onChange={(v) => updateDimension('emotionalAnchor', v)}
-                  placeholder="情感锚点"
+                  placeholder={t('outline.placeholderAnchor')}
                 />
                 <FiveDimField
                   label={t('pages.dimensionTexture')}
                   value={dimensions.worldTexture}
                   onChange={(v) => updateDimension('worldTexture', v)}
-                  placeholder="世界质感"
+                  placeholder={t('outline.placeholderTexture')}
                 />
                 <FiveDimField
                   label={t('pages.dimensionMystery')}
                   value={dimensions.concreteMystery}
                   onChange={(v) => updateDimension('concreteMystery', v)}
-                  placeholder="具体悬念"
+                  placeholder={t('outline.placeholderMystery')}
                 />
                 <FiveDimField
                   label={t('pages.dimensionTension')}
                   value={dimensions.interpersonalTension}
                   onChange={(v) => updateDimension('interpersonalTension', v)}
-                  placeholder="人际张力"
+                  placeholder={t('outline.placeholderTension')}
                 />
               </div>
 
               {aiSuggestion && (
                 <div className="mt-4 p-3 rounded-lg bg-[var(--accent-gold-soft-bg)] border border-[rgba(201,169,110,0.3)] text-[13px] text-[var(--ink-secondary)] leading-[1.6]">
                   <div className="text-[11px] font-medium text-[var(--accent-gold)] mb-1 uppercase tracking-[0.04em]">
-                    AI 优化建议
+                    {t('pages.outlineAI')}
                   </div>
                   {aiSuggestion}
                 </div>
@@ -381,7 +384,7 @@ export function Outline() {
                   onClick={handleSaveOutline}
                   disabled={saving}
                 >
-                  <Save className="w-3.5 h-3.5" /> {saving ? '保存中...' : t('pages.outlineSave')}
+                  <Save className="w-3.5 h-3.5" /> {saving ? t('common.saving') : t('pages.outlineSave')}
                 </button>
                 <button
                   className="btn-secondary flex items-center gap-1.5"
@@ -390,13 +393,15 @@ export function Outline() {
                   disabled={optimizing || !outlineText.trim()}
                 >
                   {optimizing ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {optimizing ? '优化中...' : t('pages.outlineAI')}
+                  {optimizing ? t('outline.optimizing') : t('pages.outlineAI')}
                 </button>
               </div>
             </>
           ) : (
             <div className="text-center pt-20 text-[var(--ink-tertiary)]">
-              {volumes.flatMap((v) => v.chapters).length > 0 ? '选择左侧章节开始编辑大纲' : '暂无章节，请先创建章节'}
+              {volumes.flatMap((v) => v.chapters).length > 0
+                ? t('outline.selectChapterHint')
+                : t('outline.noChaptersHint')}
             </div>
           )}
         </div>

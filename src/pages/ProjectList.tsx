@@ -1,6 +1,7 @@
-import { Trash2, X } from 'lucide-react'
+import { BookOpen, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { ProjectIcon } from '@/components/ProjectIcon'
+import { useT } from '@/hooks/useT'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
 
@@ -19,6 +20,7 @@ function formatDate(dateStr: string): string {
 export function ProjectList() {
   const { projects, setCurrentProject, showProjectList, deleteProject } = useProjectStore()
   const { setProjectDialogOpen } = useUIStore()
+  const { t } = useT()
   const totalWords = projects.reduce((s, p) => s + p.wordCount, 0)
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
@@ -38,28 +40,27 @@ export function ProjectList() {
         <div className="w-full max-w-[800px]">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="font-display text-[36px] font-semibold leading-[1.2]">我的项目</h1>
+              <h1 className="font-display text-[36px] font-semibold leading-[1.2]">{t('project.list')}</h1>
               <div className="text-[var(--ink-tertiary)] text-[13px] mt-1">
-                共 {projects.length} 个项目 · 总计 {totalWords.toLocaleString()} 字
+                {t('project.total', { count: projects.length, words: totalWords.toLocaleString() })}
               </div>
             </div>
             <button className="btn-primary h-[34px] px-5" onClick={() => setProjectDialogOpen(true)}>
-              + 新建项目
+              + {t('project.new')}
             </button>
           </div>
 
           {projects.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <div className="w-16 h-16 mb-6 rounded-2xl bg-[var(--canvas-card)] border border-[var(--hairline)] flex items-center justify-center text-[32px] text-[var(--ink-tertiary)]">
-                📖
+                <BookOpen size={32} />
               </div>
-              <h2 className="font-display text-[22px] font-semibold text-[var(--ink)] mb-2">还没有项目</h2>
-              <p className="text-[var(--ink-tertiary)] text-[14px] max-w-[320px] leading-relaxed mb-8">
-                创建一个新项目，开始你的创作之旅吧
+              <h2 className="font-display text-[22px] font-semibold text-[var(--ink)] mb-2">
+                {t('project.noProjectsTitle')}
+              </h2>
+              <p className="text-[var(--ink-tertiary)] text-[14px] max-w-[320px] leading-relaxed">
+                {t('project.noProjectsDesc')}
               </p>
-              <button className="btn-primary h-[36px] px-6 text-[14px]" onClick={() => setProjectDialogOpen(true)}>
-                + 新建项目
-              </button>
             </div>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
@@ -76,7 +77,7 @@ export function ProjectList() {
                       e.stopPropagation()
                       setDeleteTarget(p.name)
                     }}
-                    title="删除项目"
+                    title={t('project.deleteTooltip')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -96,12 +97,16 @@ export function ProjectList() {
                     ))}
                   </div>
                   <div className="flex gap-3 mb-2 pt-2 border-t border-[var(--hairline)] text-[11px] text-[var(--ink-tertiary)]">
-                    <span>{p.wordCount.toLocaleString()} 字</span>
-                    <span>{p.chapterCount} 章</span>
-                    <span>更新于 {formatDate(p.lastOpened)}</span>
+                    <span>
+                      {p.wordCount.toLocaleString()} {t('editor.words')}
+                    </span>
+                    <span>
+                      {p.chapterCount} {t('project.chapterUnit')}
+                    </span>
+                    <span>{t('project.updatedAt', { date: formatDate(p.lastOpened) })}</span>
                   </div>
                   <div className="text-[11px] text-[var(--ink-mute)]">
-                    {p.mode === 'long-novel' ? '长篇' : p.mode === 'medium-novel' ? '中篇' : '短篇'} · {p.status}
+                    {t(`project.mode.${p.mode}`)} · {t(`status.${p.status}`)}
                   </div>
                 </div>
               ))}
@@ -112,7 +117,7 @@ export function ProjectList() {
                 onClick={() => setProjectDialogOpen(true)}
               >
                 <span className="text-[28px] leading-none">+</span>
-                <span>新建项目</span>
+                <span>{t('project.new')}</span>
               </div>
             </div>
           )}
@@ -130,7 +135,7 @@ export function ProjectList() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg font-semibold text-[var(--ink)]">删除项目</h2>
+              <h2 className="font-display text-lg font-semibold text-[var(--ink)]">{t('project.deleteTooltip')}</h2>
               <button
                 className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--canvas-mid)] text-[var(--ink-tertiary)]"
                 onClick={() => setDeleteTarget(null)}
@@ -139,19 +144,19 @@ export function ProjectList() {
               </button>
             </div>
             <p className="text-[var(--ink-secondary)] text-[14px] leading-relaxed mb-6">
-              确定要删除「<strong className="text-[var(--ink)]">{deleteTarget}</strong>」吗？
+              {t('project.confirmDeleteMsg', { name: deleteTarget })}
               <br />
-              此操作将永久删除项目及其所有数据，无法恢复。
+              {t('project.permanentDelete')}
             </p>
             <div className="flex justify-end gap-2">
               <button className="btn-secondary h-[34px] px-4" onClick={() => setDeleteTarget(null)}>
-                取消
+                {t('project.cancel')}
               </button>
               <button
                 className="btn-primary h-[34px] px-4 !bg-red-600 !border-red-600 hover:!bg-red-700"
                 onClick={handleDelete}
               >
-                确认删除
+                {t('project.confirmDelete')}
               </button>
             </div>
           </div>

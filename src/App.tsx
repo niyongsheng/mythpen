@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/Sidebar'
 import { Titlebar } from '@/components/Titlebar'
 import { ToastContainer } from '@/components/ToastContainer'
 import { useToast } from '@/hooks/useToast'
+import { t } from '@/i18n'
 import { refreshAllData } from '@/lib/dataEvents'
 import { Characters } from '@/pages/Characters'
 import { Consistency } from '@/pages/Consistency'
@@ -65,7 +66,7 @@ function App() {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'R') {
         e.preventDefault()
         refreshAllData(currentProject || undefined).then(() => {
-          showToast('数据已刷新', 'success', 3000)
+          showToast(t('common.dataRefreshed'), 'success', 3000)
         })
       }
     }

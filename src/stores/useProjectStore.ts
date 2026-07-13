@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@/i18n'
 import { chaptersApi, projectsApi } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -67,7 +68,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         set({ workflowPhase: phase as WorkflowPhase })
       }
     } catch (err) {
-      set({ error: (err as any).message, loading: false })
+      set({ error: (err as any).message, loading: false, showProjectList: true })
     }
   },
 
@@ -97,7 +98,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       await projectsApi.create({ name, mode, language, genres })
 
       // 2. Auto-create Chapter 1 so user can start writing immediately
-      await chaptersApi.create(name, { title: '第一章' })
+      await chaptersApi.create(name, { title: t('chapter.firstChapterTitle') })
 
       // 3. Reload project list & set current
       await useProjectStore.getState().loadProjects()
@@ -107,7 +108,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       await useChapterStore.getState().loadChapters(name)
       useSidebarStore.getState().setActivePage('page-writing')
     } catch (err) {
-      set({ error: (err as any).message || '创建失败', loading: false })
+      set({ error: (err as any).message || t('project.createFailed'), loading: false })
       throw err
     }
   },
@@ -125,7 +126,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       }
       set({ loading: false })
     } catch (err) {
-      set({ error: (err as any).message || '删除失败', loading: false })
+      set({ error: (err as any).message || t('project.deleteFailed'), loading: false })
     }
   },
 }))

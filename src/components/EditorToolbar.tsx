@@ -1,5 +1,6 @@
 import { Loader, Pen, RemoveFormatting, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useT } from '@/hooks/useT'
 import { aiApi } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -29,6 +30,7 @@ export function EditorToolbar() {
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const loadChapterContent = useChapterStore((s) => s.loadChapterContent)
   const currentProject = useProjectStore((s) => s.currentProject)
+  const { t } = useT()
   const [loading, setLoading] = useState<'continue' | 'polish' | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const [fmt, setFmt] = useState({ bold: false, italic: false, underline: false })
@@ -146,7 +148,7 @@ export function EditorToolbar() {
     const range = sel.getRangeAt(0)
     const pre = document.createElement('pre')
     const code = document.createElement('code')
-    code.textContent = sel.toString() || '代码'
+    code.textContent = sel.toString() || t('editor.codePlaceholder')
     pre.appendChild(code)
     range.deleteContents()
     range.insertNode(pre)
@@ -158,7 +160,12 @@ export function EditorToolbar() {
     if (loading || !currentProject || !currentChapter) return
     setLoading('continue')
     const ch = currentChapter
-    const context = `项目：${currentProject}\n当前章节：第${ch?.num}章「${ch?.title}」\n当前内容：${ch?.content || ''}\n\n请直接续写小说内容，保持原有风格，不要加前缀说明。`
+    const context = t('editor.continuePrompt', {
+      project: currentProject,
+      num: ch?.num,
+      title: ch?.title,
+      content: ch?.content || '',
+    })
 
     abortRef.current = aiApi.continueWriting(
       ch?.num || 1,
@@ -167,7 +174,7 @@ export function EditorToolbar() {
       () => {}, // chunk handler — no-op for toolbar (streaming handled server-side)
       async () => {
         setLoading(null)
-        if (ch?.num) await loadChapterContent(currentProject, ch.num)
+        if (ch?.num) await loadChapterContent(currentProject, ch.num, ch.volumeId)
       },
       () => {
         setLoading(null)
@@ -199,7 +206,7 @@ export function EditorToolbar() {
     if (loading || !currentProject || !currentChapter) return
     setLoading('polish')
     const ch = currentChapter
-    const context = `项目：${currentProject}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n请润色当前章节的文字，保持原有风格和情节，提升文学质感。不要改变故事内容和剧情走向。`
+    const context = t('editor.polishPrompt', { project: currentProject, num: ch?.num, title: ch?.title })
 
     abortRef.current = aiApi.continueWriting(
       ch?.num || 1,
@@ -208,7 +215,7 @@ export function EditorToolbar() {
       () => {},
       async () => {
         setLoading(null)
-        if (ch?.num) await loadChapterContent(currentProject, ch.num)
+        if (ch?.num) await loadChapterContent(currentProject, ch.num, ch.volumeId)
       },
       () => {
         setLoading(null)
@@ -255,7 +262,7 @@ export function EditorToolbar() {
           ) : (
             <Sparkles className="w-3.5 h-3.5" />
           )}
-          <span className="text-[12px]">{loading === 'polish' ? '润色中...' : '润色'}</span>
+          <span className="text-[12px]">{loading === 'polish' ? t('editor.polishing') : t('editor.polish')}</span>
         </button>
         <button
           className={`tool-btn-ai-pill inline-flex items-center gap-1 ${loading === 'continue' ? 'opacity-60 pointer-events-none' : ''}`}
@@ -263,7 +270,7 @@ export function EditorToolbar() {
           disabled={!!loading}
         >
           {loading === 'continue' ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Pen className="w-3.5 h-3.5" />}
-          <span className="text-[12px]">{loading === 'continue' ? '续写中...' : '续写'}</span>
+          <span className="text-[12px]">{loading === 'continue' ? t('editor.continuing') : t('editor.continue')}</span>
         </button>
       </div>
     </div>

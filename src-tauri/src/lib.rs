@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::sync::Mutex;
 use std::net::TcpStream;
 use std::time::Duration;
@@ -26,6 +27,38 @@ fn wait_for_server(port: u16, timeout_secs: u64) -> bool {
     false
 }
 
+/// Send an HTTP POST request to the server's graceful shutdown endpoint.
+/// Returns true if the request was sent (server may still be shutting down).
+fn request_graceful_shutdown(port: u16) -> bool {
+    let body = "{}";
+    let request = format!(
+        "POST /api/shutdown HTTP/1.1\r\n\
+         Host: 127.0.0.1:{port}\r\n\
+         Content-Type: application/json\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\
+         \r\n\
+         {}",
+        body.len(),
+        body
+    );
+
+    match TcpStream::connect_timeout(
+        &format!("127.0.0.1:{port}").parse().unwrap(),
+        Duration::from_millis(1000),
+    ) {
+        Ok(mut stream) => {
+            let _ = stream.write_all(request.as_bytes());
+            // Don't wait for response — the server is shutting down
+            true
+        }
+        Err(_) => {
+            // Server already gone or port not reachable
+            false
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -39,21 +72,40 @@ pub fn run() {
             // and can be killed on exit (fixes Windows "file in use" on upgrade)
             app.manage(SidecarProcess(Mutex::new(Some(child))));
 
-            // Wait for the server to be ready on port 3001
-            if !wait_for_server(3001, 15) {
-                eprintln!("Warning: mythpen-server did not start within 15 seconds");
-            }
+            // Wait for server in background thread — don't block setup().
+            // The frontend's ServerStatusGate will poll independently, so the
+            // window shows immediately even on slow first-start (Windows AV scan).
+            // Timeout doubled to 30s for first-run scenarios.
+            std::thread::spawn(|| {
+                if !wait_for_server(3001, 30) {
+                    eprintln!("Warning: mythpen-server did not start within 30 seconds");
+                }
+            });
 
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app_handle, event| {
-            // Kill the sidecar on exit so Windows can overwrite the binary during upgrade
+            // Graceful sidecar shutdown on app exit.
+            //
+            // Step 1: Send HTTP POST to /api/shutdown so Express cleans up normally.
+            // Step 2: Wait briefly for the graceful shutdown to complete.
+            // Step 3: Force kill as a safety net (for Windows upgrade binary overwrite).
+            //
+            // This three-step strategy avoids triggering antivirus software that flags
+            // SIGKILL/TerminateProcess as suspicious behavior.
             if let tauri::RunEvent::Exit = event {
                 if let Some(state) = app_handle.try_state::<SidecarProcess>() {
                     if let Ok(mut guard) = state.0.lock() {
                         if let Some(child) = guard.take() {
+                            // Step 1: Request graceful shutdown via HTTP
+                            request_graceful_shutdown(3001);
+
+                            // Step 2: Give the server time to close gracefully
+                            std::thread::sleep(Duration::from_millis(2000));
+
+                            // Step 3: Force kill as safety net
                             let _ = child.kill();
                         }
                     }

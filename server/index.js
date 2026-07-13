@@ -115,7 +115,7 @@ app.post('/api/ai/chat/stream', async (req, res) => {
     let fullContent = '';
     let inputTokens = 0;
     let outputTokens = 0;
-    const MAX_TOOL_ROUNDS = 8;
+    const MAX_TOOL_ROUNDS = 120;
 
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       console.log(`[AI Stream] Round ${round}, messages: ${conversation.length}`);
@@ -304,17 +304,52 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ─── Graceful shutdown ───
+// Called by Tauri on app exit to avoid antivirus flagging SIGKILL/TerminateProcess
+let serverInstance = null;
+
+function gracefulShutdown() {
+  console.log('\n  🛑 Shutting down Mythpen API Server gracefully...');
+  if (serverInstance) {
+    serverInstance.close(() => {
+      console.log('  ✓ Server closed.');
+      process.exit(0);
+    });
+    // Force exit after 5s if close hangs
+    setTimeout(() => {
+      console.error('  ⚠️  Server close timed out, forcing exit.');
+      process.exit(0);
+    }, 5000);
+  } else {
+    process.exit(0);
+  }
+}
+
+app.post('/api/shutdown', (req, res) => {
+  res.json({ status: 'shutting_down' });
+  setImmediate(() => gracefulShutdown());
+});
+
+// Handle SIGTERM from Tauri (sent before SIGKILL on some platforms)
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
 // ─── Start (async — init DB then listen) ───
 const { initDatabase } = require('./db');
+const serverStartTime = Date.now();
+console.log('[Server] Mythpen API Server starting...');
+console.log('[Server] Port:', PORT);
 initDatabase()
   .then(() => {
-    app.listen(PORT, () => {
+    serverInstance = app.listen(PORT, () => {
       const cfg = getAiConfig();
+      const elapsed = Date.now() - serverStartTime;
       console.log(`\n  🖋️  Mythpen API Server`);
       console.log(`  ─────────────────────`);
       console.log(`  Local:   http://localhost:${PORT}`);
       console.log(`  Health:  http://localhost:${PORT}/api/health`);
       console.log(`  AI:      ${cfg.apiModel} @ ${cfg.apiBaseUrl}`);
+      console.log(`  Startup: ${elapsed}ms`);
       console.log(`\n  Ready.\n`);
     });
   })

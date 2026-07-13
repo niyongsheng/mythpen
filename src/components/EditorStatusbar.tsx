@@ -35,9 +35,7 @@ export function EditorStatusbar() {
 
   return (
     <div className="h-[var(--statusbar-h)] bg-[var(--canvas-soft)] border-t border-[var(--hairline)] flex items-center px-4 gap-4 font-mono text-[12px] text-[var(--ink-tertiary)] shrink-0">
-      <span>
-        第{currentChapter.num}章 · {currentChapter.title}
-      </span>
+      <span>{t('sidebar.chapterTitle', { num: currentChapter.num, title: currentChapter.title })}</span>
       <span>
         {(currentChapter.wordCount || 0).toLocaleString()} {t('editor.words')}
       </span>
@@ -45,7 +43,7 @@ export function EditorStatusbar() {
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-sm)] border-none bg-none cursor-pointer hover:bg-[var(--canvas-card)] transition-colors font-mono text-[12px]"
         style={{ color: STATUS_COLORS[currentChapter.status] || 'var(--ink-tertiary)' }}
         onClick={handleCycleStatus}
-        title={`切换为 ${t('status.' + NEXT_STATUS[currentChapter.status] || 'writing')}`}
+        title={t('editor.switchTo', { status: t('status.' + (NEXT_STATUS[currentChapter.status] || 'writing')) })}
       >
         {t(`status.${currentChapter.status}`)}
         <span className="text-[10px] opacity-60">↻</span>
@@ -63,11 +61,12 @@ export function EditorStatusbar() {
 }
 
 function SaveIndicator({ status }: { status: 'saved' | 'saving' | 'unsaved' }) {
+  const { t } = useT()
   if (status === 'saving') {
     return (
       <span className="inline-flex items-center gap-1 text-[11px]">
         <span className="w-2 h-2 rounded-full bg-[var(--accent-gold)] animate-pulse inline-block" />
-        保存中...
+        {t('editor.saving')}
       </span>
     )
   }
@@ -75,7 +74,7 @@ function SaveIndicator({ status }: { status: 'saved' | 'saving' | 'unsaved' }) {
     return (
       <span className="inline-flex items-center gap-1 text-[11px] text-[var(--ink-mute)]">
         <span className="w-2 h-2 rounded-full bg-[var(--ink-mute)] inline-block" />
-        未保存
+        {t('editor.notSaved')}
       </span>
     )
   }
@@ -85,7 +84,7 @@ function SaveIndicator({ status }: { status: 'saved' | 'saving' | 'unsaved' }) {
         className="w-2 h-2 rounded-full bg-[var(--success)] inline-block"
         style={{ boxShadow: '0 0 0 2px rgba(76,175,125,0.2)' }}
       />
-      已保存
+      {t('editor.saved')}
     </span>
   )
 }

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@/i18n'
 import { chaptersApi, statsApi, volumesApi } from '@/lib/api'
 import { useProjectStore } from '@/stores/useProjectStore'
 
@@ -34,7 +35,7 @@ interface ChapterState {
   setSaveStatus: (status: 'saved' | 'saving' | 'unsaved') => void
   setCurrentChapter: (ch: Chapter | null) => void
   loadChapters: (project: string) => Promise<void>
-  loadChapterContent: (project: string, num: number) => Promise<void>
+  loadChapterContent: (project: string, num: number, volumeId?: number) => Promise<void>
   updateChapter: (project: string, num: number, data: Partial<Chapter>) => Promise<void>
   createChapter: (project: string, title?: string, outline?: string, volumeId?: number) => Promise<any>
 }
@@ -102,9 +103,9 @@ export const useChapterStore = create<ChapterState>((set) => ({
     }
   },
 
-  loadChapterContent: async (project, num) => {
+  loadChapterContent: async (project, num, volumeId) => {
     try {
-      const ch = await chaptersApi.get(project, num)
+      const ch = await chaptersApi.get(project, num, volumeId)
       if (ch) {
         set((s) => {
           const chapter = {
@@ -147,14 +148,14 @@ export const useChapterStore = create<ChapterState>((set) => ({
       // Only reload if user is still on this chapter (avoid overwriting after sidebar nav)
       const currentAfterSave = useChapterStore.getState().currentChapter
       if (currentAfterSave?.num === num) {
-        await useChapterStore.getState().loadChapterContent(project, num)
+        await useChapterStore.getState().loadChapterContent(project, num, currentAfterSave.volumeId)
       }
     } catch (err) {
       console.error('Failed to update chapter:', err)
     }
   },
 
-  createChapter: async (project, title = '新章节', outline = '', volumeId?: number) => {
+  createChapter: async (project, title = t('chapter.defaultTitle'), outline = '', volumeId?: number) => {
     try {
       const created = await chaptersApi.create(project, { title, outline, volume_id: volumeId })
       // Reload chapters to include the new one

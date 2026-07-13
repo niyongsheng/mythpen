@@ -6,24 +6,25 @@ import { useT } from '@/hooks/useT'
 import { scienceApi } from '@/lib/api'
 import { useProjectName, useScienceEntries } from '@/lib/useProjectData'
 
-const LABEL_MAP: Record<string, { text: string; color: string; bg: string }> = {
-  known: { text: '已知', color: 'var(--success)', bg: 'var(--success-soft)' },
-  extrapolation: { text: '外推', color: 'var(--warning)', bg: 'var(--warning-soft)' },
-  hypothesis: { text: '假设', color: 'var(--error)', bg: 'var(--error-soft)' },
-}
-const FILTER_OPTIONS = ['全部', 'known', 'extrapolation', 'hypothesis']
+const FILTERS = ['all', 'known', 'extrapolation', 'hypothesis']
 
 export function Science() {
   const { data: entries, loading, reload } = useScienceEntries()
   useDataRefresh('science', reload)
-  const [filter, setFilter] = useState(FILTER_OPTIONS[0])
+  const [filter, setFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const { t } = useT()
   const project = useProjectName()
+  const labelMap: Record<string, { text: string; color: string; bg: string }> = {
+    known: { text: t('science.known'), color: 'var(--success)', bg: 'var(--success-soft)' },
+    extrapolation: { text: t('science.extrapolation'), color: 'var(--warning)', bg: 'var(--warning-soft)' },
+    hypothesis: { text: t('science.hypothesis'), color: 'var(--error)', bg: 'var(--error-soft)' },
+  }
 
-  if (loading) return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+  if (loading)
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
 
-  const filtered = filter === '全部' ? entries || [] : (entries || []).filter((e) => e.label === filter)
+  const filtered = filter === 'all' ? entries || [] : (entries || []).filter((e) => e.label === filter)
 
   return (
     <>
@@ -42,10 +43,10 @@ export function Science() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
-            <option value="全部">三色标签: 全部</option>
-            <option value="known">🟢 已知科学</option>
-            <option value="extrapolation">🟡 外推</option>
-            <option value="hypothesis">🔴 假设</option>
+            <option value="all">{t('science.filterAll')}</option>
+            <option value="known">{t('science.knownLabel')}</option>
+            <option value="extrapolation">{t('science.extrapolationLabel')}</option>
+            <option value="hypothesis">{t('science.hypothesisLabel')}</option>
           </select>
         </div>
       </div>
@@ -56,17 +57,22 @@ export function Science() {
           fields={[
             {
               key: 'label',
-              label: '分类',
+              label: t('science.category'),
               type: 'select',
               required: true,
               options: [
-                { value: 'known', label: '🟢 已知科学' },
-                { value: 'extrapolation', label: '🟡 外推' },
-                { value: 'hypothesis', label: '🔴 假设' },
+                { value: 'known', label: t('science.knownLabel') },
+                { value: 'extrapolation', label: t('science.extrapolationLabel') },
+                { value: 'hypothesis', label: t('science.hypothesisLabel') },
               ],
             },
-            { key: 'name', label: '名称', required: true, placeholder: '设定名称' },
-            { key: 'description', label: '描述', type: 'textarea', placeholder: '科学设定的详细说明...' },
+            { key: 'name', label: t('science.name'), required: true, placeholder: t('science.namePlaceholder') },
+            {
+              key: 'description',
+              label: t('science.description'),
+              type: 'textarea',
+              placeholder: t('science.descriptionPlaceholder'),
+            },
           ]}
           onSubmit={async (vals) => {
             await scienceApi.create(project, vals)
@@ -79,7 +85,7 @@ export function Science() {
       <div className="page-body" style={{ padding: 0 }}>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-6">
           {filtered.map((entry: any) => {
-            const lm = LABEL_MAP[entry.label] || LABEL_MAP.hypothesis
+            const lm = labelMap[entry.label] || labelMap.hypothesis
             return (
               <div
                 key={entry.id}
@@ -87,10 +93,10 @@ export function Science() {
               >
                 <span className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] inline-block mb-1.5">
                   {entry.label === 'known'
-                    ? '🟢 已知科学'
+                    ? t('science.knownLabel')
                     : entry.label === 'extrapolation'
-                      ? '🟡 外推'
-                      : '🔴 核心假设'}
+                      ? t('science.extrapolationLabel')
+                      : t('science.coreHypothesis')}
                 </span>
                 <div className="text-[15px] text-[var(--ink)] mb-1">{entry.name}</div>
                 <span

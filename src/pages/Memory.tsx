@@ -6,12 +6,12 @@ import { aiApi, extractAIJsonArray, getAIResponseText, memoriesApi } from '@/lib
 import { useMemories, useProjectName } from '@/lib/useProjectData'
 
 const CAT_LABELS: Record<string, string> = {
-  character: '角色',
-  location: '地点',
-  event: '事件',
-  promise: '承诺',
-  item: '物品',
-  other: '其他',
+  character: 'memory.categoryCharacter',
+  location: 'memory.categoryLocation',
+  event: 'memory.categoryEvent',
+  promise: 'memory.categoryPromise',
+  item: 'memory.categoryItem',
+  other: 'memory.categoryOther',
 }
 const CAT_COLORS: Record<string, { bg: string; text: string }> = {
   character: { bg: 'rgba(201,169,110,0.18)', text: 'var(--accent-gold)' },
@@ -58,11 +58,9 @@ export function Memory() {
         [
           {
             role: 'system',
-            content:
-              '你是一个叙事记忆提取助手。从小说章节内容中提取重要的叙事记忆——对后续情节有影响的情节承诺、角色线索、设定关键点。' +
-              '每个记忆用一句话概括。直接返回JSON数组，格式：[{"category":"character|location|item|event|promise|other","content":"..."}]，不要前缀说明。',
+            content: t('memory.aiPrompt'),
           },
-          { role: 'user', content: '请提取当前小说的所有重要叙事记忆。' },
+          { role: 'user', content: t('memory.aiUserMessage') },
         ],
         project,
       )
@@ -87,7 +85,8 @@ export function Memory() {
 
   const displayList = searchResults !== null ? searchResults : memories || []
 
-  if (loading) return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+  if (loading)
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
 
   return (
     <>
@@ -110,7 +109,7 @@ export function Memory() {
             disabled={extracting}
           >
             {extracting ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {extracting ? '提取中...' : t('pages.aiExtract')}
+            {extracting ? t('common.extracting') : t('pages.aiExtract')}
           </button>
         </div>
       </div>
@@ -122,7 +121,7 @@ export function Memory() {
             <input
               type="text"
               className="w-full h-8 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-lg px-3 font-sans text-[13px] text-[var(--ink)] outline-none focus:border-[var(--accent-gold)]"
-              placeholder="搜索记忆内容..."
+              placeholder={t('memory.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -133,7 +132,7 @@ export function Memory() {
               onClick={handleSearch}
               disabled={searching || !searchQuery.trim()}
             >
-              {searching ? '搜索中...' : '搜索'}
+              {searching ? t('common.searching') : t('common.search')}
             </button>
             <button
               className="h-8 w-8 rounded-lg flex items-center justify-center border border-[var(--hairline)] bg-[var(--canvas-elevated)] text-[var(--ink-tertiary)] cursor-pointer hover:text-[var(--ink)]"
@@ -144,7 +143,9 @@ export function Memory() {
           </div>
           {searchResults !== null && (
             <div className="text-[12px] text-[var(--ink-tertiary)] mt-1.5">
-              {searchResults.length === 0 ? '未找到匹配的记忆' : `找到 ${searchResults.length} 条匹配结果`}
+              {searchResults.length === 0
+                ? t('memory.noResults')
+                : t('memory.searchResultsCount', { n: searchResults.length })}
               <button
                 className="ml-2 text-[var(--accent-gold)] underline cursor-pointer bg-transparent border-none"
                 onClick={() => {
@@ -152,7 +153,7 @@ export function Memory() {
                   setSearchQuery('')
                 }}
               >
-                显示全部
+                {t('memory.showAll')}
               </button>
             </div>
           )}
@@ -172,11 +173,11 @@ export function Memory() {
                   className="text-[10px] px-[7px] py-[1px] rounded-full inline-block mb-2"
                   style={{ background: color.bg, color: color.text }}
                 >
-                  {CAT_LABELS[m.category] || m.category}
+                  {t(CAT_LABELS[m.category] || m.category)}
                 </span>
                 <div className="text-[13px] text-[var(--ink-secondary)] leading-[1.6]">{m.content}</div>
                 <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
-                  {m.source_chapter_id ? `来源: 第${m.source_chapter_id}章` : ''}
+                  {m.source_chapter_id ? t('memory.sourceChapter', { n: m.source_chapter_id }) : ''}
                 </div>
               </div>
             )

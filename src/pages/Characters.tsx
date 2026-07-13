@@ -30,7 +30,7 @@ export function Characters() {
   }
 
   if (loading) {
-    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
   }
 
   return (
@@ -50,14 +50,34 @@ export function Characters() {
         <SimpleCreateDialog
           title={`+ ${t('pages.newCharacter')}`}
           fields={[
-            { key: 'name', label: t('pages.name'), required: true, placeholder: '给角色取个名字' },
-            { key: 'age', label: t('pages.age'), placeholder: '例如: 28' },
-            { key: 'gender', label: t('pages.gender'), placeholder: '男/女/其他' },
-            { key: 'appearance', label: t('pages.appearance'), type: 'textarea', placeholder: '外貌描述' },
-            { key: 'personality', label: t('pages.personality'), type: 'textarea', placeholder: '性格特征' },
-            { key: 'background', label: t('pages.background'), type: 'textarea', placeholder: '背景故事' },
-            { key: 'motivation', label: t('pages.motivation'), type: 'textarea', placeholder: '核心动机' },
-            { key: 'arc', label: t('pages.arc'), type: 'textarea', placeholder: '角色成长弧光' },
+            { key: 'name', label: t('pages.name'), required: true, placeholder: t('characters.namePlaceholder') },
+            { key: 'age', label: t('pages.age'), placeholder: t('characters.agePlaceholder') },
+            { key: 'gender', label: t('pages.gender'), placeholder: t('characters.genderPlaceholder') },
+            {
+              key: 'appearance',
+              label: t('pages.appearance'),
+              type: 'textarea',
+              placeholder: t('characters.appearancePlaceholder'),
+            },
+            {
+              key: 'personality',
+              label: t('pages.personality'),
+              type: 'textarea',
+              placeholder: t('characters.personalityPlaceholder'),
+            },
+            {
+              key: 'background',
+              label: t('pages.background'),
+              type: 'textarea',
+              placeholder: t('characters.backgroundPlaceholder'),
+            },
+            {
+              key: 'motivation',
+              label: t('pages.motivation'),
+              type: 'textarea',
+              placeholder: t('characters.motivationPlaceholder'),
+            },
+            { key: 'arc', label: t('pages.arc'), type: 'textarea', placeholder: t('characters.arcPlaceholder') },
           ]}
           onSubmit={async (vals) => {
             await charactersApi.create(project, vals)
@@ -91,13 +111,14 @@ export function Characters() {
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] text-[var(--ink)] truncate">{c.name}</div>
                 <div className="text-[11px] text-[var(--ink-tertiary)]">
-                  {c.age || '?'}岁 ·{' '}
+                  {c.age || '?'}
+                  {t('characters.ageUnit')} ·{' '}
                   {rankChar(idx) === 'major'
                     ? t('pages.roleMajor')
                     : rankChar(idx) === 'minor'
                       ? t('pages.roleMinor')
                       : t('pages.roleExtra')}
-                  {(c.chapterCount ?? 0) > 0 && ` · ${c.chapterCount}章出场`}
+                  {(c.chapterCount ?? 0) > 0 && ` · ${c.chapterCount}${t('characters.chapterAppearances')}`}
                 </div>
               </div>
             </div>

@@ -13,7 +13,8 @@ export function Timeline() {
   const project = useProjectName()
   const [showCreate, setShowCreate] = useState(false)
 
-  if (loading) return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+  if (loading)
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
 
   return (
     <>
@@ -36,10 +37,25 @@ export function Timeline() {
         <SimpleCreateDialog
           title={`+ ${t('pages.newEvent')}`}
           fields={[
-            { key: 'year', label: '年份', required: true, placeholder: '例如: 2036' },
-            { key: 'title', label: '事件标题', required: true, placeholder: '事件的名称' },
-            { key: 'description', label: '描述', type: 'textarea', placeholder: '事件的详细描述...' },
-            { key: 'importance', label: '重要性 (1-5)', type: 'number', placeholder: '3' },
+            { key: 'year', label: t('timeline.yearLabel'), required: true, placeholder: t('timeline.yearPlaceholder') },
+            {
+              key: 'title',
+              label: t('timeline.titleLabel'),
+              required: true,
+              placeholder: t('timeline.titlePlaceholder'),
+            },
+            {
+              key: 'description',
+              label: t('timeline.descriptionLabel'),
+              type: 'textarea',
+              placeholder: t('timeline.descriptionPlaceholder'),
+            },
+            {
+              key: 'importance',
+              label: t('timeline.importanceLabel'),
+              type: 'number',
+              placeholder: t('timeline.importancePlaceholder'),
+            },
           ]}
           onSubmit={async (vals) => {
             await timelineApi.create(project, {

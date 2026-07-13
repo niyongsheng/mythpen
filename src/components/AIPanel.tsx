@@ -91,12 +91,15 @@ export function AIPanel() {
       // Only generate if current title is still a timestamp placeholder
       const currentSession = sessions.find((s: any) => s.id === currentSessionId)
       if (!currentSession) return
-      const isPlaceholder = currentSession.title?.startsWith('对话 ') || currentSession.title?.startsWith('新会话 ')
+      const isPlaceholder =
+        currentSession.title?.startsWith('对话 ') ||
+        currentSession.title?.startsWith('新会话 ') ||
+        currentSession.title?.startsWith('New Session ')
       if (!isPlaceholder) return
 
       try {
         const context = aiResponse ? `用户: ${userMsg}\nAI: ${aiResponse}` : `用户: ${userMsg}`
-        const prompt = `你是一个小说创作助手。请根据以下对话内容，用2-6个字概括这场对话的主题。直接返回标题，不要任何额外文字、标点或引号。\n\n${context}`
+        const prompt = t('ai.titleGenPrompt', { context })
         const res = await aiApi.chat([{ role: 'user', content: prompt }], project)
         const title = (res.choices?.[0]?.message?.content || '').trim().replace(/["""「」]/g, '')
         if (title && title.length <= 20) {
@@ -147,7 +150,7 @@ export function AIPanel() {
         // No sessions exist — create one
         const now = new Date()
         const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-        void createSession(currentProject, `新会话 ${ts}`)
+        void createSession(currentProject, t('ai.newSessionTemplate', { ts }))
       } else if (state.messages.length === 0) {
         // Session already selected (by loadSessions) — load messages
         useAgentStore.getState().loadMessages(project)
@@ -229,7 +232,7 @@ export function AIPanel() {
       // ── 共创模式 ──
       setToolCalls([])
       toolCallsRef.current = []
-      const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户提问：${userMsg}\n\n我们正在一起构建这部小说的世界。在回答前，你可以先查询当前的角色、世界观、伏笔等已有设定。根据用户的问题，展开有建设性的讨论，提出创意建议。如果达成共识，使用对应工具将设定写入数据库。`
+      const context = t('ai.collabPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
       // Build conversation history from stored messages.
       const chatHistory: any[] = []
       for (const msg of messages) {
@@ -251,14 +254,14 @@ export function AIPanel() {
           const fullText = streamRef.current
           const aiMsg = {
             role: 'ai' as const,
-            content: fullText || '对话完成',
+            content: fullText || t('ai.dialogComplete'),
             toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
           }
           addMessage({ id: nextMsgId(), ...aiMsg })
           saveMsg(aiMsg).catch(() => {})
           const hadToolCalls = toolCallsRef.current.length > 0
           done()
-          showToast(fullText ? 'AI 回答完成' : '对话完成', 'success')
+          showToast(fullText ? t('ai.responseComplete') : t('ai.dialogComplete'), 'success')
           generateAITitle(userMsg, fullText || undefined)
           if (hadToolCalls) {
             const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
@@ -274,7 +277,7 @@ export function AIPanel() {
         },
         (err: any) => {
           setTask({ status: 'error' })
-          const errMsg = { role: 'ai' as const, content: `错误: ${err.error || err}` }
+          const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
           addMessage({ id: nextMsgId(), ...errMsg })
           saveMsg(errMsg).catch(() => {})
           done()
@@ -297,7 +300,7 @@ export function AIPanel() {
       // ── 写作模式 ──
       setToolCalls([])
       toolCallsRef.current = []
-      const context = `项目：${project}\n当前章节：第${ch?.num}章「${ch?.title}」\n\n用户指令：${userMsg}\n\n请按照六步写作工作流执行：先阅读当前章节的大纲和前文内容，根据大纲用 update_chapter 写入正文，按照系统指令中的工作流推进章节状态。完成后将章节状态设为 review。所有创作内容必须通过工具写入数据库。`
+      const context = t('ai.writingPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
       // Build chat history (same as chat mode for context continuity)
       const chatHistory: any[] = []
       for (const msg of messages) {
@@ -319,7 +322,7 @@ export function AIPanel() {
           const fullText = streamRef.current
           const aiMsg = {
             role: 'ai' as const,
-            content: fullText || '执行完成',
+            content: fullText || t('ai.execComplete'),
             toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
           }
           addMessage({ id: nextMsgId(), ...aiMsg })
@@ -337,13 +340,13 @@ export function AIPanel() {
           }
           // Reload chapter content if tool calls were made (content was saved to DB)
           if (hadToolCalls && ch?.num) {
-            await loadChapterContent(project, ch.num)
+            await loadChapterContent(project, ch.num, ch.volumeId)
           }
         },
         (err: any) => {
           setTask({ status: 'error' })
-          showToast('AI 出错', 'error')
-          const errMsg = { role: 'ai' as const, content: `错误: ${err.error || err}` }
+          showToast(t('ai.chatError'), 'error')
+          const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
           addMessage({ id: nextMsgId(), ...errMsg })
           saveMsg(errMsg).catch(() => {})
           done()
@@ -440,7 +443,7 @@ export function AIPanel() {
             onClick={() => {
               const now = new Date()
               const ts = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-              void createSession(project, `新会话 ${ts}`)
+              void createSession(project, t('ai.newSessionTemplate', { ts }))
             }}
             title={t('ai.newSession')}
           >

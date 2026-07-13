@@ -1,3 +1,6 @@
+/**
+ * 种子数据脚本，用来创建一个名叫做 "我的科幻小说" 的示例项目，包含完整的演示数据
+ */
 const { initDatabase, getProjectDb, getProjectDbPath, getConfigDb } = require('./db');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');

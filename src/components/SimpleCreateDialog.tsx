@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useT } from '@/hooks/useT'
 
 interface Field {
   key: string
@@ -19,6 +20,7 @@ interface Props {
 export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const { t } = useT()
   const [error, setError] = useState('')
 
   const update = (key: string, val: string) => setValues((v) => ({ ...v, [key]: val }))
@@ -27,7 +29,7 @@ export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) 
     // Check required
     for (const f of fields) {
       if (f.required && !values[f.key]?.trim()) {
-        setError(`请填写「${f.label}」`)
+        setError(t('common.requiredField', { label: f.label }))
         return
       }
     }
@@ -37,7 +39,7 @@ export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) 
       await onSubmit(values)
       onClose()
     } catch (e: any) {
-      setError(e.message || '创建失败')
+      setError(e.message || t('project.createFailed'))
       setSubmitting(false)
     }
   }
@@ -75,7 +77,7 @@ export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) 
                   value={values[f.key] || ''}
                   onChange={(e) => update(f.key, e.target.value)}
                 >
-                  <option value="">请选择...</option>
+                  <option value="">{t('common.select')}</option>
                   {f.options.map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
@@ -100,14 +102,14 @@ export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) 
             className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer hover:bg-[var(--canvas-mid)]"
             onClick={onClose}
           >
-            取消
+            {t('project.cancel')}
           </button>
           <button
             className="h-[32px] px-4 rounded-lg border-none bg-[var(--accent-gold)] text-[var(--canvas)] font-medium text-[13px] cursor-pointer hover:bg-[var(--accent-gold-soft)] disabled:opacity-40"
             onClick={handleSubmit}
             disabled={submitting}
           >
-            {submitting ? '创建中...' : '创建'}
+            {submitting ? t('common.creating') : t('common.create')}
           </button>
         </div>
       </div>

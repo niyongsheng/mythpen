@@ -133,7 +133,8 @@ export function Relations() {
       const charList = chars
         .map((c: any) => {
           const ch = c.chapterCount || 0
-          const role = ch >= 3 ? '主角' : ch >= 1 ? '配角' : '其他'
+          const role =
+            ch >= 3 ? t('relations.roleMajor') : ch >= 1 ? t('relations.roleMinor') : t('relations.roleExtra')
           return `${c.name}（${role}）`
         })
         .join('、')
@@ -149,14 +150,14 @@ export function Relations() {
         [
           {
             role: 'system',
-            content:
-              '你是一个角色关系分析助手。分析角色列表，推断他们之间可能存在但尚未记录的角色关系。' +
-              '直接返回JSON数组，格式：[{"character_a_name":"...","character_b_name":"...","relation_type":"...","description":"...","intensity":3}]。' +
-              'intensity 1-5。只建议合理的关系，不要强行关联。不要前缀说明。',
+            content: t('relations.aiPrompt'),
           },
           {
             role: 'user',
-            content: `角色：${charList}\n\n已有关系：\n${existingRels || '暂无'}\n\n请推断可能存在的其他角色关系。`,
+            content: t('relations.userPrompt', {
+              charList,
+              existingRels: existingRels || t('relations.existingRelations'),
+            }),
           },
         ],
         project,
@@ -164,7 +165,7 @@ export function Relations() {
       const text = getAIResponseText(res)
       const suggestions = extractAIJsonArray(text)
       if (!suggestions) {
-        setOrgMsg('AI 未能生成建议')
+        setOrgMsg(t('relations.aiNoSuggestion'))
         setOrganizing(false)
         return
       }
@@ -192,16 +193,16 @@ export function Relations() {
       const results = await Promise.all(createOps)
       created = results.length
       await reloadRels()
-      setOrgMsg(created > 0 ? `已创建 ${created} 条新关系` : '未发现需要添加的新关系')
+      setOrgMsg(created > 0 ? t('relations.createdCount', { n: created }) : t('relations.aiNoNewRelations'))
     } catch (e) {
       console.error('AI organize failed:', e)
-      setOrgMsg('分析出错')
+      setOrgMsg(t('relations.aiError'))
     }
     setOrganizing(false)
   }
 
   if (loading) {
-    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">加载中...</div>
+    return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
   }
 
   if (chars.length === 0) {
@@ -214,7 +215,7 @@ export function Relations() {
         </div>
         <div className="flex-1 flex flex-col items-center justify-center text-[var(--ink-tertiary)] gap-3">
           <Users className="w-12 h-12 opacity-30" />
-          <p className="text-[15px]">还没有角色，先创建角色才能构建关系图谱</p>
+          <p className="text-[15px]">{t('relations.noCharacters')}</p>
         </div>
       </>
     )
@@ -367,7 +368,7 @@ export function Relations() {
                 fontFamily="Inter,sans-serif"
                 textAnchor="middle"
               >
-                还没有关系连线，点击右侧「AI 整理图谱」自动生成
+                {t('relations.noRelations')}
               </text>
             )}
           </svg>
@@ -411,11 +412,11 @@ export function Relations() {
             >
               {organizing ? (
                 <>
-                  <Loader className="w-3.5 h-3.5 animate-spin" /> 分析中...
+                  <Loader className="w-3.5 h-3.5 animate-spin" /> {t('relations.analyzing')}
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-3.5 h-3.5" /> AI 整理图谱
+                  <Sparkles className="w-3.5 h-3.5" /> {t('relations.aiOrganize')}
                 </>
               )}
             </button>
@@ -425,7 +426,7 @@ export function Relations() {
           {/* Character stats */}
           <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3">
             <div className="text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2 flex items-center gap-1.5">
-              <Users className="w-3 h-3" /> 角色出场
+              <Users className="w-3 h-3" /> {t('relations.appearsIn')}
             </div>
             {sortedByChapter.slice(0, 8).map((c: any, i) => (
               <div key={i} className="flex justify-between items-center py-[2px] text-[12px]">
@@ -434,14 +435,14 @@ export function Relations() {
               </div>
             ))}
             {chars.length === 0 && (
-              <div className="text-[12px] text-[var(--ink-tertiary)] py-2 text-center">暂无数据</div>
+              <div className="text-[12px] text-[var(--ink-tertiary)] py-2 text-center">{t('common.noData')}</div>
             )}
           </div>
 
           {/* Relation types */}
           <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3">
             <div className="text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2 flex items-center gap-1.5">
-              <Link2 className="w-3 h-3" /> 关系类型
+              <Link2 className="w-3 h-3" /> {t('relations.relationType')}
             </div>
             {sortedRelTypes.map(([type, count], i) => (
               <div key={i} className="flex justify-between items-center py-[2px] text-[12px]">
@@ -450,7 +451,7 @@ export function Relations() {
               </div>
             ))}
             {rels.length === 0 && (
-              <div className="text-[12px] text-[var(--ink-tertiary)] py-2 text-center">暂无关系</div>
+              <div className="text-[12px] text-[var(--ink-tertiary)] py-2 text-center">{t('relations.listEmpty')}</div>
             )}
           </div>
         </div>
