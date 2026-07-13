@@ -20,10 +20,10 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
-import { projectsApi } from '@/lib/api'
+import { projectsApi, statsApi } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
 import { NEXT_STATUS } from '@/lib/status'
 import { useStats } from '@/lib/useProjectData'
@@ -59,6 +59,42 @@ export function Sidebar() {
   const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([])
   const [spinKey, setSpinKey] = useState(0)
   const [collapsedVols, setCollapsedVols] = useState<Set<number>>(new Set())
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetInput, setTargetInput] = useState('')
+  const targetInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSaveTargetWords = useCallback(async () => {
+    const val = parseInt(targetInput)
+    if (!isNaN(val) && val >= 1000 && currentProject) {
+      try {
+        await statsApi.updateTargetWords(currentProject, val)
+        reloadStats()
+      } catch {
+        /* ignore */
+      }
+    }
+    setEditingTarget(false)
+    setTargetInput('')
+  }, [targetInput, currentProject, reloadStats])
+
+  const handleResetTargetWords = useCallback(async () => {
+    if (!currentProject) return
+    try {
+      await statsApi.resetTargetWords(currentProject)
+      reloadStats()
+    } catch {
+      /* ignore */
+    }
+    setEditingTarget(false)
+    setTargetInput('')
+  }, [currentProject, reloadStats])
+
+  useEffect(() => {
+    if (editingTarget && targetInputRef.current) {
+      targetInputRef.current.focus()
+      targetInputRef.current.select()
+    }
+  }, [editingTarget])
 
   const toggleVolume = (volId: number) => {
     setCollapsedVols((prev) => {
@@ -261,7 +297,36 @@ export function Sidebar() {
                 <div className="flex justify-between text-[11px] leading-none mb-1">
                   <span className="text-[var(--ink-tertiary)]">{t('sidebar.completion')}</span>
                   <span className="font-mono text-[var(--ink-mute)]">
-                    {stats.totalWords.toLocaleString()} / {stats.targetWords.toLocaleString()}
+                    {stats.totalWords.toLocaleString()} /{' '}
+                    {editingTarget ? (
+                      <input
+                        ref={targetInputRef}
+                        type="number"
+                        min={1000}
+                        className="inline w-[80px] bg-[var(--canvas-card)] border border-[var(--accent-gold)] rounded px-1 py-[1px] text-[11px] font-mono text-[var(--accent-gold)] outline-none"
+                        value={targetInput}
+                        onChange={(e) => setTargetInput(e.target.value)}
+                        onBlur={handleSaveTargetWords}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveTargetWords()
+                          if (e.key === 'Escape') {
+                            setEditingTarget(false)
+                            setTargetInput('')
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="cursor-pointer hover:text-[var(--accent-gold)] transition-colors"
+                        onClick={() => {
+                          setTargetInput(String(stats.targetWords))
+                          setEditingTarget(true)
+                        }}
+                        title={t('sidebar.clickToEditTarget')}
+                      >
+                        {stats.targetWords.toLocaleString()}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <div className="h-[5px] bg-[var(--canvas-mid)] rounded-full overflow-hidden">

@@ -574,10 +574,11 @@ router.get('/:project/stats', (req, res) => {
   const genres = db.projectQuery(pn, 'SELECT genre FROM project_genres').map(g => g.genre);
   const tokenUsage = db.projectGet(pn, 'SELECT COALESCE(SUM(input_tokens), 0) as input, COALESCE(SUM(output_tokens), 0) as output FROM token_usage') || { input: 0, output: 0 };
 
-  // Target words from project mode
+  // Target words: custom override or fallback to project mode default
   const projectMode = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'mode'")?.value || 'medium-novel';
   const TARGET_WORDS = { 'short-story': 30000, 'medium-novel': 100000, 'long-novel': 200000 };
-  const targetWords = TARGET_WORDS[projectMode] || 100000;
+  const customTarget = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'target_words'")?.value;
+  const targetWords = customTarget ? parseInt(customTarget) : (TARGET_WORDS[projectMode] || 100000);
 
   // Volume structure summary
   const volumes = db.projectQuery(pn, 'SELECT id, title, sort_order, (SELECT COUNT(*) FROM chapters WHERE volume_id = volumes.id) as chapter_count, (SELECT COALESCE(SUM(word_count), 0) FROM chapters WHERE volume_id = volumes.id) as word_count FROM volumes ORDER BY sort_order');
@@ -610,6 +611,29 @@ router.get('/:project/stats', (req, res) => {
     dailyWords,
     });
   });
+
+// ─── Target words ───
+
+router.put('/:project/target-words', (req, res) => {
+  const pn = project(req.params.project);
+  const { targetWords } = req.body;
+  if (typeof targetWords !== 'number' || targetWords < 1000) {
+    return res.status(400).json({ error: { message: 'targetWords must be a number ≥ 1000' } });
+  }
+  db.projectExecute(pn,
+    "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('target_words', ?)", [String(targetWords)]
+  );
+  res.json({ success: true, targetWords });
+});
+
+router.delete('/:project/target-words', (req, res) => {
+  const pn = project(req.params.project);
+  db.projectExecute(pn, "DELETE FROM project_meta WHERE key = 'target_words'");
+  // Return the mode-based default
+  const projectMode = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'mode'")?.value || 'medium-novel';
+  const TARGET_WORDS = { 'short-story': 30000, 'medium-novel': 100000, 'long-novel': 200000 };
+  res.json({ success: true, targetWords: TARGET_WORDS[projectMode] || 100000 });
+});
 
 // ═══════════════════════════════════════════
 // TOKEN USAGE

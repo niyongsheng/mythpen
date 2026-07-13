@@ -16,9 +16,10 @@ import {
   Users,
   Waypoints,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { statsApi } from '@/lib/api'
 import { useProjectName, useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -103,6 +104,44 @@ export function Dashboard() {
     await setPhase(project, confirmPhase as any)
     setConfirmPhase(null)
   }
+
+  // ── Target words editing ──
+  const [editingTarget, setEditingTarget] = useState(false)
+  const [targetInput, setTargetInput] = useState('')
+  const targetInputRef = useRef<HTMLInputElement>(null)
+
+  const handleSaveTargetWords = useCallback(async () => {
+    const val = parseInt(targetInput)
+    if (!isNaN(val) && val >= 1000 && project) {
+      try {
+        await statsApi.updateTargetWords(project, val)
+        reloadStats()
+      } catch {
+        /* ignore */
+      }
+    }
+    setEditingTarget(false)
+    setTargetInput('')
+  }, [targetInput, project, reloadStats])
+
+  const handleResetTargetWords = useCallback(async () => {
+    if (!project) return
+    try {
+      await statsApi.resetTargetWords(project)
+      reloadStats()
+    } catch {
+      /* ignore */
+    }
+    setEditingTarget(false)
+    setTargetInput('')
+  }, [project, reloadStats])
+
+  useEffect(() => {
+    if (editingTarget && targetInputRef.current) {
+      targetInputRef.current.focus()
+      targetInputRef.current.select()
+    }
+  }, [editingTarget])
 
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
@@ -203,7 +242,38 @@ export function Dashboard() {
             />
           </div>
           <div className="flex justify-between text-[12px] text-[var(--ink-tertiary)]">
-            <span>{t('dashboard.targetWords', { n: s.targetWords?.toLocaleString() || '0' })}</span>
+            <span>{t('dashboard.targetWordsLabel')}</span>
+            <span>
+              {editingTarget ? (
+                <input
+                  ref={targetInputRef}
+                  type="number"
+                  min={1000}
+                  className="inline w-[100px] bg-[var(--canvas-card)] border border-[var(--accent-gold)] rounded px-1 py-[1px] text-[12px] font-mono text-[var(--accent-gold)] outline-none text-right"
+                  value={targetInput}
+                  onChange={(e) => setTargetInput(e.target.value)}
+                  onBlur={handleSaveTargetWords}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTargetWords()
+                    if (e.key === 'Escape') {
+                      setEditingTarget(false)
+                      setTargetInput('')
+                    }
+                  }}
+                />
+              ) : (
+                <span
+                  className="cursor-pointer hover:text-[var(--accent-gold)] transition-colors"
+                  onClick={() => {
+                    setTargetInput(String(s.targetWords))
+                    setEditingTarget(true)
+                  }}
+                  title={t('sidebar.clickToEditTarget')}
+                >
+                  {s.targetWords?.toLocaleString() || '0'}
+                </span>
+              )}
+            </span>
             <span>{wordProgressPct.toFixed(1)}%</span>
           </div>
         </DashCard>

@@ -140,6 +140,9 @@ export const timelineApi = {
 
 export const statsApi = {
   get: (project: string) => request(`/${encodeURIComponent(project)}/stats`),
+  updateTargetWords: (project: string, targetWords: number) =>
+    request(`/${encodeURIComponent(project)}/target-words`, { method: 'PUT', body: { targetWords } }),
+  resetTargetWords: (project: string) => request(`/${encodeURIComponent(project)}/target-words`, { method: 'DELETE' }),
 }
 
 // ─── Settings ───
