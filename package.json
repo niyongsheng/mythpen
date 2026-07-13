@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
+    "@tauri-apps/plugin-shell": "^2.3.5",
     "cors": "^2.8.6",
     "epub-gen": "^0.1.0",
     "express": "^5.2.1",

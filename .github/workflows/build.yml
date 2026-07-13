@@ -161,30 +161,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Checkout (full history for changelog)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate changelog
-        id: changelog
-        shell: bash
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            LOG=$(git log --oneline --no-decorate "$PREV_TAG"..HEAD 2>/dev/null | sed 's/^/- /')
-            echo "### Changes since $PREV_TAG" > /tmp/changelog.md
-            echo "" >> /tmp/changelog.md
-            echo "$LOG" >> /tmp/changelog.md
-          else
-            echo "### Initial release" > /tmp/changelog.md
-            echo "" >> /tmp/changelog.md
-            echo "This is the first release of Mythpen." >> /tmp/changelog.md
-          fi
-          echo "body<<EOF" >> "$GITHUB_OUTPUT"
-          cat /tmp/changelog.md >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
 
@@ -192,24 +168,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Mythpen ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-          body: |
-            ## Mythpen ${{ github.ref_name }}
-
-            AI-assisted novel writing desktop app.
-
-            ### Download
-
-            | Platform | File |
-            |---|---|
-            | macOS (ARM) | \`.dmg\` — open and drag to Applications |
-            | Windows | \`.exe\` — run the installer |
-            | Linux (Debian/Ubuntu) | \`.deb\` |
-            | Linux (Fedora/CentOS) | \`.rpm\` |
-
-            ---
-
-            ${{ steps.changelog.outputs.body }}
+          generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
             Mythpen-macOS-ARM/*.dmg
