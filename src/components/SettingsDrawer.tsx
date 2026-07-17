@@ -57,6 +57,9 @@ export function SettingsDrawer() {
           messages: [{ role: 'user', content: t('settings.testMessage') }],
           temperature: 0,
           max_tokens: 10,
+          apiKey: settings.apiKey,
+          apiBaseUrl: settings.apiBaseUrl,
+          apiModel: settings.apiModel,
         }),
       })
       const ms = Date.now() - start

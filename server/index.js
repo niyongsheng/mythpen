@@ -76,6 +76,16 @@ app.post('/api/ai/chat', async (req, res) => {
     }
 
     const aiConfig = getAiConfig();
+    // 测试连接时允许前端传入 API key/baseUrl/model 覆盖数据库配置
+    if (req.body.apiKey !== undefined) {
+      aiConfig.apiKey = req.body.apiKey;
+    }
+    if (req.body.apiBaseUrl !== undefined) {
+      aiConfig.apiBaseUrl = req.body.apiBaseUrl;
+    }
+    if (req.body.apiModel !== undefined) {
+      aiConfig.apiModel = req.body.apiModel;
+    }
     const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     const systemPrompt = buildWritingPrompt(project);
 
