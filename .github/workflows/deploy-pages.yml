@@ -1,10 +1,10 @@
-# Deploy doc/ landing page to GitHub Pages
+# Deploy docs/ landing page to GitHub Pages
 name: Deploy Landing Page
 
 on:
   push:
     branches: [main]
-    paths: ['doc/**']
+    paths: ['docs/**']
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: doc
+          path: docs
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
