@@ -152,6 +152,22 @@ jobs:
           # with the t64 ABI transition on Ubuntu 24.04+.
           sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2
 
+      - name: Patch ldd for Bun sidecar
+        run: |
+          # linuxdeploy aborts when `ldd` exits 1 on Bun's statically linked
+          # sidecar. Report that one binary as statically linked so dependency
+          # resolution can continue.
+          sudo mv /usr/bin/ldd /usr/bin/ldd.real
+          sudo tee /usr/bin/ldd >/dev/null <<'WRAPPER'
+          #!/bin/bash
+          if [[ "$1" == *"mythpen-server"* ]]; then
+            echo -e "\tstatically linked"
+            exit 0
+          fi
+          exec /usr/bin/ldd.real "$@"
+          WRAPPER
+          sudo chmod +x /usr/bin/ldd
+
       - name: Install bun (for sidecar)
         uses: oven-sh/setup-bun@v2
 
