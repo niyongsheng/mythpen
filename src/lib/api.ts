@@ -34,11 +34,65 @@ async function request(path: string, options: any = {}) {
 
 // ─── Projects ───
 
+export interface ImportSseHandlers {
+  onStage?: (payload: any) => void
+  onProgress?: (payload: any) => void
+  onWarning?: (payload: any) => void
+  onDone?: (payload: any) => void
+  onError?: (error: Error) => void
+}
+
 export const projectsApi = {
   list: () => request('/projects'),
   get: (name: string) => request(`/projects/${encodeURIComponent(name)}`),
   create: (data: any) => request('/projects', { method: 'POST', body: data }),
-  importBook: (data: any) => request('/projects/import', { method: 'POST', body: data }),
+  importWithAI: (data: any, handlers: ImportSseHandlers = {}, signal?: AbortSignal): Promise<any> =>
+    new Promise((resolve, reject) => {
+      let finished = false
+      fetch(apiUrl('/projects/import-ai'), requestConfig({ method: 'POST', body: data, signal }))
+        .then(async (response) => {
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}))
+            const error = new Error(payload.error?.message || `HTTP ${response.status}`)
+            ;(error as any).code = payload.error?.code
+            handlers.onError?.(error)
+            reject(error)
+            return
+          }
+          await readSSEStream(response, {
+            stage: (payload) => handlers.onStage?.(payload),
+            progress: (payload) => handlers.onProgress?.(payload),
+            warning: (payload) => handlers.onWarning?.(payload),
+            done: (payload) => {
+              finished = true
+              handlers.onDone?.(payload)
+              resolve(payload)
+            },
+            error: (payload) => {
+              finished = true
+              const error = new Error(payload?.message || t('project.import.importFailed'))
+              ;(error as any).code = payload?.code
+              handlers.onError?.(error)
+              reject(error)
+            },
+          })
+          if (!finished) {
+            const error = new Error(t('project.import.connectionInterrupted'))
+            ;(error as any).code = 'IMPORT_STREAM_CLOSED'
+            handlers.onError?.(error)
+            reject(error)
+          }
+        })
+        .catch((error) => {
+          // A user-initiated cancel is not an AI failure.
+          if (error?.name === 'AbortError') {
+            reject(error)
+            return
+          }
+          handlers.onError?.(error)
+          reject(error)
+        })
+    }),
   delete: (name: string) => request(`/projects/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   getPhase: (name: string) => request(`/${encodeURIComponent(name)}/workflow/phase`),
   setPhase: (name: string, phase: string) =>
@@ -208,8 +262,6 @@ async function readSSEStream(response: Response, handlers: Record<string, (paylo
 export const aiApi = {
   chat: (messages: any[], project: string) =>
     aiRequest('/ai/chat', { method: 'POST', body: { messages, project } }).then((r) => r.json()),
-
-  analyzeImport: (project: string) => request('/ai/analyze-import', { method: 'POST', body: { project } }),
 
   chatStream: (
     messages: any[],

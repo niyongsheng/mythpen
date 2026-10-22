@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
-import { chaptersApi, projectsApi } from '@/lib/api'
-import type { ParsedBook } from '@/lib/import/types'
+import { chaptersApi, type ImportSseHandlers, projectsApi } from '@/lib/api'
+import type { ImportResult, ImportSource } from '@/lib/import/types'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import type { WorkflowPhase } from '@/types'
+import type { WorkflowPhase, WritingLanguage } from '@/types'
 
 interface ProjectSummary {
   id: string
@@ -33,12 +33,17 @@ interface ProjectState {
   loadProjects: () => Promise<void>
   loadPhase: (project: string) => Promise<void>
   setPhase: (project: string, phase: WorkflowPhase) => Promise<void>
-  createProject: (name: string, opts?: { mode?: string; language?: string; genres?: string[] }) => Promise<void>
+  createProject: (
+    name: string,
+    opts?: { mode?: string; language?: WritingLanguage; genres?: string[] },
+  ) => Promise<void>
   importProject: (
     name: string,
-    opts: { mode?: string; language?: string; genres?: string[] },
-    book: ParsedBook,
-  ) => Promise<void>
+    opts: { mode?: string; language?: WritingLanguage; genres?: string[] },
+    source: ImportSource,
+    handlers?: ImportSseHandlers,
+    signal?: AbortSignal,
+  ) => Promise<ImportResult | null>
   deleteProject: (name: string) => Promise<void>
 }
 
@@ -127,46 +132,50 @@ export const useProjectStore = create<ProjectState>((set) => ({
     }
   },
 
-  importProject: async (name, opts, book) => {
+  importProject: async (name, opts, source, handlers, signal) => {
     const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'] } = opts
     set({ loading: true, error: null })
     try {
-      // Create the project and write all imported volumes/chapters in one
-      // atomic request (the server cleans up on failure).
-      await projectsApi.importBook({
-        name,
-        mode,
-        language,
-        genres,
-        source: {
-          fileName: book.fileName || book.title,
-          format: book.format,
-          title: book.title,
-          author: book.author,
-          description: book.description,
+      // The server analyzes the whole book and creates the project atomically.
+      const result = await projectsApi.importWithAI(
+        {
+          name,
+          mode,
+          language,
+          genres,
+          source: {
+            fileName: source.fileName,
+            format: source.format,
+            title: source.title,
+            author: source.author,
+            description: source.description,
+            language: source.language,
+          },
+          text: source.text,
         },
-        volumes: book.volumes.map((volume) => ({
-          title: volume.title,
-          chapters: volume.chapters.map((chapter) => ({
-            title: chapter.title,
-            content: chapter.content,
-          })),
-        })),
-      })
+        handlers,
+        signal,
+      )
 
       // loadChapters keeps the current chapter when possible; for a brand-new
       // import it falls back to the last chapter (the end of the source book).
       await activateProject(name, 'writing')
 
       track('project_imported', {
-        format: book.format,
-        volumes: book.volumes.length,
-        chapters: book.totalChapters,
-        words: book.totalWords,
+        format: source.format,
+        volumes: result.volumes,
+        chapters: result.chapters,
+        words: result.wordCount,
       })
-    } catch (err) {
+      return result as ImportResult
+    } catch (err: any) {
+      // A user-initiated cancel closes the SSE stream; no project was created.
+      if (err?.name === 'AbortError') {
+        set({ loading: false })
+        return null
+      }
       set({
-        error: (err as any).message || t('project.import.importFailed'),
+        error: err?.message || t('project.import.importFailed'),
         loading: false,
       })
       throw err

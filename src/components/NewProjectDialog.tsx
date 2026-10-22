@@ -4,12 +4,14 @@ import { ImportBookPanel } from '@/components/ImportBookPanel'
 import { ToastContainer } from '@/components/ToastContainer'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
-import { aiApi } from '@/lib/api'
+import { LANGUAGES } from '@/i18n'
 import { notifyDataChanged } from '@/lib/dataEvents'
-import { parseImportFile } from '@/lib/import'
-import type { ParsedBook, TextEncoding } from '@/lib/import/types'
+import { extractImportSource } from '@/lib/import'
+import type { ImportProgress, ImportSource, TextEncoding } from '@/lib/import/types'
 import { useProjectStore } from '@/stores/useProjectStore'
+import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
+import type { WritingLanguage } from '@/types'
 
 const GENRES: { key: string; icon: LucideIcon }[] = [
   { key: 'sci-fi', icon: Rocket },
@@ -27,13 +29,6 @@ const MODES = [
   { key: 'medium-novel', labelKey: 'project.mediumNovel' },
   { key: 'long-novel', labelKey: 'project.longNovel' },
 ] as const
-
-const LANGUAGES = [
-  { key: 'zh', labelKey: 'project.chinese' },
-  { key: 'en', labelKey: 'project.english' },
-] as const
-
-const DEFAULT_NAME = '未曾设想的道路'
 
 const IMPORT_ERROR_KEYS: Record<string, string> = {
   UNSUPPORTED_FORMAT: 'project.import.unsupportedFormat',
@@ -66,22 +61,25 @@ export function NewProjectDialog() {
   const { projectDialogOpen, setProjectDialogOpen } = useUIStore()
   const { createProject, importProject, loading, error } = useProjectStore()
   const { t } = useT()
-  const { toasts, show: showToast } = useToast()
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast()
 
   const [tab, setTab] = useState<'blank' | 'import'>('blank')
-  const [name, setName] = useState(DEFAULT_NAME)
+  const [name, setName] = useState(() => t('project.defaultName'))
   const [nameTouched, setNameTouched] = useState(false)
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['sci-fi', 'romance'])
   const [mode, setMode] = useState('medium-novel')
-  const [language, setLanguage] = useState('zh')
+  const [language, setLanguage] = useState<WritingLanguage>('zh')
 
   const [file, setFile] = useState<File | null>(null)
-  const [book, setBook] = useState<ParsedBook | null>(null)
-  const [parsing, setParsing] = useState(false)
+  const [source, setSource] = useState<ImportSource | null>(null)
+  const [extracting, setExtracting] = useState(false)
   const [parseError, setParseError] = useState<string | null>(null)
   const [encoding, setEncoding] = useState<TextEncoding>('auto')
-  const [analyze, setAnalyze] = useState(false)
+  const [progress, setProgress] = useState<ImportProgress | null>(null)
   const parseTokenRef = useRef(0)
+  const importTokenRef = useRef(0)
+  const importControllerRef = useRef<AbortController | null>(null)
+  const hasApiKey = useSettingsStore((state) => Boolean(state.settings.apiKey))
 
   // Clear stale error when the dialog opens; reset import state when it closes.
   useEffect(() => {
@@ -90,96 +88,121 @@ export function NewProjectDialog() {
       return
     }
     parseTokenRef.current += 1
+    importTokenRef.current += 1
+    importControllerRef.current = null
     setTab('blank')
-    setName(DEFAULT_NAME)
+    setName(t('project.defaultName'))
     setNameTouched(false)
     setSelectedGenres(['sci-fi', 'romance'])
     setMode('medium-novel')
     setLanguage('zh')
     setFile(null)
-    setBook(null)
-    setParsing(false)
+    setSource(null)
+    setExtracting(false)
     setParseError(null)
     setEncoding('auto')
-    setAnalyze(false)
+    setProgress(null)
   }, [projectDialogOpen])
 
-  if (!projectDialogOpen) return <ToastContainer toasts={toasts} />
+  if (!projectDialogOpen) return <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
   const toggleGenre = (key: string) => {
     setSelectedGenres((prev) => (prev.includes(key) ? prev.filter((g) => g !== key) : [...prev, key]))
   }
 
-  const parseFile = async (selected: File, nextEncoding: TextEncoding) => {
+  const extractFile = async (selected: File, nextEncoding: TextEncoding) => {
     const token = ++parseTokenRef.current
     setFile(selected)
-    setBook(null)
+    setSource(null)
     setParseError(null)
-    setParsing(true)
+    setProgress(null)
+    setExtracting(true)
     try {
-      const parsed = await parseImportFile(selected, { encoding: nextEncoding })
+      const extracted = await extractImportSource(selected, { encoding: nextEncoding })
       if (token !== parseTokenRef.current) return
-      setBook(parsed)
-      if (!nameTouched) setName(sanitizeProjectName(parsed.title))
+      setSource(extracted)
+      if (!nameTouched) setName(sanitizeProjectName(extracted.title || extracted.fileName))
     } catch (err: any) {
       if (token !== parseTokenRef.current) return
       const key = err?.code ? IMPORT_ERROR_KEYS[err.code] : undefined
       setParseError(key ? t(key) : err?.message || t('project.import.parseFailed'))
     } finally {
-      if (token === parseTokenRef.current) setParsing(false)
+      if (token === parseTokenRef.current) setExtracting(false)
     }
   }
 
   const handleFileSelected = (selected: File) => {
-    void parseFile(selected, encoding)
+    void extractFile(selected, encoding)
   }
 
   const handleEncodingChange = (next: TextEncoding) => {
     setEncoding(next)
-    if (file) void parseFile(file, next)
+    if (file) void extractFile(file, next)
   }
 
-  const busy = loading || parsing
-  const canSubmit = !!name.trim() && (tab === 'blank' || (!!book && !parsing))
+  const busy = loading || extracting
+  const importing = progress !== null
+  const canSubmit = !!name.trim() && (tab === 'blank' || (!!source && !extracting && !loading))
 
   const handleSubmit = async () => {
     if (!canSubmit || busy) return
-    try {
-      if (tab === 'blank') {
+
+    if (tab === 'blank') {
+      try {
         await createProject(name.trim(), { mode, language, genres: selectedGenres })
         setProjectDialogOpen(false)
-        return
+      } catch {
+        // The store has already set a user-facing error.
       }
-      if (!book) return
-      const projectName = name.trim()
-      await importProject(projectName, { mode, language, genres: selectedGenres }, book)
-      setProjectDialogOpen(false)
+      return
+    }
 
-      if (analyze) {
-        showToast(t('project.import.analyzeRunning'), 'info', 4000)
-        aiApi
-          .analyzeImport(projectName)
-          .then((result: any) => {
-            showToast(
-              t('project.import.analyzeDone', {
-                characters: result?.characters || 0,
-                world: result?.world || 0,
-              }),
-              'success',
-              5000,
-            )
-            notifyDataChanged('character')
-            notifyDataChanged('world')
-            notifyDataChanged('memory')
-            notifyDataChanged('project')
-          })
-          .catch((err: any) => {
-            showToast(t('project.import.analyzeFailed', { message: err?.message || '' }), 'error', 6000)
-          })
-      }
+    if (!source) return
+    const projectName = name.trim()
+    const token = ++importTokenRef.current
+    const controller = new AbortController()
+    importControllerRef.current = controller
+    setProgress({ stage: 'connecting' })
+
+    try {
+      const result = await importProject(
+        projectName,
+        { mode, language, genres: selectedGenres },
+        source,
+        {
+          onStage: (payload) => setProgress(payload),
+          onProgress: (payload) => setProgress(payload),
+          onWarning: (payload) => {
+            if (payload?.message) showToast(payload.message, 'info', 5000)
+          },
+        },
+        controller.signal,
+      )
+      if (!result) return
+      setProjectDialogOpen(false)
+      notifyDataChanged('all')
+      showToast(
+        t('project.import.importDone', {
+          chapters: result.chapters,
+          characters: result.characters,
+        }),
+        'success',
+        5000,
+      )
     } catch {
       // The store has already set a user-facing error.
+    } finally {
+      // A newer import may have started after a cancel; don't clear its state.
+      if (importTokenRef.current === token) {
+        importControllerRef.current = null
+        setProgress(null)
+      }
     }
+  }
+
+  const handleCancelImport = () => {
+    importControllerRef.current?.abort()
+    showToast(t('project.import.cancelled'), 'info', 3000)
   }
 
   const handleClose = () => {
@@ -187,16 +210,16 @@ export function NewProjectDialog() {
   }
 
   const activeBtn =
-    'px-[14px] h-[30px] rounded-full border-none font-sans text-[13px] cursor-pointer bg-[var(--accent-gold)] text-[var(--canvas)] font-medium transition-all'
+    'px-[14px] h-[30px] rounded-full border-none font-sans text-[13px] cursor-pointer bg-[var(--accent-gold)] text-[var(--canvas)] font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed'
   const inactiveBtn =
-    'px-[14px] h-[30px] rounded-full border-none font-sans text-[13px] cursor-pointer bg-[var(--canvas-mid)] text-[var(--ink-secondary)] hover:bg-[var(--canvas-pop)] transition-all'
+    'px-[14px] h-[30px] rounded-full border-none font-sans text-[13px] cursor-pointer bg-[var(--canvas-mid)] text-[var(--ink-secondary)] hover:bg-[var(--canvas-pop)] transition-all disabled:opacity-40 disabled:cursor-not-allowed'
 
   const displayError = error || parseError
   const primaryLabel =
     tab === 'import'
       ? loading
-        ? t('project.import.importing')
-        : t('project.import.importStart')
+        ? t('project.import.aiImporting')
+        : t('project.import.aiImportStart')
       : loading
         ? t('project.creating')
         : t('project.start')
@@ -205,17 +228,27 @@ export function NewProjectDialog() {
     <>
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={handleClose}>
         <div
-          className="bg-[var(--canvas-card)] border border-[var(--hairline-light)] rounded-xl p-8 w-[700px] max-w-[92vw] max-h-[88vh] overflow-y-auto custom-scrollbar shadow-2xl"
+          className="bg-[var(--canvas-card)] border border-[var(--hairline-light)] rounded-xl p-5 sm:p-8 w-[700px] max-w-[92vw] max-h-[88vh] overflow-y-auto custom-scrollbar shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <h2 className="font-display text-[28px] font-semibold leading-[1.3] mb-1">{t('project.new')}</h2>
           <p className="text-[var(--ink-tertiary)] text-[13px] mb-5">{t('project.subtitle')}</p>
 
           <div className="flex gap-2 mb-5">
-            <button className={tab === 'blank' ? activeBtn : inactiveBtn} onClick={() => setTab('blank')}>
+            <button
+              type="button"
+              className={tab === 'blank' ? activeBtn : inactiveBtn}
+              onClick={() => setTab('blank')}
+              disabled={busy}
+            >
               {t('project.import.tabBlank')}
             </button>
-            <button className={tab === 'import' ? activeBtn : inactiveBtn} onClick={() => setTab('import')}>
+            <button
+              type="button"
+              className={tab === 'import' ? activeBtn : inactiveBtn}
+              onClick={() => setTab('import')}
+              disabled={busy}
+            >
               {t('project.import.tabImport')}
             </button>
           </div>
@@ -223,14 +256,21 @@ export function NewProjectDialog() {
           {tab === 'import' && (
             <div className="mb-5">
               <ImportBookPanel
-                book={book}
+                source={source}
                 file={file}
-                parsing={parsing}
+                extracting={extracting}
                 encoding={encoding}
+                progress={progress}
                 disabled={loading}
                 onFileSelected={handleFileSelected}
                 onEncodingChange={handleEncodingChange}
               />
+            </div>
+          )}
+
+          {tab === 'import' && !hasApiKey && (
+            <div className="mb-4 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25 text-[12px] text-[var(--warning)]">
+              {t('project.import.aiNotConfigured')}
             </div>
           )}
 
@@ -249,6 +289,7 @@ export function NewProjectDialog() {
               className="w-full h-9 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-lg px-3 font-sans text-[15px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--accent-gold)] focus:shadow-[0_0_0_2px_rgba(201,169,110,0.2)]"
               placeholder={t('project.namePlaceholder')}
               value={name}
+              disabled={busy}
               onChange={(e) => {
                 setName(e.target.value)
                 setNameTouched(true)
@@ -264,8 +305,10 @@ export function NewProjectDialog() {
               {GENRES.map(({ key, icon: Icon }) => (
                 <button
                   key={key}
+                  type="button"
                   className={`${selectedGenres.includes(key) ? activeBtn : inactiveBtn} inline-flex items-center gap-1.5`}
                   onClick={() => toggleGenre(key)}
+                  disabled={busy}
                 >
                   <Icon size={14} strokeWidth={2.25} className="shrink-0" />
                   {t(`project.genre.${key}`)}
@@ -280,7 +323,13 @@ export function NewProjectDialog() {
             </label>
             <div className="flex gap-2">
               {MODES.map((m) => (
-                <button key={m.key} className={mode === m.key ? activeBtn : inactiveBtn} onClick={() => setMode(m.key)}>
+                <button
+                  key={m.key}
+                  type="button"
+                  className={mode === m.key ? activeBtn : inactiveBtn}
+                  onClick={() => setMode(m.key)}
+                  disabled={busy}
+                >
                   {t(m.labelKey)}
                 </button>
               ))}
@@ -291,46 +340,32 @@ export function NewProjectDialog() {
             <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1.5">
               {t('project.languageLabel')}
             </label>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {LANGUAGES.map((l) => (
                 <button
-                  key={l.key}
-                  className={language === l.key ? activeBtn : inactiveBtn}
-                  onClick={() => setLanguage(l.key)}
+                  key={l.code}
+                  type="button"
+                  className={language === l.code ? activeBtn : inactiveBtn}
+                  onClick={() => setLanguage(l.code)}
+                  disabled={busy}
                 >
-                  {t(l.labelKey)}
+                  {l.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {tab === 'import' && book && (
-            <label className="mb-5 flex items-start gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                className="mt-0.5 accent-[var(--accent-gold)]"
-                checked={analyze}
-                onChange={(e) => setAnalyze(e.target.checked)}
-                disabled={busy}
-              />
-              <span>
-                <span className="block text-[13px] text-[var(--ink)]">{t('project.import.analyzeLabel')}</span>
-                <span className="block text-[12px] text-[var(--ink-tertiary)] mt-0.5">
-                  {t('project.import.analyzeHint')}
-                </span>
-              </span>
-            </label>
-          )}
-
           <div className="flex gap-2 justify-end mt-6 pt-4 border-t border-[var(--hairline)]">
             <button
+              type="button"
               className="h-[34px] px-5 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={handleClose}
-              disabled={busy}
+              onClick={importing ? handleCancelImport : handleClose}
+              disabled={extracting || (loading && !importing)}
             >
-              {t('project.cancel')}
+              {importing ? t('project.import.cancelImport') : t('project.cancel')}
             </button>
             <button
+              type="button"
               className="h-[34px] px-5 rounded-lg border-none bg-[var(--accent-gold)] text-[var(--canvas)] font-medium text-[13px] cursor-pointer transition-colors hover:bg-[var(--accent-gold-soft)] disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={handleSubmit}
               disabled={busy || !canSubmit}
@@ -340,7 +375,7 @@ export function NewProjectDialog() {
           </div>
         </div>
       </div>
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </>
   )
 }

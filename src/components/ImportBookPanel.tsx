@@ -1,17 +1,22 @@
 import { AlertTriangle, FileText, Loader, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import type { ImportWarning, ParsedBook, TextEncoding } from '@/lib/import/types'
+import type { ImportProgress, ImportSource, ImportWarning, TextEncoding } from '@/lib/import/types'
 
 interface ImportBookPanelProps {
-  book: ParsedBook | null
+  source: ImportSource | null
   file: File | null
-  parsing: boolean
+  extracting: boolean
   encoding: TextEncoding
+  progress: ImportProgress | null
   disabled?: boolean
   onFileSelected: (file: File) => void
   onEncodingChange: (encoding: TextEncoding) => void
 }
+
+// Only these warnings come from file extraction; legacy rule-parser warnings
+// are no longer produced by the import flow.
+const EXTRACTION_WARNINGS = new Set(['encodingFallback', 'unknownEncoding', 'tocIncomplete', 'fragmentFallback'])
 
 function warningText(warning: ImportWarning, t: ReturnType<typeof useT>['t']): string {
   return t(`project.import.${warning.code}`, {
@@ -25,10 +30,11 @@ function isTxtFile(file: File | null): boolean {
 }
 
 export function ImportBookPanel({
-  book,
+  source,
   file,
-  parsing,
+  extracting,
   encoding,
+  progress,
   disabled,
   onFileSelected,
   onEncodingChange,
@@ -38,7 +44,7 @@ export function ImportBookPanel({
   const [dragActive, setDragActive] = useState(false)
 
   const pickFile = () => {
-    if (!disabled) inputRef.current?.click()
+    if (!disabled && !extracting) inputRef.current?.click()
   }
 
   const handleInput = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,25 +57,31 @@ export function ImportBookPanel({
   const handleDrop = (event: React.DragEvent<HTMLButtonElement>) => {
     event.preventDefault()
     setDragActive(false)
-    if (disabled) return
+    if (disabled || extracting) return
     const dropped = event.dataTransfer.files?.[0]
     if (dropped) onFileSelected(dropped)
   }
 
-  const previewItems: { key: string; volume?: string; title: string }[] = []
-  if (book) {
-    let remaining = 10
-    let sequence = 0
-    for (const volume of book.volumes) {
-      if (remaining <= 0) break
-      previewItems.push({ key: `v-${sequence++}`, volume: volume.title, title: '' })
-      for (const chapter of volume.chapters) {
-        if (remaining <= 0) break
-        previewItems.push({ key: `c-${sequence++}`, title: chapter.title })
-        remaining -= 1
-      }
-    }
-  }
+  const stageKey = progress ? `project.import.stage.${progress.stage}` : ''
+  const translatedStage = stageKey ? t(stageKey) : ''
+  const stageText = progress
+    ? translatedStage === stageKey
+      ? progress.message || progress.stage
+      : translatedStage
+    : ''
+  const percent = progress?.total
+    ? Math.max(4, Math.min(100, Math.round(((progress.current || 0) / progress.total) * 100)))
+    : 30
+
+  const warnings = source
+    ? Array.from(
+        new Set(
+          source.warnings
+            .filter((warning) => EXTRACTION_WARNINGS.has(warning.code))
+            .map((warning) => warningText(warning, t)),
+        ),
+      ).filter(Boolean)
+    : []
 
   return (
     <div className="space-y-3">
@@ -84,7 +96,7 @@ export function ImportBookPanel({
       <button
         type="button"
         className={`w-full border-2 border-dashed rounded-xl px-6 py-7 text-center transition-colors ${
-          disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+          disabled || extracting ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
         } ${
           dragActive
             ? 'border-[var(--accent-gold)] bg-[var(--accent-gold-soft-bg)]'
@@ -93,7 +105,7 @@ export function ImportBookPanel({
         onClick={pickFile}
         onDragOver={(event) => {
           event.preventDefault()
-          if (!disabled) setDragActive(true)
+          if (!disabled && !extracting) setDragActive(true)
         }}
         onDragLeave={() => setDragActive(false)}
         onDrop={handleDrop}
@@ -106,12 +118,12 @@ export function ImportBookPanel({
       </button>
 
       {isTxtFile(file) && (
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-[var(--ink-secondary)]">{t('project.import.encodingLabel')}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[12px] text-[var(--ink-secondary)] shrink-0">{t('project.import.encodingLabel')}</span>
           <select
-            className="form-input h-8 text-[12px] px-2 py-0"
+            className="form-input h-8 text-[12px] px-2 py-0 w-full min-w-0 sm:w-auto sm:flex-1"
             value={encoding}
-            disabled={disabled || parsing}
+            disabled={disabled || extracting}
             onChange={(event) => onEncodingChange(event.target.value as TextEncoding)}
           >
             <option value="auto">{t('project.import.encodingAuto')}</option>
@@ -124,72 +136,76 @@ export function ImportBookPanel({
         </div>
       )}
 
-      {parsing && (
+      {extracting && (
         <div className="flex items-center gap-2 text-[13px] text-[var(--ink-secondary)]">
           <Loader className="w-4 h-4 animate-spin" />
-          {t('project.import.parsing')}
+          {t('project.import.readingFile')}
         </div>
       )}
 
-      {book && !parsing && (
+      {source && !extracting && (
         <div className="rounded-xl border border-[var(--hairline)] bg-[var(--canvas-elevated)] p-4">
           <div className="flex items-start gap-2">
             <FileText className="w-4 h-4 mt-0.5 text-[var(--accent-gold)] shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="text-[14px] text-[var(--ink)] font-medium truncate">{book.title}</div>
+              <div className="text-[14px] text-[var(--ink)] font-medium truncate">
+                {source.title || source.fileName}
+              </div>
               <div className="text-[12px] text-[var(--ink-tertiary)] mt-0.5">
                 {[
-                  book.author,
-                  book.format.toUpperCase(),
-                  t('project.import.volumesCount', { count: book.volumes.length }),
-                  t('project.import.chaptersCount', { count: book.totalChapters }),
-                  t('project.import.wordsCount', { count: book.totalWords.toLocaleString() }),
+                  source.author,
+                  source.format.toUpperCase(),
+                  t('project.import.sourceChars', { count: source.text.length.toLocaleString() }),
                 ]
                   .filter(Boolean)
                   .join(' · ')}
               </div>
+              <div className="text-[12px] text-[var(--accent-gold)] mt-2 leading-[1.6]">
+                {t('project.import.aiHint')}
+              </div>
             </div>
           </div>
 
-          {previewItems.length > 0 && (
-            <div className="mt-3 border-t border-[var(--hairline)] pt-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-              <div className="text-[11px] uppercase tracking-[0.04em] text-[var(--ink-mute)] mb-1">
-                {t('project.import.chapterPreview')}
-              </div>
-              {previewItems.map((item) =>
-                item.volume ? (
-                  <div key={item.key} className="text-[12px] text-[var(--accent-gold)] mt-1">
-                    {item.volume}
-                  </div>
-                ) : (
-                  <div key={item.key} className="text-[12px] text-[var(--ink-secondary)] pl-2 truncate">
-                    {item.title}
-                  </div>
-                ),
-              )}
-              {book.totalChapters > 10 && (
-                <div className="text-[11px] text-[var(--ink-mute)] mt-1">
-                  {t('project.import.moreChapters', { count: book.totalChapters - 10 })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {book.warnings.length > 0 && (
+          {warnings.length > 0 && (
             <div className="mt-3 border-t border-[var(--hairline)] pt-2">
               <div className="flex items-center gap-1 text-[11px] uppercase tracking-[0.04em] text-[var(--ink-mute)] mb-1">
                 <AlertTriangle className="w-3 h-3" />
                 {t('project.import.warnings')}
               </div>
-              {Array.from(new Set(book.warnings.map((warning) => warningText(warning, t))))
-                .filter(Boolean)
-                .map((text) => (
-                  <div key={text} className="text-[12px] text-[var(--warning)] leading-[1.6]">
-                    {text}
-                  </div>
-                ))}
+              {warnings.map((text) => (
+                <div key={text} className="text-[12px] text-[var(--warning)] leading-[1.6]">
+                  {text}
+                </div>
+              ))}
             </div>
           )}
+        </div>
+      )}
+
+      {progress && (
+        <div className="rounded-xl border border-[var(--hairline)] bg-[var(--canvas-elevated)] p-4">
+          <div className="flex items-center justify-between gap-3 text-[12px] text-[var(--ink-secondary)]">
+            <span className="flex items-center gap-2 min-w-0">
+              <Loader className="w-3.5 h-3.5 animate-spin shrink-0 text-[var(--accent-gold)]" />
+              <span className="truncate">{stageText}</span>
+            </span>
+            {progress.total ? (
+              <span className="shrink-0 text-[var(--ink-tertiary)]">
+                {t('project.import.progressCount', {
+                  current: progress.current || 0,
+                  total: progress.total,
+                })}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-2 h-1.5 rounded-full bg-[var(--canvas-mid)] overflow-hidden">
+            <div
+              className={`h-full bg-[var(--accent-gold)] transition-all duration-300 ${
+                progress.total ? '' : 'animate-pulse'
+              }`}
+              style={{ width: `${percent}%` }}
+            />
+          </div>
         </div>
       )}
     </div>

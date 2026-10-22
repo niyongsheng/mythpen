@@ -37,6 +37,42 @@ export interface ParsedBook {
   warnings: ImportWarning[]
 }
 
+/** A decoded/packed source file ready to send to the AI import endpoint. */
+export interface ImportSource {
+  fileName: string
+  format: ImportFormat
+  text: string
+  title?: string
+  author?: string
+  description?: string
+  language?: string
+  warnings: ImportWarning[]
+}
+
+export interface ImportProgress {
+  stage: string
+  message?: string
+  current?: number
+  total?: number
+}
+
+export interface ImportResult {
+  project: string
+  volumes: number
+  chapters: number
+  characters: number
+  chapterLinks?: number
+  relations: number
+  world: number
+  timeline: number
+  foreshadows: number
+  memories: number
+  science: number
+  wordCount: number
+  warnings?: string[]
+  usage?: { inputTokens: number; outputTokens: number } | null
+}
+
 export type TextEncoding = 'auto' | 'utf-8' | 'gb18030' | 'gbk' | 'big5' | 'utf-16le' | 'utf-16be'
 
 export class ImportError extends Error {

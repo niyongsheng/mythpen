@@ -13,8 +13,11 @@ const PORT = process.env.PORT || 3001;
 // ─── Middleware ───
 app.use(cors());
 // Imports can carry a whole book (~60MB for 20M CJK chars + JSON overhead);
-// every other endpoint keeps the original 10mb limit.
+// every other endpoint keeps the original 10mb limit. Express path matching
+// uses segment boundaries, so `/import` does not cover `/import-ai` — both
+// paths need an explicit parser.
 app.use('/api/projects/import', express.json({ limit: '128mb' }));
+app.use('/api/projects/import-ai', express.json({ limit: '128mb' }));
 app.use(express.json({ limit: '10mb' }));
 
 // ─── Request logging ───
