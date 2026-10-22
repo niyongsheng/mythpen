@@ -713,6 +713,52 @@ router.delete('/:project/cover', (req, res) => {
 // EXPORT
 // ═══════════════════════════════════════════
 
+// AI-generated / imported titles may already carry a label, e.g. "第一卷 · 完美样本".
+const VOLUME_LABEL_RE = /^(第\s*[\d零〇一二三四五六七八九十百千万两]+\s*[卷部集]|卷\s*[\d零〇一二三四五六七八九十百千万两]+|(volume|book|part)\s+([0-9]+|[ivxlcdm]+)\b|上卷|中卷|下卷|上部|中部|下部)/i;
+const CHAPTER_LABEL_RE = /^(第\s*[\d零〇一二三四五六七八九十百千万两]+\s*[章节回话幕集]|(chapter|ch\.?)\s*([0-9]+|[ivxlcdm]+)\b|序章|序言|楔子|引子|前言|尾声|终章|后记|番外|外传|附录|prologue|epilogue)/i;
+
+function volumeHeading(vol) {
+  const title = (vol.title || '').trim();
+  if (!title) return `第${vol.sort_order}卷`;
+  return VOLUME_LABEL_RE.test(title) ? title : `第${vol.sort_order}卷 ${title}`;
+}
+
+function chapterHeading(ch) {
+  const title = (ch.title || '').trim();
+  if (!title) return `第${ch.num}章`;
+  return CHAPTER_LABEL_RE.test(title) ? title : `第${ch.num}章 ${title}`;
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function textToHtmlParagraphs(text) {
+  return String(text || '')
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeHtml(line)}</p>`)
+    .join('');
+}
+
+function groupChaptersByVolume(chapters, volumes) {
+  const known = new Set(volumes.map((v) => v.id));
+  const groups = [];
+  for (const vol of volumes) {
+    const list = chapters.filter((ch) => (ch.volume_id || 1) === vol.id);
+    if (list.length > 0) groups.push({ volume: vol, chapters: list });
+  }
+  const orphans = chapters.filter((ch) => !known.has(ch.volume_id || 1));
+  if (orphans.length > 0) groups.push({ volume: null, chapters: orphans });
+  return groups;
+}
+
 router.get('/:project/export', async (req, res) => {
   const { format = 'txt' } = req.query;
   const pn = project(req.params.project);
@@ -759,15 +805,14 @@ router.get('/:project/export', async (req, res) => {
       const vol = volumeMap.get(vId);
       if (volumes.length > 1 && vol) {
         content.push({
-          title: vol.title,
-          data: `<h2>第${vol.sort_order}卷 ${vol.title}</h2>${vol.summary ? `<p>${vol.summary}</p>` : ''}`,
+          title: volumeHeading(vol),
+          data: `<h2>${escapeHtml(volumeHeading(vol))}</h2>${vol.summary ? `<p>${escapeHtml(vol.summary)}</p>` : ''}`,
         });
       }
       for (const ch of vchs) {
-        const displayTitle = ch.title.startsWith('第') ? ch.title : `第${ch.num}章 ${ch.title}`;
         content.push({
-          title: ch.title,
-          data: `<h1>${displayTitle}</h1>${ch.content}`,
+          title: chapterHeading(ch),
+          data: `<h1>${escapeHtml(chapterHeading(ch))}</h1>${textToHtmlParagraphs(ch.content)}`,
         });
       }
     }
@@ -801,6 +846,26 @@ router.get('/:project/export', async (req, res) => {
       coverHtml = `<div class="cover-page"><img src="data:${coverMime};base64,${coverBase64}" alt="封面"></div>`;
     }
 
+    const htmlGroups = groupChaptersByVolume(chapters, volumes);
+    const tocHtml = htmlGroups
+      .map((group) => {
+        const volumeItem = volumes.length > 1 && group.volume
+          ? `<li class="toc-volume">${escapeHtml(volumeHeading(group.volume))}</li>`
+          : '';
+        return volumeItem + group.chapters.map((ch) => `<li>${escapeHtml(chapterHeading(ch))}</li>`).join('');
+      })
+      .join('');
+    const chaptersHtml = htmlGroups
+      .map((group) => {
+        const volumeHeadingHtml = volumes.length > 1 && group.volume
+          ? `<div class="volume-heading"><h2>${escapeHtml(volumeHeading(group.volume))}</h2></div>`
+          : '';
+        return volumeHeadingHtml + group.chapters
+          .map((ch) => `<div class="chapter"><h1>${escapeHtml(chapterHeading(ch))}</h1>${textToHtmlParagraphs(ch.content)}</div>`)
+          .join('');
+      })
+      .join('');
+
     output = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -820,16 +885,19 @@ router.get('/:project/export', async (req, res) => {
   .chapter h1 { font-size: 22px; text-align: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #333; }
   .chapter p { text-indent: 2em; margin-bottom: 0.8em; font-size: 16px; }
   .chapter h1, .chapter h2, .chapter h3, .chapter h4 { text-indent: 0; }
+  .volume-heading { page-break-after: always; padding: 40px; max-width: 700px; margin: 0 auto; text-align: center; }
+  .volume-heading h2 { font-size: 26px; }
+  .toc-volume { font-weight: 600; margin-top: 12px; }
 </style>
 </head>
 <body>
 ${coverHtml}
 <div class="toc-page">
-  <h1>${meta.name || pn}</h1>
-  <p style="text-align:center;color:#999;margin-bottom:30px;">${meta.author_name || '佚名'} 著</p>
-  <ul>${chapters.map(ch => `<li>第${ch.num}章 ${ch.title}</li>`).join('')}</ul>
+  <h1>${escapeHtml(meta.name || pn)}</h1>
+  <p style="text-align:center;color:#999;margin-bottom:30px;">${escapeHtml(meta.author_name || '佚名')} 著</p>
+  <ul>${tocHtml}</ul>
 </div>
-${chapters.map(ch => `<div class="chapter"><h1>第${ch.num}章 ${ch.title}</h1>${ch.content}</div>`).join('')}
+${chaptersHtml}
 </body>
 </html>`;
 
@@ -851,8 +919,14 @@ ${chapters.map(ch => `<div class="chapter"><h1>第${ch.num}章 ${ch.title}</h1>$
     if (coverPath) {
       output += `<img src="data:${coverMime};base64,${coverBase64}" alt="封面" style="max-width:100%;height:auto;">\n\n`;
     }
-    for (const ch of chapters) {
-      output += `\n---\n\n## 第${ch.num}章 ${ch.title}\n\n${ch.content}\n`;
+    const mdGroups = groupChaptersByVolume(chapters, volumes);
+    const mdMultiVolume = volumes.length > 1;
+    const chapterLevel = mdMultiVolume ? '###' : '##';
+    for (const group of mdGroups) {
+      if (mdMultiVolume && group.volume) output += `\n## ${volumeHeading(group.volume)}\n`;
+      for (const ch of group.chapters) {
+        output += `\n---\n\n${chapterLevel} ${chapterHeading(ch)}\n\n${ch.content}\n`;
+      }
     }
   } else {
     // TXT
@@ -861,8 +935,14 @@ ${chapters.map(ch => `<div class="chapter"><h1>第${ch.num}章 ${ch.title}</h1>$
     filename = `${pn}.txt`;
     output = `${meta.name || pn}\n${'='.repeat(meta.name?.length || 10)}\n\n`;
     if (meta.description) output += `${meta.description}\n\n`;
-    for (const ch of chapters) {
-      output += `\n第${ch.num}章 ${ch.title}\n${'-'.repeat(20)}\n\n${ch.content.replace(/^#+/gm, '').trim()}\n`;
+    const txtGroups = groupChaptersByVolume(chapters, volumes);
+    for (const group of txtGroups) {
+      if (volumes.length > 1 && group.volume) {
+        output += `\n${volumeHeading(group.volume)}\n${'='.repeat(20)}\n`;
+      }
+      for (const ch of group.chapters) {
+        output += `\n${chapterHeading(ch)}\n${'-'.repeat(20)}\n\n${ch.content.replace(/^#+/gm, '').trim()}\n`;
+      }
     }
   }
 
