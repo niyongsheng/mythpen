@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { setLanguage } from '@/i18n'
+import { type Lang, setLanguage } from '@/i18n'
 import { settingsApi } from '@/lib/api'
 import type { AppSettings } from '@/types'
 
@@ -56,11 +56,6 @@ function loadSettings(): AppSettings {
 }
 
 const initialSettings = loadSettings()
-
-// Sync i18n module with persisted language preference
-if (initialSettings.uiLanguage !== 'zh') {
-  setLanguage(initialSettings.uiLanguage)
-}
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: initialSettings,
@@ -136,7 +131,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const extra: Partial<SettingsState> = {}
       // When uiLanguage changes, sync the i18n module so t() returns correct locale
       if (key === 'uiLanguage') {
-        setLanguage(value as 'zh' | 'en')
+        setLanguage(value as Lang)
         extra.langVersion = s.langVersion + 1
       }
       return { settings: newSettings, ...extra }

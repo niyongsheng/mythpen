@@ -52,7 +52,7 @@ export function EditorStatusbar() {
         <span className="text-[10px] opacity-60">↻</span>
       </button>
       <span>·</span>
-      <span>L1 C1</span>
+      <span>{t('editor.lineColumn', { line: 1, col: 1 })}</span>
       <div className="ml-auto flex items-center gap-3">
         <SaveIndicator status={saveStatus} />
         <span>

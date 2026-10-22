@@ -1,5 +1,6 @@
 import { Bot, Download, Eye, EyeOff, Globe, Palette, Pen, RotateCw, SwatchBook, X, Zap } from 'lucide-react'
 import { useState } from 'react'
+import { LanguageSelect } from '@/components/LanguageSelect'
 import { useT } from '@/hooks/useT'
 import { apiUrl } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
@@ -111,24 +112,8 @@ export function SettingsDrawer() {
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
               <Globe className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.uiLanguage')}
             </div>
-            <SettingRow label={t('settings.uiLanguage')} desc={t('settings.uiLanguageDesc')}>
-              <div className="flex gap-1">
-                <button
-                  className={`px-3 py-[5px] rounded-[var(--radius-sm)] border border-[var(--hairline)] text-[13px] cursor-pointer transition-colors
-                    ${settings.uiLanguage === 'zh' ? 'bg-[var(--accent-gold)] text-[var(--canvas)] border-[var(--accent-gold)] font-medium' : 'bg-[var(--canvas-elevated)] text-[var(--ink-secondary)] hover:bg-[var(--canvas-mid)]'}`}
-                  onClick={() => updateSetting('uiLanguage', 'zh')}
-                >
-                  {t('project.chinese')}
-                </button>
-                <button
-                  className={`px-3 py-[5px] rounded-[var(--radius-sm)] border border-[var(--hairline)] text-[13px] cursor-pointer transition-colors
-                    ${settings.uiLanguage === 'en' ? 'bg-[var(--accent-gold)] text-[var(--canvas)] border-[var(--accent-gold)] font-medium' : 'bg-[var(--canvas-elevated)] text-[var(--ink-secondary)] hover:bg-[var(--canvas-mid)]'}`}
-                  onClick={() => updateSetting('uiLanguage', 'en')}
-                >
-                  English
-                </button>
-              </div>
-            </SettingRow>
+            <div className="text-[12px] text-[var(--ink-tertiary)] mb-2">{t('settings.uiLanguageDesc')}</div>
+            <LanguageSelect value={settings.uiLanguage} onChange={(code) => updateSetting('uiLanguage', code)} />
           </div>
 
           {/* ── Theme ── */}
@@ -208,8 +193,8 @@ export function SettingsDrawer() {
                 value={settings.editorFontFamily}
                 onChange={(e) => handleFontFamilyChange(e.target.value)}
               >
-                <option value="'Noto Serif SC', 'Source Han Serif SC', serif">思源宋体</option>
-                <option value="'Noto Sans SC', 'Source Han Sans SC', sans-serif">思源黑体</option>
+                <option value="'Noto Serif SC', 'Source Han Serif SC', serif">{t('settings.fontSong')}</option>
+                <option value="'Noto Sans SC', 'Source Han Sans SC', sans-serif">{t('settings.fontHei')}</option>
                 <option value="Georgia, 'Noto Serif SC', serif">Georgia</option>
               </select>
             </SettingRow>

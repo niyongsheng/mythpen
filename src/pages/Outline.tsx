@@ -130,7 +130,7 @@ export function Outline() {
       const text = getAIResponseText(res)
       const parsed = extractAIJsonObject(text)
       if (parsed) {
-        if (parsed.title && activeChapter.title === '新章节') {
+        if (parsed.title && [t('chapter.defaultTitle'), t('chapter.firstChapterTitle')].includes(activeChapter.title)) {
           handleSaveTitle(parsed.title)
         }
         if (parsed.outline) setOutlineText(parsed.outline)

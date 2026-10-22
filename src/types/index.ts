@@ -126,7 +126,14 @@ export interface ChatMessage {
   toolCalls?: { id: string; name: string; arguments: any; status?: string; result?: any }[]
 }
 
+// ─── Language ───
+/** Languages supported by the system, for both the interface and project writing. */
+export type LanguageCode = 'zh' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'fr' | 'es' | 'ru'
+export type UiLanguage = LanguageCode
+export type WritingLanguage = LanguageCode
+
 // ─── Settings ───
+
 export interface AppSettings {
   apiKey: string
   apiKeyDeepseek: string
@@ -135,7 +142,7 @@ export interface AppSettings {
   apiBaseUrl: string
   apiModel: string
   apiType: 'openai' | 'claude'
-  uiLanguage: 'zh' | 'en'
+  uiLanguage: UiLanguage
   theme: 'dark' | 'light'
   editorFontSize: number
   editorFontFamily: string

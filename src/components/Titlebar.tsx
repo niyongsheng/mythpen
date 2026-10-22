@@ -30,7 +30,7 @@ export function Titlebar() {
             onClick={() => setProjectSwitcherOpen(!projectSwitcherOpen)}
           >
             <span className="text-[var(--ink-secondary)] text-[13px]">{currentProject}</span>
-            <span className="text-[var(--ink-mute)] text-[12px]">· 第一卷</span>
+            <span className="text-[var(--ink-mute)] text-[12px]">· {t('titlebar.firstVolume')}</span>
           </div>
 
           {projectSwitcherOpen && (
@@ -50,7 +50,11 @@ export function Titlebar() {
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] text-[var(--ink)] truncate">{p.name}</div>
                       <div className="text-[11px] text-[var(--ink-tertiary)]">
-                        {p.wordCount.toLocaleString()} 字 · {p.chapterCount} 章 · {p.genres.join(' ')}
+                        {t('titlebar.projectMeta', {
+                          words: p.wordCount.toLocaleString(),
+                          chapters: p.chapterCount,
+                          genres: p.genres.map((genre) => t(`project.genre.${genre}`)).join(' '),
+                        })}
                       </div>
                     </div>
                   </div>

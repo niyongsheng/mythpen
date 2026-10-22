@@ -1,10 +1,12 @@
 import { BookOpen, Database, Pen } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { isLang, LANGUAGES } from '@/i18n'
 import { apiUrl, projectsApi } from '@/lib/api'
 import { useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
+import type { WritingLanguage } from '@/types'
 
 export function BottomStatusbar() {
   const { currentProject } = useProjectStore()
@@ -13,7 +15,7 @@ export function BottomStatusbar() {
   const totalTokens = (stats?.tokenInput || 0) + (stats?.tokenOutput || 0)
 
   const [backendOnline, setBackendOnline] = useState(true)
-  const [writingLang, setWritingLang] = useState('中文')
+  const [writingLang, setWritingLang] = useState<WritingLanguage>('zh')
   const [modelName, setModelName] = useState(settings.apiModel || 'DeepSeek Chat')
   const mountedRef = useRef(true)
   const { t } = useT()
@@ -57,7 +59,7 @@ export function BottomStatusbar() {
       .get(currentProject)
       .then((meta: any) => {
         if (mountedRef.current) {
-          setWritingLang(meta.language === 'en' ? 'English' : '中文')
+          setWritingLang(isLang(meta.language) ? meta.language : 'zh')
         }
       })
       .catch(() => {})
@@ -82,13 +84,16 @@ export function BottomStatusbar() {
       </span>
 
       <span className="inline-flex items-center gap-1 text-[10px] px-[7px] py-[1px] rounded-full bg-[var(--canvas-card)] border border-[var(--hairline)] text-[var(--ink-tertiary)]">
-        UI: {settings.uiLanguage === 'zh' ? t('project.chinese') : t('project.english')}
+        {LANGUAGES.find((language) => language.code === settings.uiLanguage)?.label ?? settings.uiLanguage}
       </span>
       <span
         className="inline-flex items-center gap-1 text-[10px] px-[7px] py-[1px] rounded-full bg-[var(--canvas-card)] border"
         style={{ color: 'var(--accent-gold)', borderColor: 'rgba(201,169,110,0.3)' }}
       >
-        <Pen className="w-3 h-3" /> {t('bottomBar.writingLanguage', { lang: writingLang })}
+        <Pen className="w-3 h-3" />{' '}
+        {t('bottomBar.writingLanguage', {
+          lang: LANGUAGES.find((language) => language.code === writingLang)?.label ?? writingLang,
+        })}
       </span>
 
       <div className="ml-auto flex items-center gap-4">
@@ -98,7 +103,7 @@ export function BottomStatusbar() {
             className={`w-[7px] h-[7px] rounded-full ${backendOnline ? 'bg-[var(--success)]' : 'bg-red-500'}`}
             style={{ boxShadow: backendOnline ? '0 0 0 2px rgba(76,175,125,0.2)' : '0 0 0 2px rgba(239,68,68,0.2)' }}
           />
-          {backendOnline ? 'Backend' : t('bottomBar.offline')}
+          {backendOnline ? t('bottomBar.backend') : t('bottomBar.offline')}
         </span>
         <span className="text-[10px] inline-flex items-center gap-1">
           <Database className="w-3 h-3" /> SQLite

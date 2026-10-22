@@ -284,8 +284,7 @@ const SETTING_SCHEMA = {
   api_model: { type: 'string', default: 'deepseek-flash' },
   api_type: { type: 'enum', values: ['', 'openai', 'claude'], default: '' },
   max_output_tokens: { type: 'number', default: 8192, min: 1024, max: 131072 },
-  send_temperature: { type: 'boolean', default: true },
-  ui_language: { type: 'enum', values: ['zh', 'en'], default: 'zh' },
+  ui_language: { type: 'enum', values: ['zh', 'zh-TW', 'en', 'ja', 'ko', 'fr', 'es', 'ru'], default: 'zh' },
   theme: { type: 'enum', values: ['dark', 'light'], default: 'dark' },
   editor_font_size: { type: 'number', default: 17, min: 14, max: 24 },
   editor_font_family: {

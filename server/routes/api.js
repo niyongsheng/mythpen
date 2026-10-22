@@ -4,7 +4,8 @@ const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const { chapterHeading, volumeHeading } = require('../titles');
+const { normalizeLanguageCode } = require('../languages');
+const { chapterHeading, volumeHeading, stripLeadingChapterHeading } = require('../titles');
 
 function project(name) {
   // Ensure project DB is accessible
@@ -64,6 +65,7 @@ router.get('/projects', (req, res) => {
 
 router.post('/projects', (req, res) => {
   const { name, mode = 'medium-novel', language = 'zh', genres = ['other'] } = req.body || {};
+  const writingLanguage = normalizeLanguageCode(language);
   const nameError = db.validateProjectName(name);
   if (nameError) {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: nameError, recoverable: true } });
@@ -79,7 +81,7 @@ router.post('/projects', (req, res) => {
   const pdb = db.openProjectDb(filePath);
   db.registerRecentProject(name, filePath);
   try {
-    db.initProjectMeta(name, { mode, language });
+    db.initProjectMeta(name, { mode, language: writingLanguage });
     db.initProjectGenres(name, genres);
 
     // Default volume
@@ -91,7 +93,7 @@ router.post('/projects', (req, res) => {
     throw err;
   }
 
-  res.json({ name, filePath, mode, language, genres });
+  res.json({ name, filePath, mode, language: writingLanguage, genres });
 });
 
 router.get('/projects/:name', (req, res) => {

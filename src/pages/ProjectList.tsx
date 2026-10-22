@@ -92,7 +92,7 @@ export function ProjectList() {
                         key={g}
                         className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)]"
                       >
-                        {g}
+                        {t(`project.genre.${g}`)}
                       </span>
                     ))}
                   </div>

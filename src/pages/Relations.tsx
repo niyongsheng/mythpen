@@ -431,7 +431,9 @@ export function Relations() {
             {sortedByChapter.slice(0, 8).map((c: any, i) => (
               <div key={i} className="flex justify-between items-center py-[2px] text-[12px]">
                 <span className="text-[var(--ink-mute)] truncate max-w-[130px]">{c.name}</span>
-                <span className="font-mono text-[11px] text-[var(--ink-tertiary)]">{c.chapterCount || 0}章</span>
+                <span className="font-mono text-[11px] text-[var(--ink-tertiary)]">
+                  {t('outline.chapterCount', { n: c.chapterCount || 0 })}
+                </span>
               </div>
             ))}
             {chars.length === 0 && (
