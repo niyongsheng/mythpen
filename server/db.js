@@ -140,8 +140,17 @@ function _wrapDb(db, filePath) {
           s.step();
           const changes = db.getRowsModified();
           s.free();
+          // sql.js does not expose lastInsertRowid on statements; query it so
+          // callers can use the id returned by INSERT statements.
+          let lastInsertRowid = null;
+          try {
+            const result = db.exec('SELECT last_insert_rowid() AS id');
+            lastInsertRowid = result[0]?.values?.[0]?.[0] ?? null;
+          } catch {
+            /* ignore */
+          }
           _scheduleFlush();
-          return { changes };
+          return { changes, lastInsertRowid };
         },
       };
     },
