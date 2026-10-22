@@ -34,6 +34,7 @@ export const projectsApi = {
   list: () => request('/projects'),
   get: (name: string) => request(`/projects/${encodeURIComponent(name)}`),
   create: (data: any) => request('/projects', { method: 'POST', body: data }),
+  importBook: (data: any) => request('/projects/import', { method: 'POST', body: data }),
   delete: (name: string) => request(`/projects/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   getPhase: (name: string) => request(`/${encodeURIComponent(name)}/workflow/phase`),
   setPhase: (name: string, phase: string) =>
@@ -72,7 +73,7 @@ export const chaptersApi = {
 // ─── Volumes ───
 
 export const volumesApi = {
-  list: (project: string) => request(`/${encodeURIComponent(project)}/volumes`),
+  list: (project: string, slim = false) => request(`/${encodeURIComponent(project)}/volumes${slim ? '?slim=1' : ''}`),
 }
 
 // ─── Characters ───
@@ -199,6 +200,13 @@ async function readSSEStream(response: Response, handlers: Record<string, (paylo
 export const aiApi = {
   chat: (messages: any[], project: string) =>
     aiRequest('/ai/chat', { method: 'POST', body: { messages, project } }).then((r) => r.json()),
+
+  analyzeImport: (project: string) =>
+    aiRequest('/ai/analyze-import', { method: 'POST', body: { project } }).then(async (r) => {
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data.error?.message || `HTTP ${r.status}`)
+      return data
+    }),
 
   chatStream: (
     messages: any[],

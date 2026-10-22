@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { t } from '@/i18n'
+import { track } from '@/lib/analytics'
 import { chaptersApi, statsApi, volumesApi } from '@/lib/api'
 import { useProjectStore } from '@/stores/useProjectStore'
 
@@ -42,7 +43,7 @@ interface ChapterState {
 
 const EMPTY_VOLUMES: Volume[] = []
 
-export const useChapterStore = create<ChapterState>((set) => ({
+export const useChapterStore = create<ChapterState>((set, get) => ({
   volumes: EMPTY_VOLUMES,
   currentChapter: null,
   loading: false,
@@ -56,7 +57,9 @@ export const useChapterStore = create<ChapterState>((set) => ({
   loadChapters: async (project) => {
     set({ loading: true })
     try {
-      const vols = await volumesApi.list(project)
+      // Slim response: chapter bodies are fetched separately for the selected
+      // chapter, so large imported books don't transfer the whole text each load.
+      const vols = await volumesApi.list(project, true)
 
       // Guard: discard response if project has switched since the request was made
       const currentProj = useProjectStore.getState().currentProject
@@ -65,7 +68,7 @@ export const useChapterStore = create<ChapterState>((set) => ({
         return
       }
 
-      const volumes = vols.map((v: any) => ({
+      const volumes: Volume[] = vols.map((v: any) => ({
         id: v.id,
         sortOrder: v.sort_order,
         title: v.title,
@@ -86,17 +89,50 @@ export const useChapterStore = create<ChapterState>((set) => ({
         })),
       }))
 
-      // Find current: first chapter with content, then first writing chapter, then first chapter
-      let currentChapter = null
-      for (const v of volumes) {
+      const allChapters = volumes.flatMap((v) => v.chapters)
+      const state = get()
+      let currentChapter: Chapter | null = null
+
+      // Keep the chapter the user is currently on across refreshes (AI tool
+      // calls, status updates, etc.), as long as it still exists.
+      if (state.projectName === project && state.currentChapter) {
+        currentChapter = allChapters.find((c) => c.id === state.currentChapter?.id) || null
+      }
+      if (!currentChapter) {
         currentChapter =
-          v.chapters.find((c: any) => c.content) ||
-          v.chapters.find((c: any) => c.status === 'writing' || c.status === 'pending') ||
-          v.chapters[0]
-        if (currentChapter) break
+          allChapters.find((c) => c.status === 'writing' || c.status === 'pending') ||
+          allChapters[allChapters.length - 1] ||
+          null
       }
 
-      set({ volumes, currentChapter, loading: false, projectName: project })
+      // Fetch the selected chapter's body (slim volumes omit content) before
+      // publishing the state, so the editor never briefly renders empty/old
+      // content during a project switch.
+      let loadedChapter = currentChapter
+      if (currentChapter) {
+        try {
+          const full = await chaptersApi.get(project, currentChapter.num, currentChapter.volumeId)
+          if (full) {
+            loadedChapter = {
+              ...currentChapter,
+              content: full.content || '',
+              outline: full.outline || currentChapter.outline,
+              wordCount: full.word_count || currentChapter.wordCount,
+              status: full.status || currentChapter.status,
+            }
+          }
+        } catch {
+          /* keep the slim chapter if the body request fails */
+        }
+      }
+
+      // Discard if the project switched while the body was loading.
+      if (useProjectStore.getState().currentProject !== project) {
+        set({ loading: false })
+        return
+      }
+
+      set({ volumes, currentChapter: loadedChapter, loading: false, projectName: project })
     } catch (err) {
       console.error('Failed to load chapters:', err)
       set({ loading: false })
@@ -158,6 +194,7 @@ export const useChapterStore = create<ChapterState>((set) => ({
   createChapter: async (project, title = t('chapter.defaultTitle'), outline = '', volumeId?: number) => {
     try {
       const created = await chaptersApi.create(project, { title, outline, volume_id: volumeId })
+      track('chapter_created')
       // Reload chapters to include the new one
       await useChapterStore.getState().loadChapters(project)
       // Set the newly created chapter as current

@@ -5,8 +5,15 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'list_chapters',
-      description: '列出小说的所有章节，返回章节编号、标题、状态、字数和摘要。用于了解整体结构和进度。',
-      parameters: { type: 'object', properties: {}, required: [] },
+      description: '列出小说的章节（分页），返回章节编号、标题、状态、字数和摘要。用于了解整体结构和进度。',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: '返回条数，默认 200，最大 1000' },
+          offset: { type: 'number', description: '偏移量，默认 0' },
+        },
+        required: [],
+      },
     },
   },
   {
@@ -25,15 +32,15 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_chapter',
-      description: '创建新章节。新建后会自动按卷内顺序分配编号。如果需要跨卷续接编号（如第三卷从第9章开始），请传入 chapter_num 参数。',
+      description: '创建新章节。新建后会自动按全书顺序分配编号（跨卷唯一），并默认放入最后一卷。如需指定编号请传入 chapter_num。',
       parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: '章节标题' },
-          chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动按卷内顺序编号；传入则使用指定编号，适合跨卷续接场景' },
+          chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动按全书顺序编号；传入则使用指定编号' },
           outline: { type: 'string', description: '章节大纲（可选）' },
           content: { type: 'string', description: '章节正文（可选）' },
-          volume_id: { type: 'number', description: '所属卷ID，默认为1' },
+          volume_id: { type: 'number', description: '所属卷ID，默认为最后一卷' },
           cognitive_frame: { type: 'string', description: '叙事维度 — 认知框架（可选）' },
           emotional_anchor: { type: 'string', description: '叙事维度 — 情感锚点（可选）' },
           world_texture: { type: 'string', description: '叙事维度 — 世界质感（可选）' },
@@ -710,21 +717,38 @@ function executeTool(projectName, toolName, args) {
   switch (toolName) {
     // ── Chapters ──
     case 'list_chapters': {
-      const rows = pdb.prepare('SELECT num, title, status, word_count, outline, summary, volume_id, created_at, updated_at FROM chapters ORDER BY num').all();
-      return rows;
+      const total = pdb.prepare('SELECT COUNT(*) as c FROM chapters').get().c;
+      const limit = Math.min(Math.max(parseInt(args.limit, 10) || 200, 1), 1000);
+      const offset = Math.max(parseInt(args.offset, 10) || 0, 0);
+      const rows = pdb.prepare(
+        'SELECT num, title, status, word_count, outline, summary, volume_id, created_at, updated_at FROM chapters ORDER BY num LIMIT ? OFFSET ?',
+      ).all(limit, offset);
+      return { total, limit, offset, chapters: rows };
     }
     case 'get_chapter': {
       const row = pdb.prepare('SELECT * FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!row) return { error: `章节 ${args.chapter_num} 不存在` };
+      // Keep tool results bounded for very large (e.g. imported) chapters.
+      const MAX_SIDE = 6000;
+      if (typeof row.content === 'string' && row.content.length > MAX_SIDE * 2) {
+        const omitted = row.content.length - MAX_SIDE * 2;
+        row.content = `${row.content.slice(0, MAX_SIDE)}\n\n…（中间省略 ${omitted} 字）…\n\n${row.content.slice(-MAX_SIDE)}`;
+        row.truncated = true;
+        row.omitted_chars = omitted;
+      }
       return row;
     }
     case 'create_chapter': {
-      const volId = args.volume_id || 1;
+      let volId = args.volume_id;
+      if (!volId) {
+        const lastVol = pdb.prepare('SELECT id FROM volumes ORDER BY sort_order DESC, id DESC LIMIT 1').get();
+        volId = lastVol?.id || 1;
+      }
       let num;
       if (args.chapter_num !== undefined) {
         num = args.chapter_num;
       } else {
-        const max = pdb.prepare('SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?').get(volId);
+        const max = pdb.prepare('SELECT MAX(num) as mx FROM chapters').get();
         num = (max?.mx || 0) + 1;
       }
       pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at)

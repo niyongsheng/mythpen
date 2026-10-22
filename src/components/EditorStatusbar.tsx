@@ -1,4 +1,6 @@
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
+import { formatChapterTitle } from '@/lib/chapterTitle'
 import { NEXT_STATUS } from '@/lib/status'
 import { useProjectName } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
@@ -20,8 +22,11 @@ export function EditorStatusbar() {
 
   const handleCycleStatus = () => {
     if (!currentChapter || !project) return
-    const next = NEXT_STATUS[currentChapter.status] || 'writing'
-    updateChapter(project, currentChapter.num, { status: next }).catch(() => {})
+    const from = currentChapter.status
+    const next = NEXT_STATUS[from] || 'writing'
+    updateChapter(project, currentChapter.num, { status: next })
+      .then(() => track('chapter_status_changed', { from, to: next }))
+      .catch(() => {})
     loadChapters(project).catch(() => {})
   }
 
@@ -35,7 +40,7 @@ export function EditorStatusbar() {
 
   return (
     <div className="h-[var(--statusbar-h)] bg-[var(--canvas-soft)] border-t border-[var(--hairline)] flex items-center px-4 gap-4 font-mono text-[12px] text-[var(--ink-tertiary)] shrink-0">
-      <span>{t('sidebar.chapterTitle', { num: currentChapter.num, title: currentChapter.title })}</span>
+      <span>{formatChapterTitle(currentChapter.num, currentChapter.title, t)}</span>
       <span>
         {(currentChapter.wordCount || 0).toLocaleString()} {t('editor.words')}
       </span>

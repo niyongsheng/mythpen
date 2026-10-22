@@ -1,7 +1,9 @@
 import { Check, Loader, Pen, Plus, Save, ScrollText, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { aiApi, extractAIJsonObject, getAIResponseText } from '@/lib/api'
+import { aiApi, chaptersApi, extractAIJsonObject, getAIResponseText } from '@/lib/api'
+import { formatChapterTitle } from '@/lib/chapterTitle'
+import { formatVolumeTitle } from '@/lib/volumeTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 
@@ -95,7 +97,18 @@ export function Outline() {
     setGenerating(true)
     setAiSuggestion('')
     try {
-      const contentPreview = activeChapter.content?.slice(0, 1000) || t('outline.noContent')
+      // Chapter bodies are loaded lazily (slim volumes endpoint), so fetch the
+      // full content when the preview isn't available locally.
+      let chapterContent = activeChapter.content
+      if (!chapterContent) {
+        try {
+          const full = await chaptersApi.get(currentProject, activeChapter.num, activeChapter.volumeId)
+          chapterContent = full?.content || ''
+        } catch {
+          /* preview falls back to the empty marker */
+        }
+      }
+      const contentPreview = chapterContent?.slice(0, 1000) || t('outline.noContent')
       const res = await aiApi.chat(
         [
           {
@@ -226,9 +239,7 @@ export function Outline() {
                   >
                     ▼
                   </span>
-                  {vol.title.startsWith('第') && vol.title.endsWith('卷')
-                    ? vol.title
-                    : t('sidebar.volumeTitle', { order: vol.sortOrder, title: vol.title })}
+                  {formatVolumeTitle(vol.title, vol.sortOrder, t)}
                   <span className="text-[10px] text-[var(--ink-tertiary)] ml-auto">
                     {t('outline.chapterCount', { n: vol.chapters.length })}
                   </span>
@@ -261,9 +272,7 @@ export function Outline() {
                           >
                             {statusIcon[ch.status]}
                           </span>
-                          {ch.title.startsWith('第')
-                            ? ch.title
-                            : t('sidebar.chapterTitle', { num: ch.num, title: ch.title })}
+                          {formatChapterTitle(ch.num, ch.title, t)}
                         </div>
                         <div className="text-[12px] text-[var(--ink-tertiary)] mt-1 line-clamp-2">{ch.outline}</div>
                       </div>
@@ -288,9 +297,7 @@ export function Outline() {
           {activeChapter ? (
             <>
               <div className="font-display text-lg font-medium text-[var(--ink)] mb-1">
-                {activeChapter.title.startsWith('第')
-                  ? activeChapter.title
-                  : t('sidebar.chapterTitle', { num: activeChapter.num, title: activeChapter.title })}
+                {formatChapterTitle(activeChapter.num, activeChapter.title, t)}
               </div>
               <div className="text-[12px] text-[var(--ink-tertiary)] mb-4">
                 <span

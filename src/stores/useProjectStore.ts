@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { t } from '@/i18n'
+import { track } from '@/lib/analytics'
 import { chaptersApi, projectsApi } from '@/lib/api'
+import type { ParsedBook } from '@/lib/import/types'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import type { WorkflowPhase } from '@/types'
@@ -32,6 +34,11 @@ interface ProjectState {
   loadPhase: (project: string) => Promise<void>
   setPhase: (project: string, phase: WorkflowPhase) => Promise<void>
   createProject: (name: string, opts?: { mode?: string; language?: string; genres?: string[] }) => Promise<void>
+  importProject: (
+    name: string,
+    opts: { mode?: string; language?: string; genres?: string[] },
+    book: ParsedBook,
+  ) => Promise<void>
   deleteProject: (name: string) => Promise<void>
 }
 
@@ -107,8 +114,61 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // 4. Load chapters into sidebar & navigate to Writing page
       await useChapterStore.getState().loadChapters(name)
       useSidebarStore.getState().setActivePage('page-writing')
+
+      track('project_created', { mode, language, genres: genres.join(',') })
     } catch (err) {
       set({ error: (err as any).message || t('project.createFailed'), loading: false })
+      throw err
+    }
+  },
+
+  importProject: async (name, opts, book) => {
+    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'] } = opts
+    set({ loading: true, error: null })
+    try {
+      // Create the project and write all imported volumes/chapters in one
+      // atomic request (the server cleans up on failure).
+      await projectsApi.importBook({
+        name,
+        mode,
+        language,
+        genres,
+        source: {
+          fileName: book.fileName || book.title,
+          format: book.format,
+          title: book.title,
+          author: book.author,
+          description: book.description,
+        },
+        volumes: book.volumes.map((volume) => ({
+          title: volume.title,
+          chapters: volume.chapters.map((chapter) => ({
+            title: chapter.title,
+            content: chapter.content,
+          })),
+        })),
+      })
+
+      await useProjectStore.getState().loadProjects()
+      set({ currentProject: name, showProjectList: false, loading: false, workflowPhase: 'writing' })
+      localStorage.setItem('mythpen-current-project', name)
+
+      // loadChapters keeps the current chapter when possible; for a brand-new
+      // import it falls back to the last chapter (the end of the source book).
+      await useChapterStore.getState().loadChapters(name)
+      useSidebarStore.getState().setActivePage('page-writing')
+
+      track('project_imported', {
+        format: book.format,
+        volumes: book.volumes.length,
+        chapters: book.totalChapters,
+        words: book.totalWords,
+      })
+    } catch (err) {
+      set({
+        error: (err as any).message || t('project.import.importFailed'),
+        loading: false,
+      })
       throw err
     }
   },

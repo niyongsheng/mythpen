@@ -1,6 +1,7 @@
 import { Pen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { formatChapterTitle } from '@/lib/chapterTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useEditorStore } from '@/stores/useEditorStore'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -33,9 +34,20 @@ export function EditorContent() {
     setActivePage('page-writing')
   }
 
+  // Escape user/project text before injecting it as HTML. Imported books may
+  // contain angle brackets or even script tags; they must render as text.
+  function escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+  }
+
   // Convert inline markers to HTML
   function inlineToHtml(text: string): string {
-    return text
+    return escapeHtml(text)
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/\*(.+?)\*/g, '<i>$1</i>')
       .replace(/__(.+?)__/g, '<u>$1</u>')
@@ -166,9 +178,15 @@ export function EditorContent() {
   }, [chapter])
 
   // Watch chapter changes (switching chapters) and external content updates (AI generation)
+  const lastSyncedChapterIdRef = useRef<number | null>(null)
   useEffect(() => {
-    if (!isEditingRef.current) {
+    const chapterId = chapter?.id ?? null
+    const chapterChanged = lastSyncedChapterIdRef.current !== chapterId
+    // Always sync when the chapter identity changes (e.g. switching projects),
+    // even if the editor is focused; otherwise keep the user's in-progress text.
+    if (chapterChanged || !isEditingRef.current) {
       syncContent()
+      lastSyncedChapterIdRef.current = chapterId
     }
     setIsDirty(false)
     // Only show 'saved' if content exists and we've actually persisted it
@@ -272,7 +290,7 @@ export function EditorContent() {
                 onClick={handleTitleClick}
                 title={t('editor.clickToEditTitle')}
               >
-                {t('sidebar.chapterTitle', { num: chapter.num, title: chapter.title })}
+                {formatChapterTitle(chapter.num, chapter.title, t)}
               </h1>
             )}
             <div

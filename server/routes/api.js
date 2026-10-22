@@ -187,19 +187,31 @@ router.put('/:project/chapters/:num', (req, res) => {
 });
 
 router.post('/:project/chapters', (req, res) => {
-  const { title, volume_id = 1, outline = '', status = 'pending', chapter_num } = req.body || {};
+  const pn = project(req.params.project);
+  const { title, outline = '', status = 'pending', chapter_num } = req.body || {};
+
+  // Default to the last volume so continuation chapters land at the end of
+  // multi-volume (including imported) projects rather than in volume 1.
+  let volumeId = req.body?.volume_id;
+  if (volumeId === undefined || volumeId === null) {
+    const lastVol = db.projectGet(pn, 'SELECT id FROM volumes ORDER BY sort_order DESC, id DESC LIMIT 1');
+    volumeId = lastVol?.id ?? 1;
+  }
+
   let num;
   if (chapter_num !== undefined) {
     num = chapter_num;
   } else {
-    const maxNum = db.projectGet(project(req.params.project), 'SELECT MAX(num) as mx FROM chapters WHERE volume_id = ?', [volume_id]);
+    // Global numbering keeps chapter numbers unique across volumes, which the
+    // num-only GET/PUT/DELETE chapter endpoints rely on.
+    const maxNum = db.projectGet(pn, 'SELECT MAX(num) as mx FROM chapters');
     num = (maxNum?.mx || 0) + 1;
   }
-  db.projectExecute(project(req.params.project),
+  db.projectExecute(pn,
     'INSERT INTO chapters (volume_id, num, title, outline, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))',
-    [volume_id, num, title, outline, status]
+    [volumeId, num, title, outline, status]
   );
-  const created = db.projectGet(project(req.params.project), 'SELECT * FROM chapters WHERE num = ?', [num]);
+  const created = db.projectGet(pn, 'SELECT * FROM chapters WHERE num = ?', [num]);
   res.status(201).json(created);
 });
 
@@ -211,10 +223,15 @@ router.delete('/:project/chapters/:num', (req, res) => {
 });
 
 router.get('/:project/volumes', (req, res) => {
-  const rows = db.projectQuery(project(req.params.project), 'SELECT * FROM volumes ORDER BY sort_order');
+  const pn = project(req.params.project);
+  const slim = req.query.slim === '1' || req.query.slim === 'true';
+  const chapterCols = slim
+    ? 'id, volume_id, num, title, outline, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at'
+    : '*';
+  const rows = db.projectQuery(pn, 'SELECT * FROM volumes ORDER BY sort_order');
   for (const v of rows) {
-    v.chapters = db.projectQuery(project(req.params.project),
-      'SELECT * FROM chapters WHERE volume_id = ? ORDER BY num', [v.id]
+    v.chapters = db.projectQuery(pn,
+      `SELECT ${chapterCols} FROM chapters WHERE volume_id = ? ORDER BY num`, [v.id]
     );
   }
   res.json(rows);

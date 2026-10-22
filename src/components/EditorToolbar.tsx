@@ -1,6 +1,7 @@
 import { Loader, Pen, RemoveFormatting, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { aiApi } from '@/lib/api'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -160,13 +161,15 @@ export function EditorToolbar() {
     if (loading || !currentProject || !currentChapter) return
     setLoading('continue')
     const ch = currentChapter
+    // The server reads the tail of the chapter itself; only send metadata so
+    // very large imported chapters don't bloat the request.
     const context = t('editor.continuePrompt', {
       project: currentProject,
       num: ch?.num,
       title: ch?.title,
-      content: ch?.content || '',
     })
 
+    track('ai_continue')
     abortRef.current = aiApi.continueWriting(
       ch?.num || 1,
       context,
@@ -208,6 +211,7 @@ export function EditorToolbar() {
     const ch = currentChapter
     const context = t('editor.polishPrompt', { project: currentProject, num: ch?.num, title: ch?.title })
 
+    track('ai_polish')
     abortRef.current = aiApi.continueWriting(
       ch?.num || 1,
       context,

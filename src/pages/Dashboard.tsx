@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { statsApi } from '@/lib/api'
+import { formatChapterTitle } from '@/lib/chapterTitle'
 import { useProjectName, useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -438,7 +439,7 @@ export function Dashboard() {
             {(s.chapters || []).map((ch: any) => (
               <ChapterListItem
                 key={ch.num}
-                formattedTitle={t('dashboard.chapterFormat', { num: ch.num, title: ch.title })}
+                formattedTitle={formatChapterTitle(ch.num, ch.title, t)}
                 status={ch.status}
                 words={`${(ch.word_count || 0).toLocaleString()}${t('dashboard.wordCountSuffix')}`}
               />

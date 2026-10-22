@@ -24,9 +24,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { projectsApi, statsApi } from '@/lib/api'
+import { formatChapterTitle } from '@/lib/chapterTitle'
 import { refreshAllData } from '@/lib/dataEvents'
 import { NEXT_STATUS } from '@/lib/status'
 import { useStats } from '@/lib/useProjectData'
+import { formatVolumeTitle } from '@/lib/volumeTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -173,9 +175,7 @@ export function Sidebar() {
                     setActivePage('page-writing')
                   }}
                 >
-                  {vol.title.startsWith('第') && vol.title.endsWith('卷')
-                    ? vol.title
-                    : t('sidebar.volumeTitle', { order: vol.sortOrder, title: vol.title })}
+                  {formatVolumeTitle(vol.title, vol.sortOrder, t)}
                 </span>
               </div>
               {!collapsedVols.has(vol.id) &&
@@ -195,11 +195,7 @@ export function Sidebar() {
                       <span className="absolute left-0 top-0.5 bottom-0.5 w-[2px] bg-[var(--accent-gold)] rounded-r" />
                     )}
                     <FileText className="w-3.5 h-3.5 shrink-0" />
-                    <span className="flex-1 truncate">
-                      {ch.title.startsWith('第')
-                        ? ch.title
-                        : t('sidebar.chapterTitle', { num: ch.num, title: ch.title })}
-                    </span>
+                    <span className="flex-1 truncate">{formatChapterTitle(ch.num, ch.title, t)}</span>
                     <StatusBadge
                       status={ch.status}
                       t={t}
