@@ -232,6 +232,61 @@ const TOOLS = [
     },
   },
 
+  // ═══ Payoff Points (爽点) ═══
+  {
+    type: 'function',
+    function: {
+      name: 'list_payoffs',
+      description: '列出小说的所有爽点（打脸、逆袭、装逼等爽感设计），可按状态筛选。写爽文章节前用它确认哪些爽点待铺垫或待释放。',
+      parameters: {
+        type: 'object',
+        properties: {
+          status: { type: 'string', enum: ['planned', 'building', 'released', 'abandoned'], description: '按状态筛选（可选）' },
+        },
+        required: [],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'create_payoff',
+      description: '设计一个新的爽点，用于规划爽文中的情绪释放：何时铺垫、何时爆发。',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: '爽点标题' },
+          type: { type: 'string', enum: ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'], description: '爽点类型：face-slap(打脸)、flex(装逼)、comeback(逆袭)、reveal(身份/实力揭晓)、reward(获得奇遇)、revenge(复仇)、breakthrough(突破)、other(其他)' },
+          description: { type: 'string', description: '爽点描述：如何铺垫、如何引爆、情绪如何释放' },
+          intensity: { type: 'number', description: '爽感强度 1-5，默认 3' },
+          setup_chapter: { type: 'number', description: '铺垫章节编号（可选）' },
+          payoff_chapter: { type: 'number', description: '预计释放章节编号（可选）' },
+        },
+        required: ['title', 'description'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_payoff',
+      description: '更新爽点的状态、类型、描述、强度或章节安排。写完后把已释放的爽点标记为 released。',
+      parameters: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: '爽点标题' },
+          status: { type: 'string', enum: ['planned', 'building', 'released', 'abandoned'], description: '新状态：planned(待铺垫)、building(铺垫中)、released(已释放)、abandoned(已放弃)' },
+          type: { type: 'string', enum: ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'], description: '更新类型（可选）' },
+          description: { type: 'string', description: '更新描述（可选）' },
+          intensity: { type: 'number', description: '更新爽感强度 1-5（可选）' },
+          setup_chapter: { type: 'number', description: '更新铺垫章节（可选）' },
+          payoff_chapter: { type: 'number', description: '更新释放章节（可选）' },
+        },
+        required: ['title'],
+      },
+    },
+  },
+
   // ═══ Relations ═══
   {
     type: 'function',
@@ -520,6 +575,18 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: { title: { type: 'string', description: '伏笔标题' } },
+        required: ['title'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_payoff',
+      description: '删除指定爽点。此操作不可逆，请谨慎使用。',
+      parameters: {
+        type: 'object',
+        properties: { title: { type: 'string', description: '爽点标题' } },
         required: ['title'],
       },
     },
@@ -914,6 +981,59 @@ const HANDLERS = {
       return { updated: true, title: args.title };
     },
   },
+  // ── Payoff Points (爽点) ──
+  list_payoffs: {
+    entity: null,
+    category: '爽点设计',
+    run(ctx) {
+      const { pdb, args } = ctx;
+      let sql = 'SELECT * FROM payoff_points';
+      const params = [];
+      if (args.status) { sql += ' WHERE status = ?'; params.push(args.status); }
+      sql += ' ORDER BY payoff_chapter, created_at';
+      return pdb.prepare(sql).all(...params);
+    },
+  },
+  create_payoff: {
+    entity: 'payoff',
+    category: '爽点设计',
+    run(ctx) {
+      const { pdb, args } = ctx;
+      const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
+      if (!genres.includes('power-fantasy')) {
+        return { error: '当前项目不是爽文（power-fantasy）类型，无法创建爽点' };
+      }
+      const id = randomUUID();
+      const intensity = Math.max(1, Math.min(5, Number(args.intensity) || 3));
+      const types = ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'];
+      const type = types.includes(args.type) ? args.type : 'other';
+      pdb.prepare(`INSERT INTO payoff_points (id, title, type, description, status, intensity, setup_chapter, payoff_chapter)
+        VALUES (?, ?, ?, ?, 'planned', ?, ?, ?)`)
+        .run(id, args.title, type, args.description, intensity, args.setup_chapter || 0, args.payoff_chapter || 0);
+      return { created: true, id, title: args.title };
+    },
+  },
+  update_payoff: {
+    entity: 'payoff',
+    category: '爽点设计',
+    run(ctx) {
+      const { pdb, args, updateById } = ctx;
+      if (args.status && !['planned', 'building', 'released', 'abandoned'].includes(args.status)) {
+        return { error: `无效状态: ${args.status}` };
+      }
+      const p = pdb.prepare('SELECT id FROM payoff_points WHERE title = ?').get(args.title);
+      if (!p) return { error: `爽点 "${args.title}" 不存在` };
+      const fields = {
+        type: args.type,
+        description: args.description,
+        status: args.status,
+        intensity: args.intensity !== undefined ? Math.max(1, Math.min(5, Number(args.intensity) || 3)) : undefined,
+        setup_chapter: args.setup_chapter,
+        payoff_chapter: args.payoff_chapter,
+      };
+      return updateById(p.id, 'payoff_points', fields, ['type', 'description', 'status', 'intensity', 'setup_chapter', 'payoff_chapter'], true);
+    },
+  },
   // ── Relations ──
   list_relations: {
     entity: null,
@@ -1169,6 +1289,14 @@ const HANDLERS = {
       return deleteById(args.title, 'foreshadows', 'title', '伏笔');
     },
   },
+  delete_payoff: {
+    entity: 'payoff',
+    category: '爽点设计',
+    run(ctx) {
+      const { deleteById, args } = ctx;
+      return deleteById(args.title, 'payoff_points', 'title', '爽点');
+    },
+  },
   // ── Chapter Characters ──
   list_chapter_characters: {
     entity: null,
@@ -1355,7 +1483,7 @@ for (const name of Object.keys(HANDLERS)) {
   if (!TOOL_REGISTRY[name]) throw new Error(`Handler "${name}" has no tool schema`);
 }
 
-const CATEGORY_ORDER = ['设定构建', '世界观', '科幻设定', '伏笔与线索', '章节与卷', '时间线与记忆', '项目状态', '其他'];
+const CATEGORY_ORDER = ['设定构建', '世界观', '科幻设定', '伏笔与线索', '爽点设计', '章节与卷', '时间线与记忆', '项目状态', '其他'];
 
 function describeParams(tool) {
   const props = tool.parameters?.properties || {};

@@ -14,6 +14,7 @@ export type EntityType =
   | 'world'
   | 'science'
   | 'foreshadow'
+  | 'payoff'
   | 'relation'
   | 'memory'
   | 'timeline'

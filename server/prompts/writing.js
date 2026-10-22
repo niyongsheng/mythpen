@@ -47,7 +47,7 @@ ${context}
 
 ### 第一步 · 了解项目
 
-用 list_characters / list_foreshadows / list_world / get_chapter(前一章) 了解已有设定和前文。
+用 list_characters / list_foreshadows / list_world / get_chapter(前一章) 了解已有设定和前文。爽文项目还要用 list_payoffs 查看待铺垫/待释放的爽点。
 
 ---
 

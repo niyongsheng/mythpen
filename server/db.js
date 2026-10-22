@@ -22,7 +22,7 @@ let configDb;    // wrapped config database
 // ═══════════════════════════════════════════════════════════════
 
 const CONFIG_SCHEMA_VERSION = 2;
-const PROJECT_SCHEMA_VERSION = 3;
+const PROJECT_SCHEMA_VERSION = 4;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -543,6 +543,18 @@ const projectMigrations = [
         created_at      TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
       );
+      CREATE TABLE IF NOT EXISTS payoff_points (
+        id              TEXT PRIMARY KEY,
+        title           TEXT NOT NULL,
+        type            TEXT NOT NULL DEFAULT 'other' CHECK (type IN ('face-slap','flex','comeback','reveal','reward','revenge','breakthrough','other')),
+        description     TEXT DEFAULT '',
+        status          TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','building','released','abandoned')),
+        intensity       INTEGER NOT NULL DEFAULT 3 CHECK (intensity BETWEEN 1 AND 5),
+        setup_chapter   INTEGER,
+        payoff_chapter  INTEGER,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
       CREATE TABLE IF NOT EXISTS memories (
         id          TEXT PRIMARY KEY,
         category    TEXT NOT NULL CHECK (category IN ('character','location','item','event','promise','other')),
@@ -619,6 +631,7 @@ const projectMigrations = [
       CREATE INDEX IF NOT EXISTS idx_chapters_order ON chapters(num);
       CREATE INDEX IF NOT EXISTS idx_characters_name ON characters(name);
       CREATE INDEX IF NOT EXISTS idx_foreshadows_status ON foreshadows(status);
+      CREATE INDEX IF NOT EXISTS idx_payoff_points_status ON payoff_points(status);
       CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
     `);
   },
@@ -676,6 +689,24 @@ const projectMigrations = [
       })();
     }
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_chapters_num_unique ON chapters(num)');
+  },
+  // v3 → v4: payoff points (爽点) board for power-fantasy projects.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS payoff_points (
+        id              TEXT PRIMARY KEY,
+        title           TEXT NOT NULL,
+        type            TEXT NOT NULL DEFAULT 'other' CHECK (type IN ('face-slap','flex','comeback','reveal','reward','revenge','breakthrough','other')),
+        description     TEXT DEFAULT '',
+        status          TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','building','released','abandoned')),
+        intensity       INTEGER NOT NULL DEFAULT 3 CHECK (intensity BETWEEN 1 AND 5),
+        setup_chapter   INTEGER,
+        payoff_chapter  INTEGER,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_payoff_points_status ON payoff_points(status);
+    `);
   },
 ];
 

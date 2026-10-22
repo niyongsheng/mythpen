@@ -3,6 +3,7 @@
  * from the database and formats it for injection into system prompts.
  */
 const db = require('../db');
+const { languageName } = require('../languages');
 const { chapterHeading } = require('../titles');
 
 const GENRE_LABELS = {
@@ -22,7 +23,10 @@ const PHASE_LABELS = {
   writing: '写作', review: '审阅', consistency: '一致性', export: '导出',
 };
 
-function buildProjectContext(projectName) {
+// `toolHints: false` keeps tool names out of the prompt entirely — required for
+// tool-less requests such as /api/ai/continue, where mentioning them makes the
+// model emit tool-call markup as literal text.
+function buildProjectContext(projectName, { toolHints = true } = {}) {
   try {
     const pdb = db.getProjectDb(projectName);
     const meta = {};
@@ -52,10 +56,17 @@ function buildProjectContext(projectName) {
     const foreshadows = pdb.prepare(
       "SELECT * FROM foreshadows WHERE status IN ('planted','progressing') LIMIT 30"
     ).all();
+    // Include released payoffs too: both writing and payoff design need the
+    // existing rhythm to avoid clustering new payoffs on the same chapters.
+    const payoffs = genres.includes('power-fantasy')
+      ? pdb.prepare(
+          "SELECT * FROM payoff_points WHERE status != 'abandoned' ORDER BY COALESCE(NULLIF(payoff_chapter, 0), 999999), created_at LIMIT 40"
+        ).all()
+      : [];
 
     const genreStr = genres.map(g => GENRE_LABELS[g] || g).join('、') || '未设定';
     const modeStr = MODE_LABELS[meta.mode] || meta.mode || '中篇';
-    const langStr = meta.language === 'en' ? 'English' : '中文';
+    const langStr = languageName(meta.language);
     const phaseStr = PHASE_LABELS[meta.workflow_phase] || meta.workflow_phase || '选题';
 
     const descriptionLine = meta.description ? `\n故事简介: ${meta.description}` : '';
@@ -65,10 +76,17 @@ function buildProjectContext(projectName) {
       : '';
 
     const chapterNote = totalChapters > chapters.length
-      ? `（共 ${totalChapters} 章，仅列出前 3 章与最近 ${recentChapters.length} 章；其余请用 list_chapters / get_chapter 查询）`
+      ? `（共 ${totalChapters} 章，仅列出前 3 章与最近 ${recentChapters.length} 章${toolHints ? '；其余请用 list_chapters / get_chapter 查询' : ''}）`
       : `（共 ${totalChapters} 章）`;
 
     const charNote = totalChars > chars.length ? `（共 ${totalChars} 个，仅列出前 ${chars.length} 个）` : '';
+
+    const payoffSection = genres.includes('power-fantasy')
+      ? `
+
+爽点排期（按释放章节排序，含已释放）:
+${payoffs.length ? payoffs.map(p => `[${p.status}/${p.type}/强度${p.intensity}] ${p.title}（铺垫${p.setup_chapter || '?'}→释放${p.payoff_chapter || '?'}）：${p.description || ''}`).join('\n') : '（暂无）'}`
+      : '';
 
     return `
 项目: ${meta.name || projectName}
@@ -88,7 +106,7 @@ ${worldEntries.length ? worldEntries.map(w => `- [${w.category}] ${w.name}：${w
 ${chapters.length ? chapters.map(ch => `[${ch.status}] ${chapterHeading(ch)} - ${ch.outline || '（暂无大纲）'}`).join('\n') : '（暂无章节）'}
 
 活跃伏笔:
-${foreshadows.length ? foreshadows.map(f => `[${f.priority}] ${f.title}：${f.description || ''}`).join('\n') : '（暂无）'}`;
+${foreshadows.length ? foreshadows.map(f => `[${f.priority}] ${f.title}：${f.description || ''}`).join('\n') : '（暂无）'}${payoffSection}`;
   } catch (e) {
     return `项目: ${projectName}`;
   }

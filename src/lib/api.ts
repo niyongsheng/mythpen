@@ -2,7 +2,8 @@
 // Dev: /api is proxied by Vite to localhost:3001
 // Tauri production: sidecar server runs on 127.0.0.1:3001
 
-import { toChapter, toCharacter, toForeshadow, toMemory, toRelation, toStats } from './dto'
+import { t } from '@/i18n'
+import { toChapter, toCharacter, toForeshadow, toMemory, toPayoffPoint, toRelation, toStats } from './dto'
 import { isTauri } from './runtime'
 
 const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
@@ -106,6 +107,21 @@ export const foreshadowsApi = {
   },
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/foreshadows`, { method: 'POST', body: data }),
+}
+
+// ─── Payoffs (爽点) ───
+
+export const payoffsApi = {
+  list: async (project: string, status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return ((await request(`/${encodeURIComponent(project)}/payoffs${qs}`)) as any[]).map(toPayoffPoint)
+  },
+  create: (project: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/payoffs`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/payoffs/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/payoffs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Relations ───

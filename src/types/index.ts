@@ -74,6 +74,22 @@ export interface Foreshadow {
   priority: 'low' | 'normal' | 'high'
 }
 
+// ─── Payoff Point (爽点) ───
+export type PayoffType = 'face-slap' | 'flex' | 'comeback' | 'reveal' | 'reward' | 'revenge' | 'breakthrough' | 'other'
+
+export type PayoffStatus = 'planned' | 'building' | 'released' | 'abandoned'
+
+export interface PayoffPoint {
+  id: string
+  title: string
+  type: PayoffType
+  description: string
+  status: PayoffStatus
+  intensity: number
+  setupChapter: number
+  payoffChapter: number
+}
+
 // ─── Memory ───
 export interface Memory {
   id: string

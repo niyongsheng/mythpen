@@ -19,6 +19,7 @@ import { ExportPage } from '@/pages/ExportPage'
 import { Foreshadows } from '@/pages/Foreshadows'
 import { Memory } from '@/pages/Memory'
 import { Outline } from '@/pages/Outline'
+import { Payoffs } from '@/pages/Payoffs'
 import { ProjectList } from '@/pages/ProjectList'
 import { Relations } from '@/pages/Relations'
 import { Science } from '@/pages/Science'
@@ -39,6 +40,7 @@ const PAGES: Record<string, React.ReactNode> = {
   'page-world': <World />,
   'page-outline': <Outline />,
   'page-foreshadow': <Foreshadows />,
+  'page-payoff': <Payoffs />,
   'page-relations': <Relations />,
   'page-export': <ExportPage />,
   'page-science': <Science />,

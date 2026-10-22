@@ -18,9 +18,10 @@ import {
   RefreshCw,
   ScrollText,
   ShieldCheck,
+  Sparkles,
   Users,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { useTargetWordsEditor } from '@/hooks/useTargetWordsEditor'
@@ -50,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'science', labelKey: 'sidebar.science', icon: 'FlaskConical', route: 'page-science', genres: ['sci-fi'] },
   { id: 'outline_page', labelKey: 'sidebar.outline_page', icon: 'ScrollText', route: 'page-outline' },
   { id: 'foreshadow', labelKey: 'sidebar.foreshadow', icon: 'Link2', route: 'page-foreshadow' },
+  { id: 'payoff', labelKey: 'sidebar.payoff', icon: 'Sparkles', route: 'page-payoff', genres: ['power-fantasy'] },
   { id: 'memory', labelKey: 'sidebar.memory', icon: 'Brain', route: 'page-memory' },
   { id: 'relations', labelKey: 'sidebar.relations', icon: 'HeartHandshake', route: 'page-relations' },
   { id: 'timeline', labelKey: 'sidebar.timeline', icon: 'CalendarDays', route: 'page-timeline' },
@@ -65,6 +67,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   FlaskConical,
   ScrollText,
   Link2,
+  Sparkles,
   Brain,
   HeartHandshake,
   CalendarDays,
@@ -110,6 +113,17 @@ export function Sidebar() {
   const sidebarItems = NAV_ITEMS.filter(
     (item) => !item.genres || item.genres.some((genre) => projectGenres.includes(genre)),
   )
+
+  // Switching to a project without the required genre must not leave the user
+  // on a page whose nav entry is now hidden (e.g. 爽点/科学设定).
+  useEffect(() => {
+    const genres = stats?.genres
+    if (!genres) return
+    const hidden = NAV_ITEMS.some(
+      (item) => item.route === activePage && item.genres && !item.genres.some((genre) => genres.includes(genre)),
+    )
+    if (hidden) setActivePage('page-dashboard')
+  }, [stats, activePage, setActivePage])
 
   const handleNewChapter = async (volumeId: number) => {
     if (!currentProject) return

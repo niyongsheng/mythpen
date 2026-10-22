@@ -5,6 +5,7 @@ import type {
   CharacterRelation,
   Foreshadow,
   Memory,
+  PayoffPoint,
   ProjectStats,
   ScienceEntry,
   TimelineEvent,
@@ -14,6 +15,7 @@ import {
   charactersApi,
   foreshadowsApi,
   memoriesApi,
+  payoffsApi,
   relationsApi,
   scienceApi,
   statsApi,
@@ -79,6 +81,11 @@ export function useScienceEntries() {
 export function useForeshadows(status?: string) {
   const project = useProjectName()
   return useApiData<Foreshadow[]>(project ? () => foreshadowsApi.list(project, status) : null, [project, status])
+}
+
+export function usePayoffs(status?: string) {
+  const project = useProjectName()
+  return useApiData<PayoffPoint[]>(project ? () => payoffsApi.list(project, status) : null, [project, status])
 }
 
 export function useRelations() {

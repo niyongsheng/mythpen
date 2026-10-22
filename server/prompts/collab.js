@@ -46,6 +46,7 @@ ${context}
 - **世界观** — create_world_entry / update_world_entry
 - **科幻/奇幻设定** — create_science_entry
 - **伏笔** — create_foreshadow / update_foreshadow
+- **爽点**（爽文项目）— list_payoffs / create_payoff / update_payoff；设计时注意均匀分布：小爽点常驻、大爽点放在卷末高潮，避免相邻章节堆叠高强度爽点
 - **时间线** — create_timeline_event / update_timeline_event
 - **线索板** — create_clue / update_clue
 - **叙事记忆** — create_memory / update_memory

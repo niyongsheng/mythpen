@@ -403,6 +403,64 @@ router.post('/:project/foreshadows', (req, res) => {
 });
 
 // ═══════════════════════════════════════════
+// PAYOFF POINTS (爽点)
+// ═══════════════════════════════════════════
+
+router.get('/:project/payoffs', (req, res) => {
+  const { status } = req.query;
+  let sql = 'SELECT * FROM payoff_points';
+  const params = [];
+  if (status) { sql += ' WHERE status = ?'; params.push(status); }
+  // Order by release chapter so the board reveals the payoff rhythm at a glance.
+  sql += ' ORDER BY COALESCE(NULLIF(payoff_chapter, 0), 999999), created_at';
+  res.json(db.projectQuery(project(req.params.project), sql, params));
+});
+
+const PAYOFF_TYPES = ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'];
+const PAYOFF_STATUSES = ['planned', 'building', 'released', 'abandoned'];
+
+router.post('/:project/payoffs', (req, res) => {
+  const {
+    title,
+    type = 'other',
+    description = '',
+    status = 'planned',
+    intensity = 3,
+    setup_chapter = 0,
+    payoff_chapter = 0,
+  } = req.body || {};
+  if (!title) return res.status(400).json({ error: { message: '爽点标题不能为空' } });
+  const id = randomUUID();
+  db.projectExecute(project(req.params.project),
+    'INSERT INTO payoff_points (id, title, type, description, status, intensity, setup_chapter, payoff_chapter) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      id,
+      title,
+      PAYOFF_TYPES.includes(type) ? type : 'other',
+      description,
+      PAYOFF_STATUSES.includes(status) ? status : 'planned',
+      Math.max(1, Math.min(5, Number(intensity) || 3)),
+      setup_chapter || 0,
+      payoff_chapter || 0,
+    ]
+  );
+  res.status(201).json({ id, title });
+});
+
+router.put('/:project/payoffs/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'payoff_points', req.params.id, req.body, ['title', 'type', 'description', 'status', 'intensity', 'setup_chapter', 'payoff_chapter'], true);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '爽点不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/payoffs/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM payoff_points WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '爽点不存在' } });
+  res.json({ success: true });
+});
+
+// ═══════════════════════════════════════════
 // CHARACTER RELATIONS
 // ═══════════════════════════════════════════
 
