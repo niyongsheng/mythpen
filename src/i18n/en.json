@@ -191,6 +191,8 @@
     "apiKeyDesc": "Enter your API key",
     "model": "Model",
     "maxTokens": "Max Output Tokens",
+    "sendTemperature": "Send Temperature",
+    "sendTemperatureDesc": "Some newer models (e.g. Opus 5, Kimi K3) reject this parameter; requests retry automatically without it on a 400",
     "httpTimeout": "HTTP Timeout (s)",
     "testConnection": "Test Connection",
     "autoBackup": "Auto Backup",

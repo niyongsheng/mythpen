@@ -44,10 +44,12 @@ function getAiConfig() {
   if (aiConfigCache) return aiConfigCache;
 
   const DEFAULTS = {
-    apiBaseUrl: 'https://api.deepseek.com/v1',
+    apiBaseUrl: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_KEY || '',
-    apiModel: 'deepseek-v4-flash',
+    apiModel: 'deepseek-flash',
     apiType: '',
+    maxOutputTokens: 8192,
+    sendTemperature: true,
   };
   try {
     const db = require('./db');
@@ -59,6 +61,8 @@ function getAiConfig() {
       apiKey: map.api_key || DEFAULTS.apiKey,
       apiModel: map.api_model || DEFAULTS.apiModel,
       apiType: map.api_type || DEFAULTS.apiType,
+      maxOutputTokens: Number(map.max_output_tokens) || DEFAULTS.maxOutputTokens,
+      sendTemperature: map.send_temperature !== 'false',
     };
     return aiConfigCache;
   } catch (e) {

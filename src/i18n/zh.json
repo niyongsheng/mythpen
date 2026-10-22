@@ -191,6 +191,8 @@
     "apiKeyDesc": "点击输入密钥",
     "model": "模型",
     "maxTokens": "最大输出 Token",
+    "sendTemperature": "发送 Temperature 参数",
+    "sendTemperatureDesc": "部分新模型（如 Opus 5、Kimi K3）会拒绝该参数；若接口报 400 将自动重试并关闭",
     "httpTimeout": "HTTP 超时(秒)",
     "testConnection": "测试连接",
     "autoBackup": "自动备份",

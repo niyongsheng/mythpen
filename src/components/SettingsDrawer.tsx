@@ -100,6 +100,10 @@ export function SettingsDrawer() {
     useEditorStore.getState().setFontFamily(family)
   }
 
+  const handleMaxTokensChange = (value: number) => {
+    updateSetting('maxOutputTokens', Math.max(1024, Math.min(131072, value)))
+  }
+
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-[200]" onClick={closeSettings} />
@@ -279,7 +283,7 @@ export function SettingsDrawer() {
                 className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
                 value={settings.apiBaseUrl}
                 onChange={(e) => updateSetting('apiBaseUrl', e.target.value)}
-                placeholder="https://api.deepseek.com/v1"
+                placeholder="https://api.deepseek.com"
               />
             </SettingRow>
             <SettingRow label={t('settings.model')}>
@@ -289,9 +293,31 @@ export function SettingsDrawer() {
                   className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[200px]"
                   value={settings.apiModel}
                   onChange={(e) => updateSetting('apiModel', e.target.value)}
-                  placeholder="deepseek-v4-flash"
+                  placeholder="deepseek-flash"
                 />
               </div>
+            </SettingRow>
+            <SettingRow label={t('settings.maxTokens')}>
+              <input
+                type="number"
+                className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[120px]"
+                value={settings.maxOutputTokens}
+                min={1024}
+                max={131072}
+                step={1024}
+                onChange={(e) => handleMaxTokensChange(parseInt(e.target.value) || 8192)}
+              />
+            </SettingRow>
+            <SettingRow label={t('settings.sendTemperature')} desc={t('settings.sendTemperatureDesc')}>
+              <button
+                className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
+                  ${settings.sendTemperature ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
+                onClick={() => updateSetting('sendTemperature', !settings.sendTemperature)}
+              >
+                <span
+                  className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-[var(--ink)] transition-transform ${settings.sendTemperature ? 'translate-x-4' : ''}`}
+                />
+              </button>
             </SettingRow>
             <SettingRow label={t('settings.apiKey')}>
               <div className="flex gap-1 items-center">

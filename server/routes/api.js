@@ -498,10 +498,16 @@ router.get('/settings', (req, res) => {
     settings.api_key = process.env.DEEPSEEK_KEY || '';
   }
   if (!settings.api_base_url) {
-    settings.api_base_url = 'https://api.deepseek.com/v1';
+    settings.api_base_url = 'https://api.deepseek.com';
   }
   if (!settings.api_model) {
-    settings.api_model = 'deepseek-v4-flash';
+    settings.api_model = 'deepseek-flash';
+  }
+  if (!settings.max_output_tokens) {
+    settings.max_output_tokens = '8192';
+  }
+  if (settings.send_temperature === undefined) {
+    settings.send_temperature = 'true';
   }
   res.json(settings);
 });

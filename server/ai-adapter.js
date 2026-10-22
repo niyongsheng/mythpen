@@ -73,6 +73,108 @@ function makeResponse(content, toolCalls, inputTokens, outputTokens) {
   return { content, toolCalls, usage: { inputTokens, outputTokens } };
 }
 
+// Default output budget per request. Models are free to split long tool-call
+// batches across rounds, but a single response must fit within this limit.
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+
+// ─── Temperature handling ───
+// Some newer models (e.g. Claude Opus 5, Kimi K3) reject the `temperature`
+// parameter with HTTP 400. Users can disable it globally in settings, and we
+// also remember per-model rejections for the rest of the process so a single
+// retry is enough — no manual toggling when switching between providers.
+
+const temperatureUnsupportedModels = new Set();
+
+function temperatureKey(apiConfig) {
+  return `${apiConfig.apiType || ''}|${apiConfig.apiModel || ''}|${apiConfig.apiBaseUrl || ''}`;
+}
+
+/** Returns `{ temperature }`, or `{}` when this model should not receive it. */
+function bodyTemperature(apiConfig, value) {
+  if (apiConfig.sendTemperature === false) return {};
+  if (temperatureUnsupportedModels.has(temperatureKey(apiConfig))) return {};
+  return { temperature: value };
+}
+
+function isTemperatureRejection(status, text) {
+  return status === 400 && /temperature/i.test(String(text || ''));
+}
+
+function markTemperatureUnsupported(apiConfig, text) {
+  temperatureUnsupportedModels.add(temperatureKey(apiConfig));
+  console.warn(
+    `[AI Adapter] Model "${apiConfig.apiModel}" rejected the temperature parameter ` +
+    `(${String(text || '').slice(0, 160)}). Retrying without it.`,
+  );
+}
+
+function apiError(status, text) {
+  return Object.assign(new Error(`API Error: ${status}`), {
+    status,
+    detail: String(text || '').slice(0, 500),
+  });
+}
+
+/** POST to an OpenAI-compatible endpoint, retrying once without `temperature`. */
+async function postOpenAI(apiConfig, body) {
+  const post = () => fetch(apiConfig.chatUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
+    body: JSON.stringify(body),
+  });
+
+  let response = await post();
+  if (response.ok) return response;
+
+  const errText = await response.text();
+  if (body.temperature !== undefined && isTemperatureRejection(response.status, errText)) {
+    markTemperatureUnsupported(apiConfig, errText);
+    delete body.temperature;
+    response = await post();
+    if (response.ok) return response;
+    throw apiError(response.status, await response.text());
+  }
+  throw apiError(response.status, errText);
+}
+
+// Anthropic's SDK surfaces the provider's error body inside the message/error
+// fields rather than as a plain string.
+function isClaudeTemperatureRejection(err) {
+  if (!err || err.status !== 400) return false;
+  let text = err.message || '';
+  try {
+    text += ` ${JSON.stringify(err.error ?? '')}`;
+  } catch { /* circular error payloads are not worth failing over */ }
+  return /temperature/i.test(text);
+}
+
+/**
+ * Parse a tool call's JSON arguments defensively.
+ *
+ * When a model hits `max_tokens` mid-way through a tool call, the arguments
+ * string is cut off and JSON.parse throws "Unterminated string in JSON…",
+ * which used to take down the whole chat stream with a cryptic message.
+ */
+function parseToolArguments(toolCall, finishReason) {
+  const raw = toolCall.function?.arguments ?? '';
+  if (!raw.trim()) return {};
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    const name = toolCall.function?.name || 'unknown';
+    if (finishReason === 'length') {
+      throw Object.assign(
+        new Error(`模型输出达到单次 token 上限，工具「${name}」的参数被截断。请重试，或在设置中调大「最大输出 Token」。`),
+        { code: 'TOOL_ARGS_TRUNCATED' },
+      );
+    }
+    throw Object.assign(
+      new Error(`模型返回的工具「${name}」参数不是合法 JSON：${err.message}`),
+      { code: 'TOOL_ARGS_INVALID', detail: raw.slice(0, 200) },
+    );
+  }
+}
+
 // ═══════════════════════════════════════════
 // OPENAI PROVIDER (DeepSeek / any OpenAI-compatible API)
 // ═══════════════════════════════════════════
@@ -92,35 +194,24 @@ class OpenAIProvider {
       model: apiConfig.apiModel,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
       tools: tools || undefined,
-      temperature: temperature ?? 0.8,
-      max_tokens: 4096,
+      ...bodyTemperature(apiConfig, temperature ?? 0.8),
+      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       stream: false,
     };
 
-    const response = await fetch(apiConfig.chatUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw Object.assign(new Error(`API Error: ${response.status}`), {
-        status: response.status,
-        detail: errText.slice(0, 500),
-      });
-    }
+    const response = await postOpenAI(apiConfig, body);
 
     const data = await response.json();
     const choice = data.choices?.[0];
     const msg = choice?.message;
+    const finishReason = choice?.finish_reason;
     const inputTokens = data.usage?.prompt_tokens || 0;
     const outputTokens = data.usage?.completion_tokens || 0;
 
     const toolCalls = (msg?.tool_calls || []).map(tc => ({
       id: tc.id,
       name: tc.function.name,
-      args: JSON.parse(tc.function.arguments || '{}'),
+      args: parseToolArguments(tc, finishReason),
     }));
 
     return makeResponse(msg?.content || null, toolCalls, inputTokens, outputTokens);
@@ -135,24 +226,12 @@ class OpenAIProvider {
     const body = {
       model: apiConfig.apiModel,
       messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      temperature: temperature ?? 0.85,
-      max_tokens: 4096,
+      ...bodyTemperature(apiConfig, temperature ?? 0.85),
+      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       stream: true,
     };
 
-    const response = await fetch(apiConfig.chatUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw Object.assign(new Error(`API Error: ${response.status}`), {
-        status: response.status,
-        detail: errText.slice(0, 500),
-      });
-    }
+    const response = await postOpenAI(apiConfig, body);
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -203,15 +282,26 @@ class ClaudeProvider {
       model: apiConfig.apiModel,
       system: systemPrompt,
       messages: toClaudeMessages(messages),
-      max_tokens: 4096,
-      temperature: temperature ?? 0.8,
+      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
+      ...bodyTemperature(apiConfig, temperature ?? 0.8),
     };
 
     if (tools && tools.length > 0) {
       params.tools = toClaudeTools(tools);
     }
 
-    const response = await client.messages.create(params);
+    let response;
+    try {
+      response = await client.messages.create(params);
+    } catch (err) {
+      if (params.temperature !== undefined && isClaudeTemperatureRejection(err)) {
+        markTemperatureUnsupported(apiConfig, err.message);
+        delete params.temperature;
+        response = await client.messages.create(params);
+      } else {
+        throw err;
+      }
+    }
     const toolCalls = [];
     let content = '';
 
@@ -233,16 +323,36 @@ class ClaudeProvider {
    * Streaming chat completion (no tools).
    */
   async *stream(systemPrompt, messages, temperature) {
-    const { apiConfig, client } = this;
+    const { apiConfig } = this;
 
-    const stream = client.messages.stream({
+    const params = {
       model: apiConfig.apiModel,
       system: systemPrompt,
       messages: toClaudeMessages(messages),
-      max_tokens: 4096,
-      temperature: temperature ?? 0.85,
-    });
+      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
+      ...bodyTemperature(apiConfig, temperature ?? 0.85),
+    };
 
+    let received = false;
+    try {
+      for await (const event of this._streamOnce(params)) {
+        received = true;
+        yield event;
+      }
+    } catch (err) {
+      // A 400 fires before any content arrives, so retrying the whole stream is safe.
+      if (!received && params.temperature !== undefined && isClaudeTemperatureRejection(err)) {
+        markTemperatureUnsupported(apiConfig, err.message);
+        delete params.temperature;
+        yield* this._streamOnce(params);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  async *_streamOnce(params) {
+    const stream = this.client.messages.stream(params);
     let inputTokens = 0;
     let outputTokens = 0;
 
@@ -276,7 +386,7 @@ function createAIAdapter(model, apiConfig, apiType) {
 
   // Ensure chatUrl is set for OpenAI-compatible
   if (provider === 'openai') {
-    const baseUrl = apiConfig.apiBaseUrl || 'https://api.deepseek.com/v1';
+    const baseUrl = apiConfig.apiBaseUrl || 'https://api.deepseek.com';
     apiConfig.chatUrl = baseUrl.replace(/\/?$/, '') + '/chat/completions';
   }
 

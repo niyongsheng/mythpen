@@ -329,8 +329,9 @@ const configMigrations = [
       const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
       const defaults = [
         ['api_key', ''],
-        ['api_base_url', 'https://api.deepseek.com/v1'],
-        ['api_model', 'deepseek-v4-flash'],
+        ['api_base_url', 'https://api.deepseek.com'],
+        ['api_model', 'deepseek-flash'],
+        ['max_output_tokens', '8192'],
         ['ui_language', 'zh'],
         ['theme', 'dark'],
         ['editor_font_size', '17'],
