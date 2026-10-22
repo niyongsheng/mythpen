@@ -35,7 +35,7 @@ const PLATFORMS = [
   {
     key: 'linux-x86_64',
     artifact: 'Mythpen-Linux-x86_64',
-    isUpdaterArtifact: (name) => name.endsWith('.AppImage.tar.gz'),
+    isUpdaterArtifact: (name) => name.endsWith('.AppImage'),
   },
 ]
 

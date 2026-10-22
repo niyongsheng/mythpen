@@ -251,6 +251,6 @@ jobs:
             Mythpen-Windows-x86_64/*.exe.sig
             Mythpen-Linux-x86_64/deb/*.deb
             Mythpen-Linux-x86_64/rpm/*.rpm
-            Mythpen-Linux-x86_64/appimage/*.AppImage.tar.gz
-            Mythpen-Linux-x86_64/appimage/*.AppImage.tar.gz.sig
+            Mythpen-Linux-x86_64/appimage/*.AppImage
+            Mythpen-Linux-x86_64/appimage/*.AppImage.sig
             latest.json
