@@ -29,7 +29,7 @@ CI 会在构建时自动生成 `latest.json` 与各平台更新包，客户端�
 1. **更新版本号（三处保持一致）**
    - `package.json` → `"version"`
    - `src-tauri/tauri.conf.json` → `"version"`
-   - `doc/index.html` → `const APP_VERSION = 'X.Y.Z'`
+   - `docs/index.html` → `const APP_VERSION = 'X.Y.Z'`
 
 2. **提交并打 tag**
    ```bash
