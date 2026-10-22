@@ -26,7 +26,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   backupEnabled: true,
   accentColor: '#c9a96e',
   maxOutputTokens: 8192,
-  sendTemperature: true,
   httpTimeout: 300,
 }
 
@@ -70,7 +69,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       merged.apiBaseUrl = serverSettings.api_base_url || DEFAULT_SETTINGS.apiBaseUrl
       merged.apiModel = serverSettings.api_model || DEFAULT_SETTINGS.apiModel
       merged.maxOutputTokens = Number(serverSettings.max_output_tokens) || DEFAULT_SETTINGS.maxOutputTokens
-      merged.sendTemperature = String(serverSettings.send_temperature ?? 'true') !== 'false'
       // If server has no API key, fall back to current provider's per-provider slot
       if (!merged.apiKey) {
         const cur = get().settings
@@ -114,7 +112,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         apiModel: 'api_model',
         apiType: 'api_type',
         maxOutputTokens: 'max_output_tokens',
-        sendTemperature: 'send_temperature',
         uiLanguage: 'ui_language',
         theme: 'theme',
         editorFontSize: 'editor_font_size',

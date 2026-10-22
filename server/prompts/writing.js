@@ -149,4 +149,28 @@ ${buildToolReference()}
 ⚠️ 单纯设 status=writing 而不写 content = 无效操作。`;
 }
 
-module.exports = { buildWritingPrompt };
+/**
+ * Continue / polish system prompt.
+ *
+ * /api/ai/continue streams plain prose and registers no tools. Reusing the
+ * agentic writing prompt there made DeepSeek emit its native tool-call markup
+ * (DSML) as literal text, which the route then appended to the chapter.
+ * This prompt contains no tool instructions and forbids tool markup outright.
+ */
+function buildContinuePrompt(projectName) {
+  const context = buildProjectContext(projectName, { toolHints: false });
+
+  return `你是一位经验丰富的小说写作助手，负责续写和润色正文。
+
+${context}
+
+## 输出要求
+
+- 只输出正文本身（续写内容，或润色后的文字），不要输出解释、前言、总结或 Markdown 标题。
+- **本次请求没有可用工具。不要调用任何工具，也不要输出任何工具调用标记**（例如 <｜｜DSML｜｜>、函数名、JSON 参数）。
+- 使用项目状态中「写作语言」指定的语言；若已有正文明显使用另一种语言，则以正文语言为准。
+- 保持与已有正文一致的文风、叙事视角和人物设定。
+- 直接开始写作。`;
+}
+
+module.exports = { buildWritingPrompt, buildContinuePrompt };

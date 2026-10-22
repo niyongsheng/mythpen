@@ -296,7 +296,11 @@ export const aiApi = {
         })
         if (!gotError) onEnd()
       })
-      .catch((e) => onError(e))
+      .catch((e) => {
+        // A user-initiated stop aborts the fetch; that is not an AI failure.
+        if (e?.name === 'AbortError') return
+        onError(e)
+      })
     return controller
   },
 
@@ -307,12 +311,13 @@ export const aiApi = {
     onChunk: (t: string) => void,
     onEnd: (data?: any) => void,
     onError: (e: any) => void,
+    mode: 'continue' | 'polish' = 'continue',
   ) => {
     const controller = new AbortController()
     let finished = false
     aiRequest('/ai/continue', {
       method: 'POST',
-      body: { chapterNum, context, project },
+      body: { chapterNum, context, project, mode },
       signal: controller.signal,
     })
       .then(async (response) => {

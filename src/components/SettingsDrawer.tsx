@@ -44,7 +44,6 @@ export function SettingsDrawer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [{ role: 'user', content: t('settings.testMessage') }],
-          temperature: 0,
           max_tokens: 10,
           apiKey: settings.apiKey,
           apiBaseUrl: settings.apiBaseUrl,
@@ -271,12 +270,6 @@ export function SettingsDrawer() {
                 max={131072}
                 step={1024}
                 onChange={(e) => handleMaxTokensChange(parseInt(e.target.value) || 8192)}
-              />
-            </SettingRow>
-            <SettingRow label={t('settings.sendTemperature')} desc={t('settings.sendTemperatureDesc')}>
-              <Toggle
-                checked={settings.sendTemperature}
-                onChange={() => updateSetting('sendTemperature', !settings.sendTemperature)}
               />
             </SettingRow>
             <SettingRow label={t('settings.apiKey')}>

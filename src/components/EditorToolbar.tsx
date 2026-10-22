@@ -229,6 +229,7 @@ export function EditorToolbar() {
       () => {
         setLoading(null)
       },
+      'polish',
     )
   }, [loading, currentProject, currentChapter, loadChapterContent])
 

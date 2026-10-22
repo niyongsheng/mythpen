@@ -166,7 +166,6 @@ export interface AppSettings {
   backupEnabled: boolean
   accentColor: string
   maxOutputTokens: number
-  sendTemperature: boolean
   httpTimeout: number
 }
 

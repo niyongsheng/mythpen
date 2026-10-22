@@ -1,9 +1,11 @@
-import { Lightbulb, Loader, MessageSquare, Plus, SendHorizonal, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { Lightbulb, MessageSquare, Plus, SendHorizonal, ShieldCheck, Square, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import { SessionSelect } from '@/components/SessionSelect'
 import { ToastContainer } from '@/components/ToastContainer'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
+import { getSessionTitlePlaceholders } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { aiApi, chatApi } from '@/lib/api'
 import { type EntityType, notifyDataChanged } from '@/lib/dataEvents'
@@ -13,46 +15,51 @@ import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
 
+// Per-run bookkeeping that must survive project switches. Runs themselves live
+// in the agent store, keyed by project + session.
+const EMPTY_TOOL_CALLS: any[] = []
+const abortControllers = new Map<string, AbortController>()
+const runModifiedEntities = new Map<string, Set<EntityType>>()
+const runKey = (project: string, sessionId: string) => `${project}\u0000${sessionId}`
+
 export function AIPanel() {
   const {
     messages,
-    isRunning,
     loading,
     sessions,
     currentSessionId,
-    setTask,
+    runs,
     addMessage,
     loadSessions,
     createSession,
     switchSession,
     deleteSession,
     updateSessionTitle,
-    cancelTask,
+    startRun,
+    updateRun,
+    finishRun,
   } = useAgentStore()
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const loadChapterContent = useChapterStore((s) => s.loadChapterContent)
   const project = useProjectName()
   const [input, setInput] = useState('')
-  const [streamText, setStreamText] = useState('')
-  const [taskName, setTaskName] = useState('')
-  const [genTokens, setGenTokens] = useState(0)
   const [showConsistency, setShowConsistency] = useState(() => !localStorage.getItem('mythpen-hide-consistency'))
-  const abortRef = useRef<AbortController | null>(null)
   const msgEndRef = useRef<HTMLDivElement | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const streamRef = useRef('')
-  const runningRef = useRef(false)
   const msgIdCounter = useRef(0)
   const sessionsLoadedRef = useRef(false)
   const resizingRef = useRef(false)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
   const [mode, setMode] = useState<'writing' | 'collab'>('collab')
-  const [toolCalls, setToolCalls] = useState<any[]>([])
-  const toolCallsRef = useRef<any[]>([])
-  const modifiedEntitiesRef = useRef<Set<EntityType>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const { toasts, show: showToast } = useToast()
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast()
   const { t } = useT()
+
+  // Only the run belonging to the visible project + session is rendered.
+  const activeRun = project && currentSessionId ? runs[project]?.[currentSessionId] : undefined
+  const isRunning = activeRun?.status === 'running'
+  const streamText = activeRun?.streamText ?? ''
+  const toolCalls = activeRun?.toolCalls ?? EMPTY_TOOL_CALLS
 
   // Resize handle drag logic
   const handleResizeMouseDown = useCallback(
@@ -93,14 +100,13 @@ export function AIPanel() {
       // Only generate if current title is still a timestamp placeholder
       const currentSession = sessions.find((s: any) => s.id === currentSessionId)
       if (!currentSession) return
-      const isPlaceholder =
-        currentSession.title?.startsWith('对话 ') ||
-        currentSession.title?.startsWith('新会话 ') ||
-        currentSession.title?.startsWith('New Session ')
+      const isPlaceholder = getSessionTitlePlaceholders().some((prefix) => currentSession.title?.startsWith(prefix))
       if (!isPlaceholder) return
 
       try {
-        const context = aiResponse ? `用户: ${userMsg}\nAI: ${aiResponse}` : `用户: ${userMsg}`
+        const userLabel = t('ai.contextUser')
+        const aiLabel = t('ai.contextAI')
+        const context = aiResponse ? `${userLabel}: ${userMsg}\n${aiLabel}: ${aiResponse}` : `${userLabel}: ${userMsg}`
         const prompt = t('ai.titleGenPrompt', { context })
         const res = await aiApi.chat([{ role: 'user', content: prompt }], project)
         const title = (res.choices?.[0]?.message?.content || '').trim().replace(/["""「」]/g, '')
@@ -138,10 +144,12 @@ export function AIPanel() {
 
   // Load sessions and messages when project changes, auto-create session if none exists
   useEffect(() => {
-    if (!project) return
     sessionsLoadedRef.current = false
-    // Reset stale session from previous project before loading
-    useAgentStore.setState({ currentSessionId: null, messages: [] })
+    // Reset only the visible view — runs belonging to other projects/sessions
+    // keep streaming in the background and stay in `runs`.
+    useAgentStore.setState({ currentSessionId: null, messages: [], sessions: [], loading: false })
+
+    if (!project) return
     loadSessions(project).then(() => {
       // Guard: ignore stale completions — captured project must match the current real project
       const currentProject = useProjectStore.getState().currentProject
@@ -186,43 +194,58 @@ export function AIPanel() {
       .join(', ')
   }
 
-  const done = () => {
-    runningRef.current = false
-    setStreamText('')
-    setTaskName('')
-    streamRef.current = ''
-    setToolCalls([])
-    toolCallsRef.current = []
-    modifiedEntitiesRef.current = new Set()
-  }
-
   const stopTask = () => {
-    if (abortRef.current) {
-      abortRef.current?.abort()
-      abortRef.current = null
+    if (!project || !currentSessionId) return
+    const key = runKey(project, currentSessionId)
+    const run = useAgentStore.getState().runs[project]?.[currentSessionId]
+    if (!run) return
+    abortControllers.get(key)?.abort()
+    abortControllers.delete(key)
+    const modified = [...(runModifiedEntities.get(key) || [])]
+    runModifiedEntities.delete(key)
+    finishRun(project, currentSessionId)
+
+    // Stopping keeps the partial answer instead of discarding what the model
+    // already produced.
+    const partial = run.streamText.trim()
+    if (partial) {
+      const aiMsg = {
+        role: 'ai' as const,
+        content: partial,
+        toolCalls: run.toolCalls.length > 0 ? run.toolCalls : undefined,
+      }
+      addMessage({ id: nextMsgId(), ...aiMsg })
+      saveMsg(aiMsg).catch(() => {})
     }
-    cancelTask()
-    runningRef.current = false
-    setStreamText('')
-    setTaskName('')
-    setToolCalls([])
-    toolCallsRef.current = []
-    modifiedEntitiesRef.current = new Set()
+
+    if (modified.length > 0 && useProjectStore.getState().currentProject === project) {
+      for (const entity of modified) notifyDataChanged(entity)
+      const chapter = useChapterStore.getState().currentChapter
+      if (mode === 'collab') {
+        useChapterStore.getState().loadChapters(project)
+        useProjectStore.getState().loadProjects()
+      } else if (chapter?.num) {
+        void loadChapterContent(project, chapter.num, chapter.volumeId)
+      }
+    }
+
+    showToast(t('ai.stopped'), 'info')
   }
 
   const handleSend = () => {
-    if (!project || runningRef.current || !input.trim()) return
-    if (loading) return // wait for messages to finish loading
-    if (!currentSessionId) return // wait for session to be created
-    runningRef.current = true
+    if (!project || !currentSessionId || loading || !input.trim()) return
+    // A run belongs to the session it was started from — don't start a second
+    // one there, but don't block sends in other projects/sessions either.
+    if (useAgentStore.getState().runs[project]?.[currentSessionId]?.status === 'running') return
+
+    const runProject = project
+    const runSessionId = currentSessionId
+    const key = runKey(runProject, runSessionId)
     const userMsg = input.trim()
     const isChat = mode === 'collab'
     track('ai_chat', { mode: isChat ? 'collab' : 'writing' })
-    setTaskName(isChat ? t('ai.taskCollab') : t('ai.taskContinue'))
-    setTask({ status: 'running' })
-    setStreamText('')
-    setGenTokens(0)
-    streamRef.current = ''
+    startRun(runProject, runSessionId, isChat ? t('ai.taskCollab') : t('ai.taskContinue'))
+    runModifiedEntities.set(key, new Set())
 
     addMessage({ id: nextMsgId(), role: 'user', content: userMsg })
     saveMsg({ role: 'user', content: userMsg }).catch(() => {})
@@ -240,76 +263,114 @@ export function AIPanel() {
     }))
 
     const context = isChat
-      ? t('ai.collabPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
-      : t('ai.writingPrompt', { project, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
+      ? t('ai.collabPrompt', { project: runProject, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
+      : t('ai.writingPrompt', { project: runProject, num: ch?.num ?? 0, title: ch?.title ?? '', userMsg })
 
-    abortRef.current = aiApi.chatStream(
+    const isRunVisible = () =>
+      useProjectStore.getState().currentProject === runProject &&
+      useAgentStore.getState().currentSessionId === runSessionId
+
+    const controller = aiApi.chatStream(
       [...chatHistory, { role: 'user', content: context }],
-      project,
+      runProject,
       // onChunk
       (text: string) => {
-        streamRef.current += text
-        setStreamText(streamRef.current)
-        setGenTokens((prev) => prev + 1)
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return // stopped
+        updateRun(runProject, runSessionId, {
+          streamText: run.streamText + text,
+          genTokens: run.genTokens + 1,
+        })
       },
       // onComplete
       async () => {
-        setTask({ status: 'completed' })
-        const fullText = streamRef.current
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return // stopped
+        const fullText = run.streamText
+        const runToolCalls = run.toolCalls
         const defaultMsg = isChat ? t('ai.dialogComplete') : t('ai.execComplete')
         const aiMsg = {
           role: 'ai' as const,
           content: fullText || defaultMsg,
-          toolCalls: toolCallsRef.current.length > 0 ? toolCallsRef.current : undefined,
+          toolCalls: runToolCalls.length > 0 ? runToolCalls : undefined,
         }
-        addMessage({ id: nextMsgId(), ...aiMsg })
-        saveMsg(aiMsg).catch(() => {})
-        const hadToolCalls = toolCallsRef.current.length > 0
-        const modifiedEntities = [...modifiedEntitiesRef.current]
-        done()
-        if (fullText) {
+        const visible = isRunVisible()
+        if (visible) addMessage({ id: nextMsgId(), ...aiMsg })
+        // Persist to the session this run started from, even if the user has
+        // switched to another project in the meantime.
+        await saveMsg(aiMsg).catch(() => {})
+
+        const hadToolCalls = runToolCalls.length > 0
+        const modified = [...(runModifiedEntities.get(key) || [])]
+        runModifiedEntities.delete(key)
+        abortControllers.delete(key)
+        finishRun(runProject, runSessionId)
+
+        if (visible && fullText) {
           showToast(t('ai.responseComplete'), 'success')
         }
         generateAITitle(userMsg, fullText || undefined)
-        if (hadToolCalls) {
-          for (const entity of modifiedEntities) {
+
+        // Only touch visible project data when that project is still on
+        // screen; switching back reloads chapters and data anyway.
+        if (hadToolCalls && useProjectStore.getState().currentProject === runProject) {
+          for (const entity of modified) {
             notifyDataChanged(entity)
           }
           if (isChat) {
             // Collab mode: reload all data for immediate responsiveness
-            useChapterStore.getState().loadChapters(project!)
+            useChapterStore.getState().loadChapters(runProject)
             useProjectStore.getState().loadProjects()
           } else if (ch?.num) {
             // Writing mode: reload chapter content that was written
-            await loadChapterContent(project, ch.num, ch.volumeId)
+            await loadChapterContent(runProject, ch.num, ch.volumeId)
           }
         }
       },
       // onError
       (err: any) => {
-        setTask({ status: 'error' })
-        if (!isChat) showToast(t('ai.chatError'), 'error')
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return // stopped
+        const visible = isRunVisible()
         const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
-        addMessage({ id: nextMsgId(), ...errMsg })
+        if (visible) {
+          if (!isChat) showToast(t('ai.chatError'), 'error')
+          addMessage({ id: nextMsgId(), ...errMsg })
+        }
         saveMsg(errMsg).catch(() => {})
-        done()
+        runModifiedEntities.delete(key)
+        abortControllers.delete(key)
+        finishRun(runProject, runSessionId)
       },
       mode,
       (tc: any) => {
-        const updated = [...toolCallsRef.current, { ...tc, status: 'running' }]
-        toolCallsRef.current = updated
-        setToolCalls(updated)
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return
+        updateRun(runProject, runSessionId, {
+          toolCalls: [...run.toolCalls, { ...tc, status: 'running' }],
+        })
       },
       (tr: any) => {
-        if (tr.entity) modifiedEntitiesRef.current.add(tr.entity as EntityType)
-        const updated = toolCallsRef.current.map((tc) =>
-          tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc,
-        )
-        toolCallsRef.current = updated
-        setToolCalls(updated)
+        if (tr.entity) runModifiedEntities.get(key)?.add(tr.entity as EntityType)
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return
+        updateRun(runProject, runSessionId, {
+          toolCalls: run.toolCalls.map((tc) => (tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc)),
+        })
       },
     )
+    abortControllers.set(key, controller)
   }
+
+  // Status/error summaries are rendered without a card background. The
+  // prefixes cover the localized defaults plus legacy Chinese summaries.
+  const mutedMessagePrefixes = [
+    t('ai.errorPrefix', { msg: '' }),
+    t('ai.execComplete'),
+    t('ai.dialogComplete'),
+    '完成',
+    '错误',
+  ]
 
   return (
     <aside className="w-[var(--right-panel-w)] bg-[var(--canvas-soft)] border-l border-[var(--hairline)] shrink-0 flex flex-col min-h-0 relative">
@@ -368,19 +429,11 @@ export function AIPanel() {
 
         {/* Session selector */}
         <div className="flex items-center gap-1.5">
-          <select
-            id="ai-session-select"
-            name="ai-session-select"
-            className="flex-1 h-[28px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] outline-none cursor-pointer focus:border-[var(--accent-gold)]"
-            value={currentSessionId || ''}
-            onChange={(e) => e.target.value && switchSession(project, e.target.value)}
-          >
-            {sessions.map((s: any, i) => (
-              <option key={`${s.id}-${i}`} value={s.id}>
-                {s.title}
-              </option>
-            ))}
-          </select>
+          <SessionSelect
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            onSelect={(sessionId) => switchSession(project, sessionId)}
+          />
           <button
             className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] border border-[var(--hairline)] bg-[var(--canvas-elevated)] text-[var(--ink-tertiary)] cursor-pointer hover:text-[var(--ink)] hover:bg-[var(--canvas-mid)] transition-colors shrink-0"
             onClick={() => {
@@ -406,38 +459,6 @@ export function AIPanel() {
 
       {/* Scrollable messages area */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
-        {/* Task runner */}
-        {isRunning && (
-          <div className="mx-4 mb-2.5 p-3 bg-[var(--accent-gold-soft-bg)] border border-[rgba(201,169,110,0.3)] rounded-lg">
-            <div className="flex items-center gap-2.5">
-              <span className="w-[7px] h-[7px] rounded-full bg-[var(--warning)] animate-pulse self-start mt-1 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-[12px] text-[var(--ink)] font-medium flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 inline-block mr-1" />
-                  {taskName}
-                  {currentChapter?.title ? ` · ${currentChapter.title}` : ''}
-                </div>
-                <div className="text-[11px] text-[var(--ink-tertiary)] mt-0.5 font-mono">
-                  {genTokens > 0 ? t('ai.generatedTokens', { count: genTokens }) : t('ai.running')}
-                </div>
-                <div className="h-[3px] bg-[var(--canvas-mid)] rounded-full mt-1.5 overflow-hidden">
-                  <div
-                    className="h-full bg-[var(--accent-gold)] rounded-full animate-pulse"
-                    style={{ width: `${Math.min(95, genTokens * 2)}%` }}
-                  />
-                </div>
-              </div>
-              <button
-                className="w-[26px] h-[26px] flex items-center justify-center rounded-[var(--radius-sm)] border border-[var(--hairline-light)] text-[var(--ink-tertiary)] text-[13px] cursor-pointer shrink-0 hover:bg-[var(--error-soft)] hover:text-[var(--error)] hover:border-[var(--error)] transition-colors"
-                onClick={stopTask}
-                title={t('ai.cancel')}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Consistency report */}
         {showConsistency && (
           <div
@@ -478,7 +499,7 @@ export function AIPanel() {
               )}
               {msg.role === 'ai' && msg.content && (
                 <div
-                  className={`p-2.5 rounded-lg text-[13px] leading-[1.6] mb-2 ${msg.content.startsWith('完成') || msg.content.startsWith('错误') ? 'text-[var(--ink-secondary)]' : 'bg-[var(--canvas-card)] text-[var(--ink-secondary)]'}`}
+                  className={`p-2.5 rounded-lg text-[13px] leading-[1.6] mb-2 ${mutedMessagePrefixes.some((prefix) => prefix && msg.content.startsWith(prefix)) ? 'text-[var(--ink-secondary)]' : 'bg-[var(--canvas-card)] text-[var(--ink-secondary)]'}`}
                 >
                   {/* Inline tool calls */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
@@ -589,13 +610,26 @@ export function AIPanel() {
             }}
             disabled={isRunning}
           />
-          <button
-            className="w-7 h-7 rounded-[var(--radius-sm)] border-none bg-[var(--accent-gold)] text-[var(--canvas)] text-sm cursor-pointer flex items-center justify-center shrink-0 hover:bg-[var(--accent-gold-soft)] transition-colors disabled:opacity-40"
-            onClick={handleSend}
-            disabled={isRunning || !input.trim()}
-          >
-            {isRunning ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <SendHorizonal className="w-3.5 h-3.5" />}
-          </button>
+          {isRunning ? (
+            <button
+              type="button"
+              className="w-7 h-7 rounded-[var(--radius-sm)] border border-[var(--hairline-light)] bg-[var(--error-soft)] text-[var(--error)] cursor-pointer flex items-center justify-center shrink-0 hover:bg-[var(--error)] hover:text-white hover:border-[var(--error)] transition-colors"
+              onClick={stopTask}
+              title={t('ai.cancel')}
+              aria-label={t('ai.cancel')}
+            >
+              <Square className="w-3 h-3 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="w-7 h-7 rounded-[var(--radius-sm)] border-none bg-[var(--accent-gold)] text-[var(--canvas)] text-sm cursor-pointer flex items-center justify-center shrink-0 hover:bg-[var(--accent-gold-soft)] transition-colors disabled:opacity-40"
+              onClick={handleSend}
+              disabled={!input.trim()}
+            >
+              <SendHorizonal className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
         <div className="text-[11px] text-[var(--ink-mute)] mt-1.5 pl-1 font-sans">
           <kbd className="bg-[var(--canvas-mid)] px-[5px] py-[1px] rounded-[3px] font-sans text-[10px] text-[var(--ink-tertiary)]">
@@ -608,7 +642,7 @@ export function AIPanel() {
           {t('ai.enterNewline')}
         </div>
       </div>
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {confirmDelete && (
         <div
@@ -632,6 +666,13 @@ export function AIPanel() {
                 className="h-[32px] px-4 rounded-lg bg-[var(--error)] text-white text-[13px] font-medium cursor-pointer border-none hover:brightness-110"
                 onClick={() => {
                   if (!currentSessionId) return
+                  // Stop a run in this session before deleting it, otherwise
+                  // its late save would target a deleted session.
+                  const key = runKey(project, currentSessionId)
+                  abortControllers.get(key)?.abort()
+                  abortControllers.delete(key)
+                  runModifiedEntities.delete(key)
+                  finishRun(project, currentSessionId)
                   void deleteSession(project, currentSessionId)
                   setConfirmDelete(false)
                 }}
