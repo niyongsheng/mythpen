@@ -6,10 +6,13 @@
 |---|---|---|
 | 写作 `writing` | 了解→读大纲→创作→润色→审稿→定稿 | `prompts/writing.js` |
 | 共创 `collab` | 设定共创→分卷规划→前三章交付→交接写作 | `prompts/collab.js` |
+| 导入 `import` | 结构识别→元数据→章节档案→全书归档 | `server/import/pipeline.js` |
 
 - **双 Provider**：OpenAI-compatible / Claude，自动检测
-- **工具循环**：8 轮上限，tool_calls → 执行 → 喂回
-- **续写**：POST `/api/ai/continue`，取最后 1500 字符上下文，流式生成后自动保存
+- **工具循环**：120 轮上限，tool_calls → 执行 → 喂回
+- **续写/润色**：POST `/api/ai/continue`，取最后 1500 字符上下文，流式生成后自动保存；`mode=polish` 替换整章
+- **旧书导入**：POST `/api/projects/import-ai`（SSE），失败或取消不留半成品项目
+- **爽点**：power-fantasy 项目的 `payoff_points` 看板 + list/create/update/delete_payoff 工具
 - **章节状态**：`pending → writing → review → accepted`
 - **叙事维度**：每章 5 字段 — cognitive_frame / emotional_anchor / world_texture / concrete_mystery / interpersonal_tension
 

@@ -23,6 +23,9 @@
 # Feature
 
 - **AI Writing** — Two modes: *Writing* (guided 6-step workflow) and *Collab* (AI co-writer). Supports OpenAI and Claude.
+- **AI Book Import** — Import an existing TXT/EPUB; the model detects volumes and chapters, then builds characters, world-building, timeline, foreshadows and narrative memories.
+- **Payoff Board** — Plan face-slap, reveal and comeback beats on a kanban board for power-fantasy projects, with AI-designed payoff schedules.
+- **Multilingual** — 8 UI languages (Simplified/Traditional Chinese, English, Japanese, Korean, French, Spanish, Russian); each project keeps its own writing language.
 - **Novel Management** — Characters, world-building, chapters, foreshadowing, timeline, and relations — all in one place.
 - **Local-First** — Data stored in SQLite under `~/.mythpen/`. No cloud required, full privacy.
 - **Rich Editor** — Bold, italic, underline via keyboard shortcuts. Chapters auto-save locally.
@@ -45,7 +48,7 @@ pnpm tauri build    # Build desktop installer (.dmg/.msi/.AppImage)
 ## Tech Stack
 
 **Frontend**: React 19 + TypeScript 5 + Zustand  
-**Backend**: Express 5 + better-sqlite3  
+**Backend**: Express 5 + sql.js  
 **Desktop**: Tauri v2  
 **AI**: OpenAI-compatible  
 

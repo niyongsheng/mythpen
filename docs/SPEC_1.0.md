@@ -22,7 +22,7 @@
   - 两种主键类型不可混用外键引用
 - **时间戳**: 所有时间戳 MUST 以 ISO-8601 本地时间格式存储和传输，SQLite 默认 `datetime('now')` 生成
 - **文本编码**: 所有文件/内容 MUST 使用 UTF-8 编码
-- **国际化**: 支持中英文 UI 语言切换，AI 写作语言为项目级配置
+- **国际化**: 支持 8 种 UI 语言（简体中文 / 繁体中文 / 英语 / 日语 / 韩语 / 法语 / 西班牙语 / 俄语），AI 写作语言为项目级配置
 
 ---
 
@@ -43,7 +43,7 @@ Mythpen 是一个**本地优先的 AI 辅助小说创作桌面应用**，帮助�
 | **状态管理** | Zustand | ^5.0.14 |
 | **后端框架** | Express 5 | ^5.2.1 |
 | **后端语言** | JavaScript (Node.js) | ES modules |
-| **数据库** | SQLite (via better-sqlite3) | ^12.11.1 |
+| **数据库** | SQLite (via sql.js) | ^1.13.0 |
 | **AI 集成** | OpenAI-compatible + Anthropic SDK | 双适配器 |
 | **包管理** | pnpm | ^10.10.0 |
 | **图标** | Lucide React | ^1.23.0 |
@@ -59,7 +59,7 @@ Mythpen 是一个**本地优先的 AI 辅助小说创作桌面应用**，帮助�
 │                                                       │
 │  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
 │  │ db.js    │  │ tools.js │  │ ai-adapter.js    │   │
-│  │ SQLite   │  │ 25+ 工具  │  │ OpenAI / Claude  │   │
+│  │ SQLite   │  │ 50+ 工具  │  │ OpenAI / Claude  │   │
 │  │ 层       │  │ 执行引擎  │  │ 双适配器          │   │
 │  └────┬─────┘  └────┬─────┘  └────────┬─────────┘   │
 │       │             │                  │              │
@@ -92,12 +92,12 @@ Mythpen 是一个**本地优先的 AI 辅助小说创作桌面应用**，帮助�
 | 维度 | 旧架构 (v0.1 spec) | 当前架构 (v1.0) |
 |---|---|---|
 | **桌面壳** | Tauri v2 (Rust) | Express 直接运行，前端浏览器访问 |
-| **数据库层** | Rust rusqlite + sqlite-vec | Node.js better-sqlite3 |
+| **数据库层** | Rust rusqlite + sqlite-vec | Node.js sql.js |
 | **AI 运行时** | Node.js Sidecar + Claude Agent SDK | Express 直连，SSE 流式通信 |
 | **前端通信** | Tauri IPC + WebSocket | HTTP 请求 + SSE 事件流 |
 | **编辑器** | TipTap (ProseMirror) | contentEditable + document.execCommand |
 | **语义搜索** | sqlite-vec 向量检索 | 尚未实现 |
-| **AI 工具系统** | Claude Agent SDK 自动循环 | 自实现 8 轮工具调用循环 |
+| **AI 工具系统** | Claude Agent SDK 自动循环 | 自实现 120 轮工具调用循环 |
 | **导出** | Rust 原生 | Express 服务端 |
 | **打包** | Tauri build (.dmg/.msi) | pnpm build + 可选 sidecar |
 
@@ -115,11 +115,17 @@ Mythpen 是一个**本地优先的 AI 辅助小说创作桌面应用**，帮助�
 |---|---|
 | `server/index.js` | Express 入口、中间件、AI 路由（chat/stream/continue）、配置读取 |
 | `server/db.js` | SQLite 数据库层：配置库 + 项目库管理、迁移、查询封装 |
-| `server/routes/api.js` | 全部 REST API 路由（CRUD + workflow phase + 聊天 + 导出 + 封面） |
-| `server/tools.js` | 25+ AI 工具定义（OpenAI function-calling 格式）+ `executeTool` 执行引擎 |
+| `server/routes/api.js` | 全部 REST API 路由（CRUD + workflow phase + 聊天 + 导出 + 封面 + 爽点） |
+| `server/routes/import.js` | AI 导入 SSE 端点（进度、取消、原子写入） |
+| `server/tools.js` | 50+ AI 工具定义（OpenAI function-calling 格式）+ `executeTool` 执行引擎 |
 | `server/ai-adapter.js` | AI 提供商适配器：OpenAI / Claude 双协议，消息格式互转 |
-| `server/prompts/writing.js` | 写作模式系统提示（六步工作流） |
+| `server/languages.js` | 写作语言码、提示词语言名与导入 token 预算 |
+| `server/titles.js` | 章节/卷标题格式化与重复标题清理 |
+| `server/tool-markup.js` | 清理模型误输出的工具调用标记（DSML） |
+| `server/import/` | AI 导入流水线：结构识别 → 元数据 → 章节档案 → 全书归档 |
+| `server/prompts/writing.js` | 写作模式与续写/润色系统提示 |
 | `server/prompts/collab.js` | 共创模式系统提示（四步工作流） |
+| `server/prompts/import.js` | 导入各阶段严格 JSON 提示词 |
 | `server/prompts/context.js` | 项目上下文构建器（从数据库提取项目状态注入提示词） |
 | `server/seed.js` | 种子数据初始化 |
 | `server/test-tools.js` | AI 工具集成测试（40 项） |
@@ -224,8 +230,12 @@ src/
 │   ├── BottomStatusbar.tsx     # 底部状态栏
 │   ├── EditorContent.tsx       # 富文本编辑器（contentEditable）
 │   ├── EditorStatusbar.tsx     # 编辑器状态栏
-│   ├── NewProjectDialog.tsx    # 新建项目对话框
+│   ├── NewProjectDialog.tsx    # 新建项目对话框（含 AI 导入）
+│   ├── ImportBookPanel.tsx     # 旧书导入面板（进度/取消）
 │   ├── SettingsDrawer.tsx      # 设置抽屉
+│   ├── Dropdown.tsx            # 通用下拉组件
+│   ├── LanguageSelect.tsx      # UI 语言选择
+│   ├── SessionSelect.tsx       # AI 会话选择
 │   ├── ToastContainer.tsx      # Toast 通知
 │   ├── MarkdownContent.tsx     # Markdown 渲染
 │   └── ...                     # 各页面专用组件
@@ -236,6 +246,7 @@ src/
 │   ├── World.tsx               # 世界观设定
 │   ├── Outline.tsx             # 大纲编辑器
 │   ├── Foreshadows.tsx         # 伏笔看板
+│   ├── Payoffs.tsx             # 爽点看板（爽文项目）
 │   ├── Relations.tsx           # 人物关系图
 │   ├── Memory.tsx              # 叙事记忆
 │   ├── Timeline.tsx            # 时间线
@@ -247,12 +258,14 @@ src/
 ├── stores/                     # Zustand stores
 ├── lib/
 │   ├── api.ts                  # HTTP API 客户端 + SSE 读取器
+│   ├── import/                 # TXT/EPUB 文本提取与标题识别
 │   └── ...                     # 工具函数
 ├── hooks/                      # 自定义 hooks
 ├── i18n/
 │   ├── index.ts                # i18n 核心（t() 函数）
-│   ├── zh.json                 # 中文翻译
-│   └── en.json                 # 英文翻译
+│   ├── zh.json / zh-TW.json    # 简体 / 繁体中文
+│   ├── en.json / ja.json       # 英语 / 日语
+│   └── ...                     # ko / fr / es / ru 语言包
 └── types/
     └── index.ts                # 全部 TypeScript 类型定义
 ```
@@ -376,7 +389,7 @@ CREATE TABLE project_meta (
 | `name` | string | 项目名称 |
 | `description` | string | 项目简介 |
 | `mode` | `'short-story' | 'medium-novel' | 'long-novel'` | 篇幅模式 |
-| `language` | `'zh' | 'en'` | 写作语言 |
+| `language` | `LanguageCode`（8 种） | 写作语言 |
 | `version` | string | 数据库版本 |
 | `created_at` | ISO string | 创建时间 |
 | `updated_at` | ISO string | 更新时间 |
@@ -385,6 +398,9 @@ CREATE TABLE project_meta (
 | `workflow_phase` | `'idea' | 'setting' | 'outline' | 'writing' | 'review' | 'consistency' | 'export'` | 当前阶段 |
 | `cover_mime` | string | 封面图片 MIME 类型 |
 | `cover_ext` | string | 封面图片扩展名 |
+| `import_source_file` | string | 导入来源文件名（可选） |
+| `import_source_format` | `'txt' | 'epub'` | 导入来源格式（可选） |
+| `imported_at` | ISO string | 导入时间（可选） |
 
 #### 4.3.2 项目类型标签
 
@@ -593,6 +609,27 @@ CREATE TABLE clue_board (
 );
 ```
 
+**爽点 (Payoff Points)**
+
+```sql
+CREATE TABLE payoff_points (
+    id             TEXT PRIMARY KEY,     -- UUID
+    title          TEXT NOT NULL,
+    type           TEXT NOT NULL DEFAULT 'other'
+                       CHECK (type IN ('face-slap','flex','comeback','reveal','reward','revenge','breakthrough','other')),
+    description    TEXT DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'planned'
+                       CHECK (status IN ('planned','building','released','abandoned')),
+    intensity      INTEGER NOT NULL DEFAULT 3 CHECK (intensity BETWEEN 1 AND 5),
+    setup_chapter  INTEGER,
+    payoff_chapter INTEGER,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+爽点仅对 `power-fantasy`（爽文）项目启用：侧边栏入口、看板页面与 AI 工具均按项目类型过滤。
+
 #### 4.3.4 侧边栏定义
 
 ```sql
@@ -619,11 +656,12 @@ CREATE TABLE sidebar_items (
 | science | sidebar.science | FlaskConical | genre | sci-fi | 4 |
 | outline_page | sidebar.outline_page | ScrollText | universal | — | 5 |
 | foreshadow | sidebar.foreshadow | Link2 | universal | — | 6 |
-| memory | sidebar.memory | Brain | universal | — | 7 |
-| relations | sidebar.relations | HeartHandshake | universal | — | 8 |
-| timeline | sidebar.timeline | CalendarDays | universal | — | 9 |
-| consistency | sidebar.consistency | ShieldCheck | universal | — | 10 |
-| export | sidebar.export | Download | universal | — | 11 |
+| payoff | sidebar.payoff | Sparkles | genre | power-fantasy | 7 |
+| memory | sidebar.memory | Brain | universal | — | 8 |
+| relations | sidebar.relations | HeartHandshake | universal | — | 9 |
+| timeline | sidebar.timeline | CalendarDays | universal | — | 10 |
+| consistency | sidebar.consistency | ShieldCheck | universal | — | 11 |
+| export | sidebar.export | Download | universal | — | 12 |
 
 #### 4.3.5 日志和统计
 
@@ -736,13 +774,14 @@ CREATE INDEX idx_chat_messages_session ON chat_messages(session_id);
 
 | 页面 | 组件 | 说明 |
 |---|---|---|
-| **项目列表** | `ProjectList` | 初始页：显示所有项目，支持新建/删除 |
+| **项目列表** | `ProjectList` | 初始页：显示所有项目，支持新建、删除与 AI 导入旧书 |
 | **项目概览** | `Dashboard` | 主仪表盘：统计卡片、写作进度、章节列表、阶段推进 |
 | **写作** | `Writing` | 核心编辑页：章节选择、富文本编辑器、大纲编辑、续写功能 |
 | **角色管理** | `Characters` | 角色 CRUD、角色卡编辑、角色列表 |
 | **世界观** | `World` | 按类别（地点/组织/概念/事件）分组的世界观条目 CRUD |
 | **大纲** | `Outline` | 章节概要编辑器，五维维度编辑 |
 | **伏笔管理** | `Foreshadows` | 按状态筛选的伏笔看板，CRUD |
+| **爽点板** | `Payoffs` | 爽文项目的爽点看板：状态分栏、强度、铺垫/释放章节，支持 AI 设计 |
 | **人物关系** | `Relations` | 力导向关系图谱，节点拖拽，关系 CRUD |
 | **叙事记忆** | `Memory` | 按分类的记忆列表，搜索，CRUD |
 | **年表** | `Timeline` | 按时间排序的事件列表，CRUD |
@@ -816,9 +855,10 @@ CREATE INDEX idx_chat_messages_session ON chat_messages(session_id);
 
 POST `/api/ai/continue`：
 - 读取最后 ~1500 字符作为上下文
-- AI 流式生成续写内容
-- 自动追加到数据库章节
+- 使用无工具提示词生成正文，避免模型输出工具调用标记
+- `mode=continue`（默认）自动追加到章节；`mode=polish` 替换整章，并做最短长度与并发修改保护
 - 自动更新字数和状态
+- 保存前清理与章节标题重复的首行标题
 
 ### 6.3 项目上下文构建
 
@@ -839,13 +879,16 @@ POST `/api/ai/continue`：
 
 活跃伏笔:
   [{priority}] {title}：{description}
+
+爽点排期（仅 power-fantasy）:
+  [{status}/{type}/强度{intensity}] {title}（铺垫{setup_chapter}→释放{payoff_chapter}）：{description}
 ```
 
 ### 6.4 AI 工具系统
 
 #### 6.4.1 工具定义
 
-25+ 工具以 OpenAI function-calling 格式定义在 `server/tools.js`，通过多轮循环执行（最多 8 轮）：
+50+ 工具以 OpenAI function-calling 格式定义在 `server/tools.js`，通过多轮循环执行（最多 120 轮）：
 
 | 类别 | 工具 | 数量 |
 |---|---|---|
@@ -855,6 +898,7 @@ POST `/api/ai/continue`：
 | **世界观** | list/create/update/delete_world_entry | 4 |
 | **科幻** | list/create/delete_science_entry | 3 |
 | **伏笔** | list/create/update/delete_foreshadow | 4 |
+| **爽点** | list/create/update/delete_payoff（仅爽文项目） | 4 |
 | **关系** | list/create/update/delete_relation | 4 |
 | **记忆** | list/create/update/delete_memory | 4 |
 | **时间线** | list/create/update/delete_timeline_event | 4 |
@@ -872,7 +916,7 @@ POST /api/ai/chat/stream
      ├── content_chunk → SSE 发送 text
      ├── tool_calls → 执行 executeTool() → tool_result → 继续下一轮
      └── 无 tool_calls + 有 content → 结束
-  → 最多 8 轮工具调用
+  → 最多 120 轮工具调用
   → 记录 token 用量到 token_usage 表
   → SSE task_end 事件
 ```
@@ -917,6 +961,7 @@ POST /api/ai/chat/stream
 | `GET` | `/api/projects` | 列出所有项目 | 200 |
 | `POST` | `/api/projects` | 创建项目 | 201 |
 | `GET` | `/api/projects/:name` | 获取项目元数据 | 200/404 |
+| `POST` | `/api/projects/import-ai` | AI 导入旧书并创建项目（SSE） | 201/4xx |
 | `DELETE` | `/api/projects/:name` | 删除项目 | 200/404 |
 
 ### 7.2 章节和卷
@@ -941,6 +986,7 @@ POST /api/ai/chat/stream
 | 世界观 | `/:project/world` | — | `/:project/world` | `/:project/world/:id` | `/:project/world/:id` |
 | 科幻 | `/:project/science` | — | `/:project/science` | — | `/:project/science/:id` |
 | 伏笔 | `/:project/foreshadows` | — | `/:project/foreshadows` | — | — |
+| 爽点 | `/:project/payoffs` | — | `/:project/payoffs` | `/:project/payoffs/:id` | `/:project/payoffs/:id` |
 | 关系 | `/:project/relations` | — | `/:project/relations` | `/:project/relations/:id` | `/:project/relations/:id` |
 | 记忆 | `/:project/memories` | — | `/:project/memories` | `/:project/memories/:id` | `/:project/memories/:id` |
 | 时间线 | `/:project/timeline` | — | `/:project/timeline` | `/:project/timeline/:id` | `/:project/timeline/:id` |
@@ -987,9 +1033,10 @@ POST /api/ai/chat/stream
 t('editor.wordCount', { count: 42 })  // → "42 字"
 ```
 
-- 翻译文件：`zh.json`（中文，默认）、`en.json`（英文）
-- 语言切换即时生效，写入 localStorage 和服务端
+- 翻译文件：`src/i18n/{zh,zh-TW,en,ja,ko,fr,es,ru}.json`，8 个语言包保持 key 对齐
+- 语言切换即时生效，写入 localStorage 和服务端；同时更新 `<html lang>` 与页面标题
 - 所有 UI 文本 MUST 通过 `t()` 函数引用
+- 服务端 `server/languages.js` 维护写作语言码、提示词语言名与导入 token 预算
 
 ### 8.2 语言包结构
 
@@ -1003,16 +1050,21 @@ t('editor.wordCount', { count: 42 })  // → "42 字"
   "ai": { "chat": "AI 对话", ... },
   "project": { "list": "我的项目", ... },
   "settings": { "title": "设置", ... },
+  "payoff": { "payoffBoard": "爽点板", ... },
   "pages": { "characters": "角色管理", ... }
 }
 ```
+
+所有语言包使用相同的嵌套 key 结构；新增文案 MUST 同步更新全部 8 个文件。
 
 ### 8.3 双维度语言模型
 
 | 维度 | 存储位置 | 描述 |
 |---|---|---|
-| UI 语言 | localStorage + `config.db` | 界面文字语言 |
-| 写作语言 | `project_meta.language` | AI 生成内容语言 |
+| UI 语言 | localStorage + `config.db` | 界面文字语言，8 种语言码 |
+| 写作语言 | `project_meta.language` | AI 生成内容语言，与 UI 语言独立 |
+
+统一语言码：`zh` / `zh-TW` / `en` / `ja` / `ko` / `fr` / `es` / `ru`。
 
 ---
 
@@ -1097,6 +1149,18 @@ interface Character {
   avatar: string; notes: string;
   chapterCount?: number; role?: 'major'|'minor'|'extra';
 }
+
+interface PayoffPoint {
+  id: string; title: string;
+  type: 'face-slap'|'flex'|'comeback'|'reveal'|'reward'|'revenge'|'breakthrough'|'other';
+  description: string;
+  status: 'planned'|'building'|'released'|'abandoned';
+  intensity: number; setupChapter: number; payoffChapter: number;
+}
+
+type LanguageCode = 'zh'|'zh-TW'|'en'|'ja'|'ko'|'fr'|'es'|'ru';
+type UiLanguage = LanguageCode;
+type WritingLanguage = LanguageCode;
 ```
 
 ### 10.2 设置类型
@@ -1105,14 +1169,11 @@ interface Character {
 interface AppSettings {
   apiKey: string; apiKeyDeepseek: string; apiKeyAnthropic: string;
   apiKeyOpenai: string; apiBaseUrl: string; apiModel: string;
-  apiType: 'openai'|'claude'; uiLanguage: 'zh'|'en';
+  apiType: 'openai'|'claude'; uiLanguage: LanguageCode;
   theme: 'dark'|'light'; editorFontSize: number;
   editorFontFamily: string; autoSaveInterval: number;
   backupEnabled: boolean; accentColor: string;
-  maxOutputTokens: number; contextBudget: string;
-  httpTimeout: number; compressionEnabled: boolean;
-  compressionThreshold: number; compressionTarget: number;
-  contextLengthKb: number;
+  maxOutputTokens: number; httpTimeout: number;
 }
 
 type WorkflowPhase = 'idea'|'setting'|'outline'|'writing'|'review'|'consistency'|'export';
@@ -1153,7 +1214,7 @@ type WorkflowPhase = 'idea'|'setting'|'outline'|'writing'|'review'|'consistency'
 
 | 类型 | 文件 | 范围 |
 |---|---|---|
-| AI 工具集成测试 | `server/test-tools.js` | 40 项，覆盖所有实体 CRUD 生命周期 |
+| AI 工具集成测试 | `server/test-tools.js` | 40 项，覆盖所有实体 CRUD 生命周期（爽点与 AI 导入端点暂无自动化测试） |
 | 种子数据 | `server/seed.js` | 初始化演示数据 |
 
 ### 11.4 开发命令
@@ -1189,7 +1250,7 @@ node server/test-tools.js # 运行 AI 工具集成测试（40项）
 [写作风格] — 语言质感、节奏、对话规范
 [使用提示] — 与用户交互的行为指南
 [辅助数据更新] — 角色出场/伏笔/记忆/线索板的同步更新规则
-[工具使用] — 25+ 工具说明和用途
+[工具使用] — 50+ 工具说明和用途
 ```
 
 #### A.2 共创模式系统提示结构
@@ -1227,6 +1288,19 @@ POST /api/projects
   6. 写入项目类型标签
   7. 记录到 config.db 的 recent_projects
   8. 前端自动创建第一章并导航到写作页
+```
+
+### E. AI 导入流程
+
+```
+POST /api/projects/import-ai (SSE)
+  1. 前端提取 TXT/EPUB 文本与元数据，POST 到服务端（不预先切章）
+  2. structure：模型识别真实卷/章标题（全文或候选行）
+  3. metadata：模型提取书名、作者、简介、语言、类型、篇幅
+  4. chapters：分批生成章节大纲、摘要与五维叙事字段
+  5. archive：分块提取角色、世界观、关系、事件、伏笔、记忆、科幻设定
+  6. persist：全部成功后一次性创建数据库并原子写入；失败/取消不留半成品
+  7. SSE 事件：stage / progress / warning / done / error
 ```
 
 ---
