@@ -65,6 +65,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_aptabase::Builder::new("A-US-9460803259").build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // Spawn the Express server as a sidecar process
             let sidecar = app.shell().sidecar("mythpen-server").unwrap();

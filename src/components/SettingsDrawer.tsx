@@ -1,10 +1,11 @@
 import { Bot, Download, Eye, EyeOff, Globe, Palette, Pen, RotateCw, SwatchBook, X, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { apiUrl } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
-import { useEditorStore } from '@/stores/useEditorStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
+import { useUpdateStore } from '@/stores/useUpdateStore'
 
 const ACCENT_COLORS = ['#c9a96e', '#e06c75', '#61afef', '#98c379', '#c678dd', '#d4a040', '#56b6c2']
 
@@ -23,34 +24,21 @@ export function SettingsDrawer() {
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
   const [testTime, setTestTime] = useState(0)
   const [testError, setTestError] = useState('')
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'upToDate' | 'available' | 'error'>('idle')
-  const [latestVersion, setLatestVersion] = useState('')
-  const [releaseUrl, setReleaseUrl] = useState('')
-
-  const checkForUpdates = async () => {
-    setUpdateStatus('checking')
-    try {
-      const res = await fetch('https://api.github.com/repos/niyongsheng/mythpen/releases/latest')
-      if (!res.ok) {
-        setUpdateStatus('error')
-        return
-      }
-      const data = await res.json()
-      const latestTag = (data.tag_name || '').replace(/^v/, '')
-      setLatestVersion(latestTag)
-      setReleaseUrl(data.html_url || `https://github.com/niyongsheng/mythpen/releases/tag/${data.tag_name}`)
-      setUpdateStatus(compareVersions(latestTag, __APP_VERSION__) > 0 ? 'available' : 'upToDate')
-    } catch {
-      setUpdateStatus('error')
-    }
-  }
+  const updateStatus = useUpdateStore((s) => s.status)
+  const updateVersion = useUpdateStore((s) => s.version)
+  const updateError = useUpdateStore((s) => s.error)
+  const updateErrorContext = useUpdateStore((s) => s.errorContext)
+  const updateProgress = useUpdateStore((s) => s.progress)
+  const checkForUpdates = useUpdateStore((s) => s.check)
+  const installUpdate = useUpdateStore((s) => s.install)
+  const restartApp = useUpdateStore((s) => s.restart)
 
   const handleTestConnection = async () => {
     setTestStatus('testing')
     setTestError('')
     const start = Date.now()
     try {
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch(apiUrl('/ai/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,7 +58,7 @@ export function SettingsDrawer() {
         setTestStatus('fail')
         try {
           const body = await res.json()
-          setTestError(body.error || `HTTP ${res.status}`)
+          setTestError(typeof body.error === 'string' ? body.error : body.error?.message || `HTTP ${res.status}`)
         } catch {
           setTestError(`HTTP ${res.status}`)
         }
@@ -90,14 +78,11 @@ export function SettingsDrawer() {
   }
 
   const handleFontSizeChange = (size: number) => {
-    const clamped = Math.max(14, Math.min(24, size))
-    updateSetting('editorFontSize', clamped)
-    useEditorStore.getState().setFontSize(clamped)
+    updateSetting('editorFontSize', Math.max(14, Math.min(24, size)))
   }
 
   const handleFontFamilyChange = (family: string) => {
     updateSetting('editorFontFamily', family)
-    useEditorStore.getState().setFontFamily(family)
   }
 
   const handleMaxTokensChange = (value: number) => {
@@ -212,15 +197,10 @@ export function SettingsDrawer() {
                   : t('settings.autoSaveDisabled')
               }
             >
-              <button
-                className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
-                  ${settings.autoSaveInterval > 0 ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
-                onClick={() => updateSetting('autoSaveInterval', settings.autoSaveInterval > 0 ? 0 : 30)}
-              >
-                <span
-                  className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-[var(--ink)] transition-transform ${settings.autoSaveInterval > 0 ? 'translate-x-4' : ''}`}
-                />
-              </button>
+              <Toggle
+                checked={settings.autoSaveInterval > 0}
+                onChange={() => updateSetting('autoSaveInterval', settings.autoSaveInterval > 0 ? 0 : 30)}
+              />
             </SettingRow>
             <SettingRow label={t('settings.fontFamily')}>
               <select
@@ -309,15 +289,10 @@ export function SettingsDrawer() {
               />
             </SettingRow>
             <SettingRow label={t('settings.sendTemperature')} desc={t('settings.sendTemperatureDesc')}>
-              <button
-                className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0
-                  ${settings.sendTemperature ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'}`}
-                onClick={() => updateSetting('sendTemperature', !settings.sendTemperature)}
-              >
-                <span
-                  className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-[var(--ink)] transition-transform ${settings.sendTemperature ? 'translate-x-4' : ''}`}
-                />
-              </button>
+              <Toggle
+                checked={settings.sendTemperature}
+                onChange={() => updateSetting('sendTemperature', !settings.sendTemperature)}
+              />
             </SettingRow>
             <SettingRow label={t('settings.apiKey')}>
               <div className="flex gap-1 items-center">
@@ -386,8 +361,8 @@ export function SettingsDrawer() {
             >
               <button
                 className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer transition-colors hover:bg-[var(--canvas-mid)] disabled:opacity-50 flex items-center gap-1.5"
-                onClick={checkForUpdates}
-                disabled={updateStatus === 'checking'}
+                onClick={() => void checkForUpdates()}
+                disabled={updateStatus === 'checking' || updateStatus === 'downloading' || updateStatus === 'ready'}
               >
                 <Download className="w-3.5 h-3.5" />
                 {updateStatus === 'checking' ? t('settings.checkingUpdates') : t('settings.checkForUpdates')}
@@ -399,22 +374,47 @@ export function SettingsDrawer() {
               </div>
             )}
             {updateStatus === 'available' && (
-              <div className="text-[12px] text-[var(--accent-gold)] mt-2 flex items-center gap-1">
-                <span>{t('settings.updateAvailable', { version: latestVersion })}</span>
-                <span className="text-[var(--ink-mute)]">·</span>
-                <a
-                  href={releaseUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[var(--accent-gold)] hover:underline no-underline cursor-pointer"
+              <div className="text-[12px] text-[var(--accent-gold)] mt-2 flex items-center gap-2">
+                <span>{t('settings.updateAvailable', { version: updateVersion })}</span>
+                <button
+                  type="button"
+                  className="border-none bg-transparent text-[var(--accent-gold)] text-[12px] cursor-pointer hover:underline p-0"
+                  onClick={() => void installUpdate()}
                 >
-                  {t('settings.downloadUpdate')}
-                </a>
+                  {t('update.download')}
+                </button>
+              </div>
+            )}
+            {updateStatus === 'downloading' && (
+              <div className="mt-2">
+                <div className="text-[12px] text-[var(--ink-tertiary)]">
+                  {t('update.downloading', { percent: updateProgress })}
+                </div>
+                <div className="mt-1.5 h-1.5 rounded-full bg-[var(--canvas-mid)] overflow-hidden">
+                  <div
+                    className="h-full bg-[var(--accent-gold)] transition-[width] duration-300"
+                    style={{ width: `${Math.max(2, updateProgress)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            {updateStatus === 'ready' && (
+              <div className="text-[12px] text-[var(--success)] mt-2 flex items-center gap-2">
+                <span>{t('update.ready')}</span>
+                <button
+                  type="button"
+                  className="border-none bg-transparent text-[var(--accent-gold)] text-[12px] cursor-pointer hover:underline p-0"
+                  onClick={() => void restartApp()}
+                >
+                  {t('update.restart')}
+                </button>
               </div>
             )}
             {updateStatus === 'error' && (
-              <div className="text-[12px] text-[var(--error)] mt-2 flex items-center gap-1">
-                <span>{t('settings.updateCheckFailed')}</span>
+              <div className="text-[12px] text-[var(--error)] mt-2">
+                {updateErrorContext === 'install'
+                  ? t('update.installFailed', { message: updateError })
+                  : updateError || t('settings.updateCheckFailed')}
               </div>
             )}
           </div>
@@ -442,16 +442,23 @@ export function SettingsDrawer() {
   )
 }
 
-function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number),
-    pb = b.split('.').map(Number)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const na = pa[i] || 0,
-      nb = pb[i] || 0
-    if (na > nb) return 1
-    if (na < nb) return -1
-  }
-  return 0
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      className={`w-9 h-5 rounded-full border-none cursor-pointer relative transition-colors shrink-0 ${
+        checked ? 'bg-[var(--accent-gold)]' : 'bg-[var(--canvas-mid)]'
+      }`}
+      onClick={onChange}
+    >
+      <span
+        className={`absolute top-[2px] left-[2px] w-4 h-4 rounded-full bg-[var(--ink)] transition-transform ${
+          checked ? 'translate-x-4' : ''
+        }`}
+      />
+    </button>
+  )
 }
 
 function SettingRow({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {

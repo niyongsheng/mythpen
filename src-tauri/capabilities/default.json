@@ -9,6 +9,8 @@
     "core:default",
     "shell:allow-open",
     "aptabase:allow-track-event",
+    "updater:default",
+    "process:default",
     {
       "identifier": "shell:allow-spawn",
       "allow": [

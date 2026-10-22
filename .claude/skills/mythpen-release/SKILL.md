@@ -7,6 +7,23 @@ description: 执行 Mythpen 发布新版本流程（更新版本号、提交、�
 
 当需要发布 Mythpen 新版本时，按以下步骤执行：
 
+## 一次性准备（自动更新签名）
+
+首次发布或更换密钥时执行：
+
+```bash
+pnpm tauri signer generate -w ~/.tauri/mythpen.key
+```
+
+1. 将输出的**公钥**填入 `src-tauri/tauri.conf.json` → `plugins.updater.pubkey`
+2. 在 GitHub 仓库 Secrets 中添加：
+   - `TAURI_SIGNING_PRIVATE_KEY`：`~/.tauri/mythpen.key` 的文件内容
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`：生成密钥时设置的密码
+3. 离线备份私钥。私钥丢失后，已安装用户将无法再接收自动更新。
+
+CI 会在构建时自动生成 `latest.json` 与各平台更新包，客户端通过
+`releases/latest/download/latest.json` 检查和安装更新。
+
 ## 步骤
 
 1. **更新版本号（三处保持一致）**

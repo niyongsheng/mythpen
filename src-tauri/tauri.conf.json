@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -40,5 +41,13 @@
     "externalBin": [
       "binaries/mythpen-server"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEYxNUU3RERCODM4MDdGMQpSV1R4QnppNDNlY1ZEenE1dy9rd3M5SVBxMGJaWTBQUGhaL3BtaExMVVJXWFJ4cjU5ZjlmVDdjbAo=",
+      "endpoints": [
+        "https://github.com/niyongsheng/mythpen/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

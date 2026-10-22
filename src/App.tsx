@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { AIPanel } from '@/components/AIPanel'
 import { BottomStatusbar } from '@/components/BottomStatusbar'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
@@ -6,6 +6,7 @@ import { SettingsDrawer } from '@/components/SettingsDrawer'
 import { Sidebar } from '@/components/Sidebar'
 import { Titlebar } from '@/components/Titlebar'
 import { ToastContainer } from '@/components/ToastContainer'
+import { UpdatePrompt } from '@/components/UpdatePrompt'
 import { useToast } from '@/hooks/useToast'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
@@ -29,6 +30,7 @@ import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import { useUIStore } from '@/stores/useUIStore'
+import { useUpdateStore } from '@/stores/useUpdateStore'
 
 const PAGES: Record<string, React.ReactNode> = {
   'page-dashboard': <Dashboard />,
@@ -55,13 +57,35 @@ function App() {
   const loadSettings = useSettingsStore((s) => s.loadFromServer)
   const rightPanelVisible = useUIStore((s) => s.rightPanelVisible)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
+  const autoCheckForUpdates = useUpdateStore((s) => s.autoCheck)
   const { toasts, show: showToast } = useToast()
+
+  // Mount a page the first time it is visited, then keep it alive so local
+  // state survives navigation. Avoids firing every page's data fetches at launch.
+  const [mountedPages, setMountedPages] = useState<Set<string>>(() => new Set([activePage]))
+  useEffect(() => {
+    setMountedPages((prev) => (prev.has(activePage) ? prev : new Set(prev).add(activePage)))
+  }, [activePage])
 
   // Load projects and settings on mount
   useEffect(() => {
     loadProjects()
     loadSettings()
   }, [])
+
+  // Check for updates after startup and periodically while the app stays open.
+  // autoCheck itself throttles to once per day.
+  useEffect(() => {
+    const check = () => {
+      void autoCheckForUpdates()
+    }
+    const initial = setTimeout(check, 5000)
+    const interval = setInterval(check, 6 * 60 * 60 * 1000)
+    return () => {
+      clearTimeout(initial)
+      clearInterval(interval)
+    }
+  }, [autoCheckForUpdates])
 
   // Global keyboard shortcut: ⌘⇧R / Ctrl+Shift+R — manual refresh
   useEffect(() => {
@@ -109,14 +133,16 @@ function App() {
               <div className="flex flex-1 min-w-0 min-h-0">
                 {/* Page content + AI panel */}
                 <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${showProjectList ? 'hidden' : 'flex'}`}>
-                  {Object.entries(PAGES).map(([id, page]) => (
-                    <div
-                      key={id}
-                      className={`flex-1 flex-col min-w-0 min-h-0 ${activePage === id ? 'flex' : 'hidden'}`}
-                    >
-                      {page}
-                    </div>
-                  ))}
+                  {Object.entries(PAGES)
+                    .filter(([id]) => id === activePage || mountedPages.has(id))
+                    .map(([id, page]) => (
+                      <div
+                        key={id}
+                        className={`flex-1 flex-col min-w-0 min-h-0 ${activePage === id ? 'flex' : 'hidden'}`}
+                      >
+                        {page}
+                      </div>
+                    ))}
                 </div>
                 {/* AI Panel - toggle via Titlebar button */}
                 {!showProjectList && rightPanelVisible && <AIPanel />}
@@ -128,6 +154,7 @@ function App() {
       <BottomStatusbar />
       <NewProjectDialog />
       <SettingsDrawer />
+      <UpdatePrompt />
       <ToastContainer toasts={toasts} />
 
       {/* Global styles for reused patterns */}
