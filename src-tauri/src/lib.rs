@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use std::net::TcpStream;
 use std::time::Duration;
 use tauri::Manager;
+use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandChild;
 
@@ -63,6 +64,7 @@ fn request_graceful_shutdown(port: u16) -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_aptabase::Builder::new("A-US-9460803259").build())
         .setup(|app| {
             // Spawn the Express server as a sidecar process
             let sidecar = app.shell().sidecar("mythpen-server").unwrap();
@@ -86,7 +88,11 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app_handle, event| {
+        .run(|app_handle, event| match event {
+            tauri::RunEvent::Ready => {
+                // Aptabase: session start (the plugin adds OS, app version, etc.)
+                let _ = app_handle.track_event("app_started", None);
+            }
             // Graceful sidecar shutdown on app exit.
             //
             // Step 1: Send HTTP POST to /api/shutdown so Express cleans up normally.
@@ -95,7 +101,11 @@ pub fn run() {
             //
             // This three-step strategy avoids triggering antivirus software that flags
             // SIGKILL/TerminateProcess as suspicious behavior.
-            if let tauri::RunEvent::Exit = event {
+            tauri::RunEvent::Exit => {
+                // Aptabase: session end, then flush queued events before the process dies
+                let _ = app_handle.track_event("app_exited", None);
+                app_handle.flush_events_blocking();
+
                 if let Some(state) = app_handle.try_state::<SidecarProcess>() {
                     if let Ok(mut guard) = state.0.lock() {
                         if let Some(child) = guard.take() {
@@ -111,5 +121,6 @@ pub fn run() {
                     }
                 }
             }
+            _ => {}
         });
 }

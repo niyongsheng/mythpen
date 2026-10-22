@@ -8,6 +8,7 @@ import { Titlebar } from '@/components/Titlebar'
 import { ToastContainer } from '@/components/ToastContainer'
 import { useToast } from '@/hooks/useToast'
 import { t } from '@/i18n'
+import { track } from '@/lib/analytics'
 import { refreshAllData } from '@/lib/dataEvents'
 import { About } from '@/pages/About'
 import { Characters } from '@/pages/Characters'
@@ -82,6 +83,11 @@ function App() {
       loadChapters(currentProject)
     }
   }, [currentProject])
+
+  // Analytics: which screen is visible (no project names or content)
+  useEffect(() => {
+    track('screen_view', { screen: showProjectList ? 'project_list' : activePage.replace(/^page-/, '') })
+  }, [activePage, showProjectList])
 
   // Restore right panel width from localStorage
   useEffect(() => {

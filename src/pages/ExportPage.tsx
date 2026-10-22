@@ -1,6 +1,7 @@
 import { Book, Download, File, FileEdit, FileText, type LucideIcon, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { projectsApi } from '@/lib/api'
 import { useProjectName } from '@/lib/useProjectData'
 
@@ -87,6 +88,7 @@ export function ExportPage() {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
+      track('project_exported', { format: fmt })
       setExportMsg(t('export.downloadingFile', { fmt: fmt.toUpperCase() }))
       setExportStatus('success')
       setTimeout(() => setExportMsg(''), 3000)

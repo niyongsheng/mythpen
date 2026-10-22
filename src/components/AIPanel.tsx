@@ -4,6 +4,7 @@ import { MarkdownContent } from '@/components/MarkdownContent'
 import { ToastContainer } from '@/components/ToastContainer'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
+import { track } from '@/lib/analytics'
 import { aiApi, chatApi } from '@/lib/api'
 import { getModifiedEntities, notifyDataChanged } from '@/lib/dataEvents'
 import { useProjectName } from '@/lib/useProjectData'
@@ -213,6 +214,7 @@ export function AIPanel() {
     runningRef.current = true
     const userMsg = input.trim()
     const isChat = mode === 'collab'
+    track('ai_chat', { mode: isChat ? 'collab' : 'writing' })
     setTaskName(isChat ? t('ai.taskCollab') : t('ai.taskContinue'))
     setTask({ status: 'running' })
     setStreamText('')
