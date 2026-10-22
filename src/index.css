@@ -38,6 +38,9 @@
   --pending: #8a8880;
   --pending-soft: #26262b;
 
+  /* Elevation */
+  --shadow-pop: 0 12px 32px -8px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
+
   /* Typography */
   --font-display: 'Instrument Serif', 'Noto Serif SC', Georgia, serif;
   --font-editor: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif;
@@ -85,7 +88,9 @@ html[data-theme="light"] {
   --ink: #2a2824;
   --success-soft: rgba(76, 175, 125, 0.15);
   --warning-soft: rgba(212, 160, 64, 0.15);
+  --error-soft: rgba(200, 74, 74, 0.13);
   --info-soft: rgba(96, 144, 192, 0.15);
+  --shadow-pop: 0 12px 28px -10px rgba(74, 58, 30, 0.28), 0 2px 6px rgba(74, 58, 30, 0.12);
   --pending: #55524c;
   --pending-soft: #d5cfc3;
   --ink-hover: #1a1814;
@@ -182,6 +187,36 @@ pre::-webkit-scrollbar-thumb { background: var(--canvas-mid); border-radius: 999
 .custom-scrollbar::-webkit-scrollbar-track,
 textarea::-webkit-scrollbar-track,
 pre::-webkit-scrollbar-track { background: transparent; }
+
+/* ─── Toasts ─── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+@keyframes toast-progress {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+.toast-enter { animation: toast-in 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.toast-leave { animation: toast-out 0.18s ease-in forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter, .toast-leave { animation: none; }
+  .toast-progress-bar { animation: none !important; }
+}
+
+/* ─── Dropdown menus ─── */
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.dropdown-menu { transform-origin: top center; animation: pop-in 0.14s cubic-bezier(0.16, 1, 0.3, 1); }
+@media (prefers-reduced-motion: reduce) {
+  .dropdown-menu { animation: none; }
+}
 
 /* ─── Tailwind-style utility layers ─── */
 @theme {

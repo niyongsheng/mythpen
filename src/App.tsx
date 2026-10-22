@@ -58,7 +58,7 @@ function App() {
   const rightPanelVisible = useUIStore((s) => s.rightPanelVisible)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
   const autoCheckForUpdates = useUpdateStore((s) => s.autoCheck)
-  const { toasts, show: showToast } = useToast()
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast()
 
   // Mount a page the first time it is visited, then keep it alive so local
   // state survives navigation. Avoids firing every page's data fetches at launch.
@@ -155,7 +155,7 @@ function App() {
       <NewProjectDialog />
       <SettingsDrawer />
       <UpdatePrompt />
-      <ToastContainer toasts={toasts} />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
       {/* Global styles for reused patterns */}
       <style>{`
@@ -339,10 +339,6 @@ function App() {
         @keyframes shimmer {
           0%, 100% { opacity: 0.6; }
           50% { opacity: 1; }
-        }
-        @keyframes slideIn {
-          from { transform: translateX(100%); opacity: 0; }
-          to { transform: translateX(0); opacity: 1; }
         }
         .animate-spin-once {
           animation: spin-once 0.5s ease-in-out;
