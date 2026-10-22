@@ -1,4 +1,6 @@
 // ─── Tool schema definitions (OpenAI function-calling format) ───
+const { stripLeadingChapterHeading } = require('./titles');
+
 const TOOLS = [
   // ═══ Chapters ═══
   {
@@ -750,6 +752,14 @@ const HANDLERS = {
       const allowed = ['title', 'content', 'outline', 'status', 'summary', 'cognitive_frame', 'emotional_anchor', 'world_texture', 'concrete_mystery', 'interpersonal_tension'];
       const updates = [];
       const params = [];
+      if (typeof fields.content === 'string') {
+        // AI often repeats the chapter heading at the top of the body; the UI
+        // renders the title separately, so store the content without it.
+        const row = pdb.prepare('SELECT title FROM chapters WHERE num = ?').get(chapter_num);
+        fields.content = stripLeadingChapterHeading(fields.content, {
+          title: typeof fields.title === 'string' ? fields.title : row && row.title,
+        });
+      }
       for (const key of allowed) {
         if (fields[key] !== undefined) {
           updates.push(`${key} = ?`);

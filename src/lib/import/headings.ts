@@ -62,6 +62,16 @@ export function matchNormalizedVolumeHeading(line: string): string | null {
   return VOLUME_RE.test(line) ? line : null
 }
 
+/**
+ * Title text after the chapter label ("第三章 转机" → "转机"). Returns '' when
+ * the line is not a chapter heading. Markdown heading markers are ignored.
+ */
+export function chapterHeadingBody(line: string): string {
+  const trimmed = normalizeLine(line).replace(/^\s{0,3}#{1,6}\s+/, '')
+  if (!CHAPTER_RE.test(trimmed)) return ''
+  return (trimmed.replace(CHAPTER_RE, '$1') || '').trim()
+}
+
 /** True when a stored chapter title already carries its own numbering. */
 export function isStandaloneChapterHeading(title: string): boolean {
   const trimmed = normalizeLine(title)

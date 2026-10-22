@@ -167,7 +167,20 @@ router.put('/:project/chapters/:num', (req, res) => {
   const fields = [];
   const params = [];
   if (title !== undefined) { fields.push('title = ?'); params.push(title); }
-  if (content !== undefined) { fields.push('content = ?'); params.push(content); }
+  if (content !== undefined) {
+    // Drop a heading that repeats the chapter title — the UI renders the title
+    // separately, so keeping it in the body would show it twice.
+    const row = db.projectGet(project(req.params.project), 'SELECT title FROM chapters WHERE num = ?', [parseInt(num)]);
+    const cleanContent = stripLeadingChapterHeading(content, {
+      title: title !== undefined ? title : row?.title || '',
+    });
+    fields.push('content = ?');
+    params.push(cleanContent);
+    // Update word count for Chinese text
+    const wc = db.countWords(cleanContent);
+    fields.push('word_count = ?');
+    params.push(wc);
+  }
   if (outline !== undefined) { fields.push('outline = ?'); params.push(outline); }
   if (status !== undefined) { fields.push('status = ?'); params.push(status); }
   if (cognitive_frame !== undefined) { fields.push('cognitive_frame = ?'); params.push(cognitive_frame); }
@@ -175,13 +188,6 @@ router.put('/:project/chapters/:num', (req, res) => {
   if (world_texture !== undefined) { fields.push('world_texture = ?'); params.push(world_texture); }
   if (concrete_mystery !== undefined) { fields.push('concrete_mystery = ?'); params.push(concrete_mystery); }
   if (interpersonal_tension !== undefined) { fields.push('interpersonal_tension = ?'); params.push(interpersonal_tension); }
-
-  if (content !== undefined) {
-    // Update word count for Chinese text
-    const wc = db.countWords(content);
-    fields.push('word_count = ?');
-    params.push(wc);
-  }
 
   fields.push("updated_at = datetime('now')");
   params.push(parseInt(num));
@@ -744,6 +750,9 @@ router.get('/:project/export', async (req, res) => {
   const { format = 'txt' } = req.query;
   const pn = project(req.params.project);
   const chapters = db.projectQuery(pn, "SELECT num, title, content, volume_id FROM chapters WHERE content != '' ORDER BY num");
+  // Legacy/AI content may still start with the chapter title; exports add the
+  // heading themselves, so strip the duplicate here.
+  for (const ch of chapters) ch.content = stripLeadingChapterHeading(ch.content, ch);
   const volumes = db.projectQuery(pn, 'SELECT * FROM volumes ORDER BY sort_order');
   const meta = {};
   db.projectQuery(pn, 'SELECT key, value FROM project_meta').forEach(m => meta[m.key] = m.value);

@@ -32,4 +32,50 @@ function volumeHeading(vol) {
   return VOLUME_LABEL_RE.test(title) ? title : `第${vol.sort_order}卷 ${title}`;
 }
 
-module.exports = { chapterHeading, volumeHeading };
+/** Title text after the chapter label ("第三章 转机" → "转机"), '' otherwise. */
+function chapterHeadingBody(line) {
+  const trimmed = String(line || '').replace(/^\s{0,3}#{1,6}\s+/, '').trim();
+  if (!CHAPTER_LABEL_RE.test(trimmed)) return '';
+  return trimmed.replace(CHAPTER_LABEL_RE, '').replace(/^[\s：:、.．·\-—_—]+/, '').trim();
+}
+
+/** Ignore spacing/punctuation differences when comparing titles. */
+function foldTitle(value) {
+  return String(value || '').replace(/[\s：:、.．·\-—_—《》「」“”"'（）()【】]/g, '');
+}
+
+/**
+ * Drop a leading chapter-heading line that duplicates chapter.title.
+ *
+ * Mirrors stripLeadingChapterHeading() in src/lib/chapterTitle.ts. Content is
+ * normalized on write and on export so AI-generated and legacy chapters don't
+ * render the title twice.
+ */
+function stripLeadingChapterHeading(content, chapter) {
+  if (typeof content !== 'string' || !content) return content;
+  const lines = content.split('\n');
+  let index = 0;
+  while (index < lines.length && !lines[index].trim()) index++;
+  if (index >= lines.length) return content;
+
+  const raw = lines[index].trim();
+  const isMarkdownHeading = /^#{1,6}\s+/.test(raw);
+  const line = raw.replace(/^#{1,6}\s+/, '');
+  const headingBody = chapterHeadingBody(line) || (isMarkdownHeading ? line : '');
+  if (!headingBody) return content;
+
+  const title = String((chapter && chapter.title) || '').trim();
+  const titleBody = chapterHeadingBody(title) || title;
+  if (!titleBody || foldTitle(headingBody) !== foldTitle(titleBody)) return content;
+
+  return lines.slice(index + 1).join('\n');
+}
+
+module.exports = {
+  chapterHeading,
+  volumeHeading,
+  chapterHeadingBody,
+  stripLeadingChapterHeading,
+  CHAPTER_LABEL_RE,
+  VOLUME_LABEL_RE,
+};

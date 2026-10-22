@@ -1,7 +1,7 @@
 import { Pen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { formatChapterTitle } from '@/lib/chapterTitle'
+import { formatChapterTitle, stripLeadingChapterHeading } from '@/lib/chapterTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
@@ -59,9 +59,11 @@ export function EditorContent() {
   }
 
   // Parse content to HTML for display
-  function renderContent(content: string | undefined) {
+  function renderContent(content: string | undefined, title: string) {
     if (!content) return ''
-    const lines = content.split('\n').filter((l) => l.trim())
+    // The title is rendered above the editor; drop a duplicated heading line.
+    const body = stripLeadingChapterHeading(content, title)
+    const lines = body.split('\n').filter((l) => l.trim())
     return lines
       .map((line) => {
         if (line.startsWith('# ')) return `<h1>${inlineToHtml(line.slice(2))}</h1>`
@@ -172,7 +174,7 @@ export function EditorContent() {
       editorRef.current.innerHTML = ''
       return
     }
-    editorRef.current.innerHTML = chapter.content ? renderContent(chapter.content) : ''
+    editorRef.current.innerHTML = chapter.content ? renderContent(chapter.content, chapter.title) : ''
     if (editorRef.current.innerHTML) {
       editorRef.current.removeAttribute('data-placeholder')
     } else {
