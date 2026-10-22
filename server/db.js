@@ -4,6 +4,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 
 const DB_DIR = path.join(require('os').homedir(), '.mythpen');
 const CONFIG_DB = path.join(DB_DIR, 'config.db');
@@ -20,8 +21,8 @@ let configDb;    // wrapped config database
 // Schema versioning — bump these when adding migrations
 // ═══════════════════════════════════════════════════════════════
 
-const CONFIG_SCHEMA_VERSION = 1;
-const PROJECT_SCHEMA_VERSION = 2;
+const CONFIG_SCHEMA_VERSION = 2;
+const PROJECT_SCHEMA_VERSION = 3;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -40,38 +41,10 @@ function _flushDb(db, filePath) {
   fs.writeFileSync(filePath, Buffer.from(data));
 }
 
-// ─── Named-param helper ───
-// sql.js 1.13+ has a bug where binding named params via object (e.g. {id:1})
-// doesn't work — values come through as NULL.
-// We work around it by converting @param / :param / $param → ? at the JS level.
-const NAMED_PARAM_RE = /[$@:](\w+)/g;
-
-function _normalizeParams(params) {
+// sql.js requires null instead of undefined for positional bindings.
+function _bindArgs(params) {
   if (params.length === 0) return null;
-  // Single plain object = named params (e.g. {id: 1, name: 'test'})
-  if (params.length === 1 && typeof params[0] === 'object' && params[0] !== null && !Array.isArray(params[0])) {
-    return { named: true, values: params[0] };
-  }
-  return { named: false, values: params };
-}
-
-function _buildSql(sqlText, bindMeta) {
-  if (!bindMeta) return { sql: sqlText, args: null };
-  if (!bindMeta.named) {
-    // Positional params — convert undefined → null for sql.js compatibility
-    return { sql: sqlText, args: bindMeta.values.map(v => v === undefined ? null : v) };
-  }
-  // Named params — convert to positional ? and collect values in SQL order
-  const args = [];
-  const converted = sqlText.replace(NAMED_PARAM_RE, (_, name) => {
-    if (bindMeta.values[name] !== undefined) {
-      args.push(bindMeta.values[name]);
-      return '?';
-    }
-    // Keep unknown named params as-is (unbound → SQLite treats as NULL)
-    return '@' + name;
-  });
-  return { sql: converted, args };
+  return params.map((v) => (v === undefined ? null : v));
 }
 
 /**
@@ -116,8 +89,8 @@ function _wrapDb(db, filePath) {
     prepare(sql) {
       return {
         all(...params) {
-          const { sql: sql2, args } = _buildSql(sql, _normalizeParams(params));
-          const s = db.prepare(sql2);
+          const args = _bindArgs(params);
+          const s = db.prepare(sql);
           if (args) s.bind(args);
           const rows = [];
           while (s.step()) rows.push(s.getAsObject());
@@ -125,8 +98,8 @@ function _wrapDb(db, filePath) {
           return rows;
         },
         get(...params) {
-          const { sql: sql2, args } = _buildSql(sql, _normalizeParams(params));
-          const s = db.prepare(sql2);
+          const args = _bindArgs(params);
+          const s = db.prepare(sql);
           if (args) s.bind(args);
           let row = null;
           if (s.step()) row = s.getAsObject();
@@ -134,8 +107,8 @@ function _wrapDb(db, filePath) {
           return row;
         },
         run(...params) {
-          const { sql: sql2, args } = _buildSql(sql, _normalizeParams(params));
-          const s = db.prepare(sql2);
+          const args = _bindArgs(params);
+          const s = db.prepare(sql);
           if (args) s.bind(args);
           s.step();
           const changes = db.getRowsModified();
@@ -179,6 +152,10 @@ function _wrapDb(db, filePath) {
           throw e;
         }
       };
+    },
+
+    flush() {
+      _flushSync();
     },
 
     close() {
@@ -300,6 +277,50 @@ function runMigrations(db, migrations, targetVersion, getVersionFn, setVersionFn
 // Config DB migrations
 // ═══════════════════════════════════════════════════════════════
 
+// Single source of truth for settings: defaults, coercion and validation.
+const SETTING_SCHEMA = {
+  api_key: { type: 'string', default: '' },
+  api_base_url: { type: 'string', default: 'https://api.deepseek.com' },
+  api_model: { type: 'string', default: 'deepseek-flash' },
+  api_type: { type: 'enum', values: ['', 'openai', 'claude'], default: '' },
+  max_output_tokens: { type: 'number', default: 8192, min: 1024, max: 131072 },
+  send_temperature: { type: 'boolean', default: true },
+  ui_language: { type: 'enum', values: ['zh', 'en'], default: 'zh' },
+  theme: { type: 'enum', values: ['dark', 'light'], default: 'dark' },
+  editor_font_size: { type: 'number', default: 17, min: 14, max: 24 },
+  editor_font_family: {
+    type: 'string',
+    default: "'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif",
+  },
+  auto_save_interval: { type: 'number', default: 30, min: 0, max: 3600 },
+  backup_enabled: { type: 'boolean', default: true },
+  accent_color: { type: 'string', default: '#c9a96e' },
+};
+
+const DEFAULT_APP_SETTINGS = Object.fromEntries(
+  Object.entries(SETTING_SCHEMA).map(([key, schema]) => [key, String(schema.default)]),
+);
+
+/** Coerce and validate a setting value; undefined means "reject". */
+function normalizeSetting(key, value) {
+  const schema = SETTING_SCHEMA[key];
+  if (!schema) return undefined;
+  if (schema.type === 'boolean') {
+    if (value === true || value === 'true' || value === 1 || value === '1') return 'true';
+    if (value === false || value === 'false' || value === 0 || value === '0') return 'false';
+    return undefined;
+  }
+  if (schema.type === 'number') {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return undefined;
+    return String(Math.min(Math.max(num, schema.min), schema.max));
+  }
+  if (schema.type === 'enum') {
+    return schema.values.includes(value) ? String(value) : undefined;
+  }
+  return String(value ?? '');
+}
+
 const configMigrations = [
   // v0 → v1: initial schema + defaults
   (db) => {
@@ -327,24 +348,19 @@ const configMigrations = [
     const count = db.prepare('SELECT COUNT(*) as c FROM app_settings').get().c;
     if (count === 0) {
       const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
-      const defaults = [
-        ['api_key', ''],
-        ['api_base_url', 'https://api.deepseek.com'],
-        ['api_model', 'deepseek-flash'],
-        ['max_output_tokens', '8192'],
-        ['ui_language', 'zh'],
-        ['theme', 'dark'],
-        ['editor_font_size', '17'],
-        ['editor_font_family', "'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif"],
-        ['auto_save_interval', '30'],
-        ['backup_enabled', 'true'],
-        ['accent_color', '#c9a96e'],
-      ];
       const innerTx = db.transaction(() => {
-        for (const [k, v] of defaults) insert.run(k, v);
+        for (const [k, v] of Object.entries(DEFAULT_APP_SETTINGS)) insert.run(k, v);
       });
       innerTx();
     }
+  },
+  // v1 → v2: project names are unique registry keys; file paths are opaque.
+  (db) => {
+    db.exec(`
+      DELETE FROM recent_projects
+      WHERE rowid NOT IN (SELECT MAX(rowid) FROM recent_projects GROUP BY name);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_recent_projects_name ON recent_projects(name);
+    `);
   },
 ];
 
@@ -376,20 +392,56 @@ function migrateConfig(db) {
 // ═══════════════════════════════════════════════════════════════
 
 const projectConnections = new Map();
+// Bound the number of project databases held in memory. Least-recently-used
+// connections are flushed and closed; opening one again reloads it from disk.
+const MAX_OPEN_PROJECTS = 8;
 
+function projectNotFound(name) {
+  const err = new Error(`项目"${name}"不存在`);
+  err.status = 404;
+  err.code = 'PROJECT_NOT_FOUND';
+  err.recoverable = true;
+  return err;
+}
+
+/** Resolve a registered project name to its stable file path. */
 function getProjectDbPath(name) {
-  return path.join(PROJECTS_DIR, `${name}.mythpen.db`);
+  const row = dbGet('SELECT file_path FROM recent_projects WHERE name = ?', [name]);
+  if (!row) throw projectNotFound(name);
+  return row.file_path;
+}
+
+/** Generate an opaque path for a new project; the display name is not a filename. */
+function newProjectFilePath() {
+  return path.join(PROJECTS_DIR, `${randomUUID()}.mythpen.db`);
+}
+
+function isProjectOpen(filePath) {
+  return projectConnections.has(filePath);
 }
 
 function openProjectDb(filePath) {
-  if (projectConnections.has(filePath)) {
-    return projectConnections.get(filePath);
+  const existing = projectConnections.get(filePath);
+  if (existing) {
+    // Refresh LRU position.
+    projectConnections.delete(filePath);
+    projectConnections.set(filePath, existing);
+    return existing;
   }
   const db = _loadDb(filePath);
   db.run('PRAGMA foreign_keys = ON');
   const wrapped = _wrapDb(db, filePath);
   migrateProject(wrapped);
   projectConnections.set(filePath, wrapped);
+  if (projectConnections.size > MAX_OPEN_PROJECTS) {
+    const [oldestPath, oldest] = projectConnections.entries().next().value;
+    projectConnections.delete(oldestPath);
+    try {
+      oldest.close();
+    } catch (e) {
+      console.warn(`[DB] Failed to close idle project "${oldestPath}":`, e.message);
+    }
+  }
   return wrapped;
 }
 
@@ -401,7 +453,11 @@ function closeProjectDb(filePath) {
 }
 
 function getProjectDb(name) {
-  return openProjectDb(getProjectDbPath(name));
+  const filePath = getProjectDbPath(name);
+  // Reads must not create projects. Only explicit create/import paths call
+  // openProjectDb() on a path that does not exist yet.
+  if (!projectConnections.has(filePath) && !fs.existsSync(filePath)) throw projectNotFound(name);
+  return openProjectDb(filePath);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -476,29 +532,6 @@ const projectMigrations = [
       CREATE TABLE IF NOT EXISTS project_genres (
         genre TEXT PRIMARY KEY
       );
-      CREATE TABLE IF NOT EXISTS sidebar_items (
-        id          TEXT PRIMARY KEY,
-        label_key   TEXT NOT NULL,
-        icon        TEXT NOT NULL,
-        category    TEXT NOT NULL CHECK (category IN ('universal','genre','optional')),
-        genres      TEXT DEFAULT '',
-        sort_order  INTEGER NOT NULL,
-        route       TEXT NOT NULL,
-        enabled     INTEGER NOT NULL DEFAULT 1
-      );
-      -- Seed default sidebar items
-      INSERT OR IGNORE INTO sidebar_items (id, label_key, icon, category, genres, sort_order, route, enabled) VALUES
-        ('dashboard',    'sidebar.dashboard',    'LayoutDashboard', 'universal', '',  1,  'page-dashboard',    1),
-        ('characters',   'sidebar.characters',   'Users',           'universal', '',  2,  'page-characters',   1),
-        ('world',        'sidebar.world',        'Globe',           'universal', '',  3,  'page-world',        1),
-        ('science',      'sidebar.science',      'FlaskConical',    'genre', 'sci-fi',  4,  'page-science',      1),
-        ('outline_page', 'sidebar.outline_page', 'ScrollText',      'universal', '',  5,  'page-outline',      1),
-        ('foreshadow',   'sidebar.foreshadow',   'Link2',           'universal', '',  6,  'page-foreshadow',   1),
-        ('memory',       'sidebar.memory',       'Brain',           'universal', '',  7,  'page-memory',       1),
-        ('relations',    'sidebar.relations',    'HeartHandshake',  'universal', '',  8,  'page-relations',    1),
-        ('timeline',     'sidebar.timeline',     'CalendarDays',    'universal', '',  9,  'page-timeline',     1),
-        ('consistency',  'sidebar.consistency',  'ShieldCheck',     'universal', '',  10, 'page-consistency',  1),
-        ('export',       'sidebar.export',       'Download',        'universal', '',  11, 'page-export',       1);
       CREATE TABLE IF NOT EXISTS foreshadows (
         id              TEXT PRIMARY KEY,
         title           TEXT NOT NULL,
@@ -603,6 +636,48 @@ const projectMigrations = [
       console.warn("[DB] Migration v1→v2 (index) skipped:", e.message)
     }
   },
+  // v2 → v3: chapter numbers are global across volumes. Legacy projects could
+  // repeat 1..N per volume; renumber them in reading order, remap the only
+  // num-based reference (foreshadow expected chapter), then enforce uniqueness.
+  (db) => {
+    const duplicate = db
+      .prepare('SELECT num FROM chapters GROUP BY num HAVING COUNT(*) > 1 LIMIT 1')
+      .get();
+    if (duplicate) {
+      // Keep a restorable copy before rewriting chapter numbers.
+      const filePath = db._path;
+      if (filePath && fs.existsSync(filePath)) {
+        try {
+          db.flush();
+          const backup = `${filePath}.pre-v3-${Date.now()}.bak`;
+          fs.copyFileSync(filePath, backup);
+          console.warn(`[DB] Chapter numbers duplicated; backup written to ${backup}`);
+        } catch (e) {
+          console.warn('[DB] Failed to back up project before renumbering:', e.message);
+        }
+      }
+      db.transaction(() => {
+        const rows = db.prepare('SELECT id, num FROM chapters ORDER BY num, id').all();
+        const remap = new Map();
+        rows.forEach((row, index) => {
+          if (!remap.has(row.num)) remap.set(row.num, index + 1);
+        });
+        // Two-phase renumber avoids transient collisions with the legacy
+        // UNIQUE(volume_id, num) constraint.
+        const parkChapter = db.prepare('UPDATE chapters SET num = -id WHERE id = ?');
+        rows.forEach((row) => parkChapter.run(row.id));
+        const updateChapter = db.prepare('UPDATE chapters SET num = ? WHERE id = ?');
+        rows.forEach((row, index) => updateChapter.run(index + 1, row.id));
+        const updateForeshadow = db.prepare(
+          'UPDATE foreshadows SET expected_resolve_chapter = ? WHERE expected_resolve_chapter = ?',
+        );
+        for (const [oldNum, newNum] of remap) {
+          if (oldNum !== newNum) updateForeshadow.run(newNum, oldNum);
+        }
+      })();
+    }
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_chapters_num_unique ON chapters(num)');
+  },
 ];
 
 const getProjectVersion = makeVersionGetter('project_meta');
@@ -665,10 +740,97 @@ function projectTransaction(projectName, fn) {
 // Shared helpers
 // ═══════════════════════════════════════════════════════════════
 
+/** Word count used for chapters and export totals (whitespace excluded). */
+function countWords(text) {
+  return String(text ?? '').replace(/\s/g, '').length;
+}
+
 function recalculateWordCount(projectName) {
   const total = projectGet(projectName, 'SELECT SUM(word_count) as total FROM chapters')?.total || 0;
   projectExecute(projectName, "UPDATE project_meta SET value = ? WHERE key = 'word_count'", [String(total)]);
   projectExecute(projectName, "UPDATE project_meta SET value = ? WHERE key = 'updated_at'", [new Date().toISOString()]);
+}
+
+// Project names become filenames, so every entry point must apply the same rules.
+const INVALID_NAME_RE = /[\\/:*?"<>|\u0000-\u001f]/;
+const WINDOWS_RESERVED_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+
+/** Returns a user-facing error message, or null when the name is valid. */
+function validateProjectName(name) {
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (!trimmed) return '项目名称不能为空';
+  if (trimmed.length > 80) return '项目名称不能超过 80 个字符';
+  if (trimmed === '.' || trimmed === '..') return '项目名称不合法';
+  if (trimmed.startsWith('.')) return '项目名称不能以点开头';
+  if (INVALID_NAME_RE.test(trimmed)) return '项目名称不能包含 \\ / : * ? " < > | 等字符';
+  if (WINDOWS_RESERVED_RE.test(trimmed)) return '项目名称不能使用系统保留名';
+  return null;
+}
+
+/** Write the default project metadata, with per-path overrides. */
+function initProjectMeta(projectName, overrides = {}) {
+  const now = new Date().toISOString();
+  const meta = {
+    name: projectName,
+    description: '',
+    mode: 'medium-novel',
+    language: 'zh',
+    version: '1',
+    created_at: now,
+    updated_at: now,
+    word_count: '0',
+    author_name: '佚名',
+    workflow_phase: 'idea',
+    ...overrides,
+  };
+  const insert = getProjectDb(projectName).prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)');
+  for (const [key, value] of Object.entries(meta)) insert.run(key, value);
+}
+
+function initProjectGenres(projectName, genres) {
+  const insert = getProjectDb(projectName).prepare('INSERT OR IGNORE INTO project_genres (genre) VALUES (?)');
+  for (const genre of genres) insert.run(genre);
+}
+
+/** Record AI token usage; never let accounting failures break a request. */
+function recordTokenUsage(projectName, taskName, usage, model) {
+  try {
+    projectExecute(
+      projectName,
+      'INSERT INTO token_usage (task_name, input_tokens, output_tokens, model) VALUES (?, ?, ?, ?)',
+      [taskName, usage?.inputTokens || 0, usage?.outputTokens || 0, model],
+    );
+  } catch (e) {
+    console.warn(`[Token Usage] Failed to record ${taskName}:`, e.message);
+  }
+}
+
+function registerRecentProject(name, filePath, wordCount = 0) {
+  const now = new Date().toISOString();
+  const existing = dbGet('SELECT id FROM recent_projects WHERE name = ?', [name]);
+  if (existing) {
+    dbExecute(
+      'UPDATE recent_projects SET file_path = ?, last_opened = ?, word_count = ? WHERE id = ?',
+      [filePath, now, wordCount, existing.id],
+    );
+    return existing.id;
+  }
+  const id = randomUUID();
+  dbExecute(
+    'INSERT INTO recent_projects (id, name, file_path, last_opened, word_count) VALUES (?, ?, ?, ?, ?)',
+    [id, name, filePath, now, wordCount],
+  );
+  return id;
+}
+
+/** The volume continuation chapters should land in (the last one). */
+function lastVolumeId(projectName) {
+  return projectGet(projectName, 'SELECT id FROM volumes ORDER BY sort_order DESC, id DESC LIMIT 1')?.id ?? 1;
+}
+
+/** Globally unique chapter number used by the num-only chapter APIs. */
+function nextChapterNumber(projectName) {
+  return (projectGet(projectName, 'SELECT MAX(num) as mx FROM chapters')?.mx || 0) + 1;
 }
 
 function getCoverDir(projectName) {
@@ -693,6 +855,8 @@ module.exports = {
   getConfigDb,
   getProjectDb,
   getProjectDbPath,
+  newProjectFilePath,
+  isProjectOpen,
   openProjectDb,
   closeProjectDb,
   dbQuery,
@@ -702,9 +866,20 @@ module.exports = {
   projectGet,
   projectExecute,
   projectTransaction,
+  countWords,
   recalculateWordCount,
+  recordTokenUsage,
+  initProjectMeta,
+  initProjectGenres,
+  validateProjectName,
+  registerRecentProject,
+  lastVolumeId,
+  nextChapterNumber,
   getCoverDir,
   findCoverPath,
   MIME_TO_EXT,
   EXT_TO_MIME,
+  DEFAULT_APP_SETTINGS,
+  SETTING_SCHEMA,
+  normalizeSetting,
 };

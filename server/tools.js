@@ -690,33 +690,14 @@ const TOOLS = [
 ];
 const { randomUUID } = require('crypto');
 
-function executeTool(projectName, toolName, args) {
-  const db = require('./db');
-  const pdb = db.getProjectDb(projectName);
-
-  // ─── Shared helpers ───
-  function updateById(id, table, fields, allowed, addUpdatedAt) {
-    const updates = []; const params = [];
-    for (const key of allowed) {
-      if (fields[key] !== undefined) { updates.push(`${key} = ?`); params.push(fields[key]); }
-    }
-    if (updates.length === 0) return { error: '没有要更新的字段' };
-    if (addUpdatedAt) updates.push("updated_at = datetime('now')");
-    params.push(id);
-    const info = pdb.prepare(`UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`).run(...params);
-    if (info.changes === 0) return { error: `条目 ${id} 不存在` };
-    return { updated: true, id };
-  }
-
-  function deleteById(id, table, idField, entityName) {
-    const info = pdb.prepare(`DELETE FROM ${table} WHERE ${idField} = ?`).run(id);
-    if (info.changes === 0) return { error: `${entityName} ${id} 不存在` };
-    return { deleted: true, [idField]: id };
-  }
-
-  switch (toolName) {
-    // ── Chapters ──
-    case 'list_chapters': {
+// Each tool entry owns its handler, client entity and prompt category.
+const HANDLERS = {
+  // ── Chapters ──
+  list_chapters: {
+    entity: null,
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const total = pdb.prepare('SELECT COUNT(*) as c FROM chapters').get().c;
       const limit = Math.min(Math.max(parseInt(args.limit, 10) || 200, 1), 1000);
       const offset = Math.max(parseInt(args.offset, 10) || 0, 0);
@@ -724,8 +705,13 @@ function executeTool(projectName, toolName, args) {
         'SELECT num, title, status, word_count, outline, summary, volume_id, created_at, updated_at FROM chapters ORDER BY num LIMIT ? OFFSET ?',
       ).all(limit, offset);
       return { total, limit, offset, chapters: rows };
-    }
-    case 'get_chapter': {
+    },
+  },
+  get_chapter: {
+    entity: null,
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const row = pdb.prepare('SELECT * FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!row) return { error: `章节 ${args.chapter_num} 不存在` };
       // Keep tool results bounded for very large (e.g. imported) chapters.
@@ -737,29 +723,29 @@ function executeTool(projectName, toolName, args) {
         row.omitted_chars = omitted;
       }
       return row;
-    }
-    case 'create_chapter': {
-      let volId = args.volume_id;
-      if (!volId) {
-        const lastVol = pdb.prepare('SELECT id FROM volumes ORDER BY sort_order DESC, id DESC LIMIT 1').get();
-        volId = lastVol?.id || 1;
-      }
-      let num;
-      if (args.chapter_num !== undefined) {
-        num = args.chapter_num;
-      } else {
-        const max = pdb.prepare('SELECT MAX(num) as mx FROM chapters').get();
-        num = (max?.mx || 0) + 1;
-      }
+    },
+  },
+  create_chapter: {
+    entity: 'chapter',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      const volId = args.volume_id || db.lastVolumeId(projectName);
+      const num = args.chapter_num !== undefined ? args.chapter_num : db.nextChapterNumber(projectName);
       pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
         .run(volId, num, args.title, args.outline || '', args.content || '',
-          args.content ? String(args.content).replace(/\s/g, '').length : 0,
+          args.content ? db.countWords(args.content) : 0,
           args.cognitive_frame || '', args.emotional_anchor || '', args.world_texture || '',
           args.concrete_mystery || '', args.interpersonal_tension || '');
       return { created: true, chapter_num: num, title: args.title };
-    }
-    case 'update_chapter': {
+    },
+  },
+  update_chapter: {
+    entity: 'chapter',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const { chapter_num, ...fields } = args;
       const allowed = ['title', 'content', 'outline', 'status', 'summary', 'cognitive_frame', 'emotional_anchor', 'world_texture', 'concrete_mystery', 'interpersonal_tension'];
       const updates = [];
@@ -772,7 +758,7 @@ function executeTool(projectName, toolName, args) {
       }
       if (updates.length === 0) return { error: '没有要更新的字段' };
       if (fields.content !== undefined) {
-        const wc = String(fields.content).replace(/\s/g, '').length;
+        const wc = db.countWords(fields.content);
         updates.push('word_count = ?');
         params.push(wc);
       }
@@ -781,20 +767,34 @@ function executeTool(projectName, toolName, args) {
       pdb.prepare(`UPDATE chapters SET ${updates.join(', ')} WHERE num = ?`).run(...params);
       db.recalculateWordCount(projectName);
       return { updated: true, chapter_num, changed_fields: Object.keys(fields).filter(k => allowed.includes(k)) };
-    }
-    case 'delete_chapter': {
+    },
+  },
+  delete_chapter: {
+    entity: 'chapter',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const row = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!row) return { error: `章节 ${args.chapter_num} 不存在` };
       pdb.prepare('DELETE FROM chapters WHERE num = ?').run(args.chapter_num);
       db.recalculateWordCount(projectName);
       return { deleted: true, chapter_num: args.chapter_num };
-    }
-
-    // ── Characters ──
-    case 'list_characters': {
+    },
+  },
+  // ── Characters ──
+  list_characters: {
+    entity: null,
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return pdb.prepare('SELECT id, name, age, gender, personality, background, motivation, arc, notes FROM characters ORDER BY name').all();
-    }
-    case 'get_character': {
+    },
+  },
+  get_character: {
+    entity: null,
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const row = pdb.prepare('SELECT * FROM characters WHERE name = ?').get(args.name);
       if (!row) return { error: `角色 "${args.name}" 不存在` };
       // Get chapters this character appears in
@@ -805,16 +805,26 @@ function executeTool(projectName, toolName, args) {
         WHERE ch.name = ?
       `).all(args.name);
       return { ...row, appears_in: chapters };
-    }
-    case 'create_character': {
+    },
+  },
+  create_character: {
+    entity: 'character',
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       pdb.prepare(`INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, args.name, args.age || '', args.gender || '', args.appearance || '', args.personality || '',
           args.background || '', args.motivation || '', args.arc || '', args.notes || '');
       return { created: true, id, name: args.name };
-    }
-    case 'update_character': {
+    },
+  },
+  update_character: {
+    entity: 'character',
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const { name, ...fields } = args;
       const existing = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(name);
       if (!existing) return { error: `角色 "${name}" 不存在` };
@@ -829,35 +839,58 @@ function executeTool(projectName, toolName, args) {
       params.push(name);
       pdb.prepare(`UPDATE characters SET ${updates.join(', ')} WHERE name = ?`).run(...params);
       return { updated: true, name };
-    }
-
-    // ── World ──
-    case 'list_world': {
+    },
+  },
+  // ── World ──
+  list_world: {
+    entity: null,
+    category: '世界观',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return pdb.prepare('SELECT id, category, name, description, tags FROM world_entries ORDER BY category, name').all();
-    }
-    case 'create_world_entry': {
+    },
+  },
+  create_world_entry: {
+    entity: 'world',
+    category: '世界观',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       pdb.prepare('INSERT INTO world_entries (id, category, name, description, tags) VALUES (?, ?, ?, ?, ?)')
         .run(id, args.category, args.name, args.description, args.tags || '');
       return { created: true, id, category: args.category, name: args.name };
-    }
-
-    // ── Foreshadows ──
-    case 'list_foreshadows': {
+    },
+  },
+  // ── Foreshadows ──
+  list_foreshadows: {
+    entity: null,
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       let sql = 'SELECT * FROM foreshadows';
       const params = [];
       if (args.status) { sql += ' WHERE status = ?'; params.push(args.status); }
       sql += ' ORDER BY created_at';
       return pdb.prepare(sql).all(...params);
-    }
-    case 'create_foreshadow': {
+    },
+  },
+  create_foreshadow: {
+    entity: 'foreshadow',
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       pdb.prepare(`INSERT INTO foreshadows (id, title, description, status, priority, expected_resolve_chapter)
         VALUES (?, ?, ?, 'planted', ?, ?)`)
         .run(id, args.title, args.description, args.priority || 'normal', args.expected_resolve_chapter || 0);
       return { created: true, id, title: args.title };
-    }
-    case 'update_foreshadow': {
+    },
+  },
+  update_foreshadow: {
+    entity: 'foreshadow',
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const f = pdb.prepare('SELECT id FROM foreshadows WHERE title = ?').get(args.title);
       if (!f) return { error: `伏笔 "${args.title}" 不存在` };
       const updates = [];
@@ -869,18 +902,27 @@ function executeTool(projectName, toolName, args) {
       params.push(args.title);
       pdb.prepare(`UPDATE foreshadows SET ${updates.join(', ')} WHERE title = ?`).run(...params);
       return { updated: true, title: args.title };
-    }
-
-    // ── Relations ──
-    case 'list_relations': {
+    },
+  },
+  // ── Relations ──
+  list_relations: {
+    entity: null,
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return pdb.prepare(`
         SELECT cr.*, ca.name as character_a_name, cb.name as character_b_name
         FROM character_relations cr
         JOIN characters ca ON cr.character_a_id = ca.id
         JOIN characters cb ON cr.character_b_id = cb.id
       `).all();
-    }
-    case 'create_relation': {
+    },
+  },
+  create_relation: {
+    entity: 'relation',
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const a = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_a);
       const b = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_b);
       if (!a) return { error: `角色 "${args.character_a}" 不存在，请先创建` };
@@ -890,32 +932,54 @@ function executeTool(projectName, toolName, args) {
         VALUES (?, ?, ?, ?, ?, ?)`)
         .run(id, a.id, b.id, args.relation_type, args.description || '', args.intensity || 3);
       return { created: true, id, relation: `${args.character_a} → ${args.character_b}: ${args.relation_type}` };
-    }
-
-    // ── Memories ──
-    case 'list_memories': {
+    },
+  },
+  // ── Memories ──
+  list_memories: {
+    entity: null,
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return pdb.prepare('SELECT * FROM memories ORDER BY created_at DESC').all();
-    }
-    case 'create_memory': {
+    },
+  },
+  create_memory: {
+    entity: 'memory',
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       pdb.prepare('INSERT INTO memories (id, category, content, source_chapter_id) VALUES (?, ?, ?, ?)')
         .run(id, args.category, args.content, args.source_chapter_num || null);
       return { created: true, id, category: args.category };
-    }
-
-    // ── Timeline ──
-    case 'list_timeline': {
+    },
+  },
+  // ── Timeline ──
+  list_timeline: {
+    entity: null,
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return pdb.prepare('SELECT * FROM timeline_events ORDER BY year').all();
-    }
-    case 'create_timeline_event': {
+    },
+  },
+  create_timeline_event: {
+    entity: 'timeline',
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       pdb.prepare('INSERT INTO timeline_events (id, year, title, description, importance) VALUES (?, ?, ?, ?, ?)')
         .run(id, args.year, args.title, args.description, args.importance || 3);
       return { created: true, id, year: args.year, title: args.title };
-    }
-
-    // ── Stats ──
-    case 'get_stats': {
+    },
+  },
+  // ── Stats ──
+  get_stats: {
+    entity: null,
+    category: '项目状态',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const totalWords = pdb.prepare('SELECT SUM(word_count) as total FROM chapters').get().total || 0;
       const chCount = pdb.prepare('SELECT COUNT(*) as cnt FROM chapters').get().cnt;
       const charCount = pdb.prepare('SELECT COUNT(*) as cnt FROM characters').get().cnt;
@@ -926,24 +990,38 @@ function executeTool(projectName, toolName, args) {
       pdb.prepare('SELECT status, COUNT(*) as cnt FROM chapters GROUP BY status').all()
         .forEach(r => statusBreakdown[r.status] = r.cnt);
       return { totalWords, chapterCount: chCount, characterCount: charCount, foreshadowCount, worldCount, sciCount, chapterStatus: statusBreakdown };
-    }
-
-    // ── Volumes ──
-    case 'list_volumes': {
+    },
+  },
+  // ── Volumes ──
+  list_volumes: {
+    entity: null,
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const vols = pdb.prepare('SELECT * FROM volumes ORDER BY sort_order').all();
       for (const v of vols) {
         v.chapters = pdb.prepare('SELECT num, title, status, word_count, outline, summary FROM chapters WHERE volume_id = ? ORDER BY num').all(v.id);
       }
       return vols;
-    }
-    case 'create_volume': {
+    },
+  },
+  create_volume: {
+    entity: 'volume',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const max = pdb.prepare('SELECT COALESCE(MAX(sort_order), 0) as mx FROM volumes').get();
       const sortOrder = (max?.mx || 0) + 1;
       const result = pdb.prepare("INSERT INTO volumes (sort_order, title, summary, created_at) VALUES (?, ?, ?, datetime('now'))")
         .run(sortOrder, args.title, args.summary || '');
       return { created: true, volume_id: result.lastInsertRowid, title: args.title };
-    }
-    case 'update_volume': {
+    },
+  },
+  update_volume: {
+    entity: 'volume',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const updates = [];
       const params = [];
       if (args.title !== undefined) { updates.push('title = ?'); params.push(args.title); }
@@ -952,75 +1030,141 @@ function executeTool(projectName, toolName, args) {
       params.push(args.volume_id);
       pdb.prepare(`UPDATE volumes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
       return { updated: true, volume_id: args.volume_id };
-    }
-    case 'delete_volume': {
+    },
+  },
+  delete_volume: {
+    entity: 'volume',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const vol = pdb.prepare('SELECT id FROM volumes WHERE id = ?').get(args.volume_id);
       if (!vol) return { error: `卷 ${args.volume_id} 不存在` };
       pdb.prepare('DELETE FROM chapters WHERE volume_id = ?').run(args.volume_id);
       pdb.prepare('DELETE FROM volumes WHERE id = ?').run(args.volume_id);
       return { deleted: true, volume_id: args.volume_id };
-    }
-
-    // ── Science ──
-    case 'list_science': {
+    },
+  },
+  // ── Science ──
+  list_science: {
+    entity: null,
+    category: '科幻设定',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return pdb.prepare('SELECT * FROM science_entries ORDER BY label, name').all();
-    }
-    case 'create_science_entry': {
+    },
+  },
+  create_science_entry: {
+    entity: 'science',
+    category: '科幻设定',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       pdb.prepare('INSERT INTO science_entries (id, label, name, description, "references") VALUES (?, ?, ?, ?, ?)')
         .run(id, args.label, args.name, args.description, args.references || '');
       return { created: true, id, label: args.label, name: args.name };
-    }
-
-    // ── World update/delete ──
-    case 'update_world_entry': {
+    },
+  },
+  // ── World update/delete ──
+  update_world_entry: {
+    entity: 'world',
+    category: '世界观',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return updateById(args.id, 'world_entries', args, ['category', 'name', 'description', 'tags'], true);
-    }
-    case 'delete_world_entry': {
+    },
+  },
+  delete_world_entry: {
+    entity: 'world',
+    category: '世界观',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'world_entries', 'id', '条目');
-    }
-
-    // ── Relations update/delete ──
-    case 'update_relation': {
+    },
+  },
+  // ── Relations update/delete ──
+  update_relation: {
+    entity: 'relation',
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return updateById(args.id, 'character_relations', args, ['relation_type', 'description', 'intensity'], false);
-    }
-    case 'delete_relation': {
+    },
+  },
+  delete_relation: {
+    entity: 'relation',
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'character_relations', 'id', '关系');
-    }
-
-    // ── Memories update/delete ──
-    case 'update_memory': {
+    },
+  },
+  // ── Memories update/delete ──
+  update_memory: {
+    entity: 'memory',
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return updateById(args.id, 'memories', args, ['category', 'content'], false);
-    }
-    case 'delete_memory': {
+    },
+  },
+  delete_memory: {
+    entity: 'memory',
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'memories', 'id', '记忆');
-    }
-
-    // ── Timeline update/delete ──
-    case 'update_timeline_event': {
+    },
+  },
+  // ── Timeline update/delete ──
+  update_timeline_event: {
+    entity: 'timeline',
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return updateById(args.id, 'timeline_events', args, ['year', 'title', 'description', 'importance'], false);
-    }
-    case 'delete_timeline_event': {
+    },
+  },
+  delete_timeline_event: {
+    entity: 'timeline',
+    category: '时间线与记忆',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'timeline_events', 'id', '事件');
-    }
-
-    // ── Science delete ──
-    case 'delete_science_entry': {
+    },
+  },
+  // ── Science delete ──
+  delete_science_entry: {
+    entity: 'science',
+    category: '科幻设定',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'science_entries', 'id', '条目');
-    }
-
-    // ── Character delete ──
-    case 'delete_character': {
+    },
+  },
+  // ── Character delete ──
+  delete_character: {
+    entity: 'character',
+    category: '设定构建',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.name, 'characters', 'name', '角色');
-    }
-
-    // ── Foreshadow delete ──
-    case 'delete_foreshadow': {
+    },
+  },
+  // ── Foreshadow delete ──
+  delete_foreshadow: {
+    entity: 'foreshadow',
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.title, 'foreshadows', 'title', '伏笔');
-    }
-
-    // ── Chapter Characters ──
-    case 'list_chapter_characters': {
+    },
+  },
+  // ── Chapter Characters ──
+  list_chapter_characters: {
+    entity: null,
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       if (args.chapter_num) {
         return pdb.prepare(`
           SELECT cc.chapter_id, c.title as chapter_title, cc.character_id, ch.name as character_name, cc.role
@@ -1047,8 +1191,13 @@ function executeTool(projectName, toolName, args) {
         JOIN chapters c ON c.id = cc.chapter_id
         JOIN characters ch ON ch.id = cc.character_id
         ORDER BY c.num, ch.name`).all();
-    }
-    case 'set_chapter_character': {
+    },
+  },
+  set_chapter_character: {
+    entity: 'chapter',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const ch = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!ch) return { error: `章节 ${args.chapter_num} 不存在` };
       const char = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_name);
@@ -1057,8 +1206,13 @@ function executeTool(projectName, toolName, args) {
       pdb.prepare('INSERT OR REPLACE INTO chapter_characters (chapter_id, character_id, role) VALUES (?, ?, ?)')
         .run(ch.id, char.id, role);
       return { set: true, chapter_num: args.chapter_num, character_name: args.character_name, role };
-    }
-    case 'remove_chapter_character': {
+    },
+  },
+  remove_chapter_character: {
+    entity: 'chapter',
+    category: '章节与卷',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const ch = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!ch) return { error: `章节 ${args.chapter_num} 不存在` };
       const char = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.character_name);
@@ -1066,16 +1220,25 @@ function executeTool(projectName, toolName, args) {
       const info = pdb.prepare('DELETE FROM chapter_characters WHERE chapter_id = ? AND character_id = ?').run(ch.id, char.id);
       if (info.changes === 0) return { error: `角色 ${args.character_name} 在章节 ${args.chapter_num} 中没有出场记录` };
       return { deleted: true, chapter_num: args.chapter_num, character_name: args.character_name };
-    }
-
-    // ── Clue Board ──
-    case 'list_clues': {
+    },
+  },
+  // ── Clue Board ──
+  list_clues: {
+    entity: null,
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       let sql = 'SELECT * FROM clue_board ORDER BY resolved, created_at DESC';
       if (args.status === 'unresolved') { sql = 'SELECT * FROM clue_board WHERE resolved = 0 ORDER BY created_at DESC'; }
       if (args.status === 'resolved') { sql = 'SELECT * FROM clue_board WHERE resolved = 1 ORDER BY resolved_at DESC'; }
       return pdb.prepare(sql).all();
-    }
-    case 'create_clue': {
+    },
+  },
+  create_clue: {
+    entity: null,
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
       let relatedChapterId = null;
       if (args.related_chapter_num) {
@@ -1085,8 +1248,13 @@ function executeTool(projectName, toolName, args) {
       pdb.prepare('INSERT INTO clue_board (id, title, description, kind, related_chapter_id, resolved, created_at) VALUES (?, ?, ?, ?, ?, 0, datetime(\'now\'))')
         .run(id, args.title, args.description || '', args.kind, relatedChapterId);
       return { created: true, id, title: args.title, kind: args.kind };
-    }
-    case 'update_clue': {
+    },
+  },
+  update_clue: {
+    entity: null,
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const existing = pdb.prepare('SELECT * FROM clue_board WHERE id = ?').get(args.id);
       if (!existing) return { error: `线索 ${args.id} 不存在` };
       const updates = []; const params = [];
@@ -1102,13 +1270,22 @@ function executeTool(projectName, toolName, args) {
       params.push(args.id);
       pdb.prepare(`UPDATE clue_board SET ${updates.join(', ')} WHERE id = ?`).run(...params);
       return { updated: true, id: args.id };
-    }
-    case 'delete_clue': {
+    },
+  },
+  delete_clue: {
+    entity: null,
+    category: '伏笔与线索',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'clue_board', 'id', '线索');
-    }
-
-    // ── Project Meta ──
-    case 'get_project_meta': {
+    },
+  },
+  // ── Project Meta ──
+  get_project_meta: {
+    entity: null,
+    category: '项目状态',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const meta = {};
       pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
       const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
@@ -1121,25 +1298,116 @@ function executeTool(projectName, toolName, args) {
         language: meta.language || 'zh',
         phase: meta.workflow_phase || 'idea',
         phaseLabel: ({idea:'选题',setting:'设定',outline:'大纲',writing:'写作',review:'审阅',consistency:'一致性',export:'导出'})[meta.workflow_phase] || '选题',
-        wordCount: meta.word_count || 0,
+        wordCount: Number(meta.word_count) || 0,
         authorName: meta.author_name || '',
         description: meta.description || '',
       };
-    }
-
-    // ── Project Phase ──
-    case 'update_project_phase': {
+    },
+  },
+  // ── Project Phase ──
+  update_project_phase: {
+    entity: 'project',
+    category: '项目状态',
+    run(ctx) {
+      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const validPhases = ['idea', 'setting', 'outline', 'writing', 'review', 'consistency', 'export'];
       if (!validPhases.includes(args.phase)) {
         return { error: `无效阶段: ${args.phase}，有效值: ${validPhases.join('、')}` };
       }
       pdb.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('workflow_phase', ?)").run(args.phase);
       return { updated: true, phase: args.phase };
-    }
+    },
+  },
+};
 
-    default:
-      return { error: `未知工具: ${toolName}` };
-  }
+// Single tool registry: schema + handler + entity + prompt category.
+// TOOLS (the AI-facing schema array) is the source for names/params; the
+// handler map is validated against it at startup so the two cannot drift.
+const TOOL_REGISTRY = Object.fromEntries(
+  TOOLS.map((schema) => {
+    const name = schema.function.name;
+    const handler = HANDLERS[name];
+    if (!handler) throw new Error(`Tool "${name}" has no handler`);
+    return [
+      name,
+      {
+        name,
+        description: schema.function.description,
+        parameters: schema.function.parameters,
+        entity: handler.entity,
+        category: handler.category,
+        run: handler.run,
+      },
+    ];
+  }),
+);
+for (const name of Object.keys(HANDLERS)) {
+  if (!TOOL_REGISTRY[name]) throw new Error(`Handler "${name}" has no tool schema`);
 }
 
-module.exports = { TOOLS, executeTool };
+const CATEGORY_ORDER = ['设定构建', '世界观', '科幻设定', '伏笔与线索', '章节与卷', '时间线与记忆', '项目状态', '其他'];
+
+function describeParams(tool) {
+  const props = tool.parameters?.properties || {};
+  const required = new Set(tool.parameters?.required || []);
+  return Object.entries(props)
+    .map(([key, schema]) => {
+      const hint = schema.enum ? schema.enum.join('|') : schema.type;
+      return `${key}${required.has(key) ? '' : '?'}${hint ? `:${hint}` : ''}`;
+    })
+    .join(', ');
+}
+
+/** Compact tool manual generated from the registry (used by prompts). */
+function buildToolReference() {
+  const groups = new Map();
+  for (const tool of Object.values(TOOL_REGISTRY)) {
+    if (!groups.has(tool.category)) groups.set(tool.category, []);
+    groups.get(tool.category).push(tool);
+  }
+  const order = [...groups.keys()].sort(
+    (a, b) => (CATEGORY_ORDER.indexOf(a) + 1 || 99) - (CATEGORY_ORDER.indexOf(b) + 1 || 99),
+  );
+  return order
+    .map((category) => {
+      const items = groups.get(category).map((tool) => {
+        const summary = String(tool.description || '').split(/[。\n]/)[0].slice(0, 120);
+        return `- ${tool.name}(${describeParams(tool)}) — ${summary}`;
+      });
+      return `【${category}】\n${items.join('\n')}`;
+    })
+    .join('\n\n');
+}
+
+function executeTool(projectName, toolName, args) {
+  const tool = TOOL_REGISTRY[toolName];
+  if (!tool) return { error: `未知工具: ${toolName}` };
+
+  const db = require('./db');
+  const pdb = db.getProjectDb(projectName);
+
+  // ─── Shared helpers ───
+  function updateById(id, table, fields, allowed, addUpdatedAt) {
+    const updates = []; const params = [];
+    for (const key of allowed) {
+      if (fields[key] !== undefined) { updates.push(`${key} = ?`); params.push(fields[key]); }
+    }
+    if (updates.length === 0) return { error: '没有要更新的字段' };
+    if (addUpdatedAt) updates.push("updated_at = datetime('now')");
+    params.push(id);
+    const info = pdb.prepare(`UPDATE ${table} SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+    if (info.changes === 0) return { error: `条目 ${id} 不存在` };
+    return { updated: true, id };
+  }
+
+  function deleteById(id, table, idField, entityName) {
+    const info = pdb.prepare(`DELETE FROM ${table} WHERE ${idField} = ?`).run(id);
+    if (info.changes === 0) return { error: `${entityName} ${id} 不存在` };
+    return { deleted: true, [idField]: id };
+  }
+
+  return tool.run({ db, pdb, projectName, args, updateById, deleteById });
+}
+
+module.exports = { TOOLS, TOOL_REGISTRY, buildToolReference, executeTool };
+

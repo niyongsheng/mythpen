@@ -4,6 +4,7 @@ const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
+const { chapterHeading, volumeHeading } = require('../titles');
 
 function project(name) {
   // Ensure project DB is accessible
@@ -31,69 +32,78 @@ function updateRecord(projectName, table, id, body, allowedFields, addUpdatedAt)
 
 router.get('/projects', (req, res) => {
   const rows = db.dbQuery('SELECT * FROM recent_projects ORDER BY last_opened DESC');
-  const projects = rows.map(r => {
-    let status = '刚起步';
-    try {
-      const db2 = db.openProjectDb(r.file_path);
-      const meta = {};
-      db2.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
-      const chCount = db2.prepare('SELECT COUNT(*) as c FROM chapters').get().c;
-      const genres = db2.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
-      const wordCount = parseInt(meta.word_count || '0');
-      const iconMap = { 'sci-fi': 'Rocket', 'fantasy': 'Wand', 'romance': 'Heart', 'history': 'Landmark', 'urban': 'Building', 'power-fantasy': 'Zap', 'biography': 'BookOpen', 'other': 'Scroll' };
-      const iconName = genres.map(g => iconMap[g] || 'BookOpen').join(' ');
-      const genreLabels = { 'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情', 'history': '历史', 'urban': '都市', 'power-fantasy': '爽文', 'biography': '传记', 'other': '其他' };
-      return {
-        id: r.id, name: r.name, iconName: iconName || 'BookOpen',
-        genres: genres.map(g => genreLabels[g] || g),
-        wordCount, chapterCount: chCount, lastOpened: r.last_opened,
-        mode: meta.mode || 'medium-novel',
-        status: wordCount > 30000 ? '写作中' : wordCount > 5000 ? '进行中' : '刚起步',
-      };
-    } catch (e) {
-      return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: '未知' };
-    }
-  });
+  const projects = rows
+    .map((r) => {
+      try {
+        // Never recreate a registered project whose file was removed externally.
+        // A freshly created project may still be only in memory.
+        if (!fs.existsSync(r.file_path) && !db.isProjectOpen(r.file_path)) return null;
+        const db2 = db.openProjectDb(r.file_path);
+        const meta = {};
+        db2.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
+        const chCount = db2.prepare('SELECT COUNT(*) as c FROM chapters').get().c;
+        const genres = db2.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
+        const wordCount = parseInt(meta.word_count || '0');
+        const iconMap = { 'sci-fi': 'Rocket', 'fantasy': 'Wand', 'romance': 'Heart', 'history': 'Landmark', 'urban': 'Building', 'power-fantasy': 'Zap', 'biography': 'BookOpen', 'other': 'Scroll' };
+        const iconName = genres.map(g => iconMap[g] || 'BookOpen').join(' ');
+        const genreLabels = { 'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情', 'history': '历史', 'urban': '都市', 'power-fantasy': '爽文', 'biography': '传记', 'other': '其他' };
+        return {
+          id: r.id, name: r.name, iconName: iconName || 'BookOpen',
+          genres: genres.map(g => genreLabels[g] || g),
+          wordCount, chapterCount: chCount, lastOpened: r.last_opened,
+          mode: meta.mode || 'medium-novel',
+          status: wordCount > 30000 ? 'writing' : wordCount > 5000 ? 'inProgress' : 'new',
+        };
+      } catch (e) {
+        return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: 'unknown' };
+      }
+    })
+    .filter(Boolean);
   res.json(projects);
 });
 
 router.post('/projects', (req, res) => {
   const { name, mode = 'medium-novel', language = 'zh', genres = ['other'] } = req.body || {};
-  if (!name) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '项目名称不能为空', recoverable: true } });
+  const nameError = db.validateProjectName(name);
+  if (nameError) {
+    return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: nameError, recoverable: true } });
+  }
 
-  const filePath = db.getProjectDbPath(name);
-  if (require('fs').existsSync(filePath)) {
+  if (db.dbGet('SELECT 1 AS x FROM recent_projects WHERE name = ?', [name])) {
     return res.status(409).json({ error: { code: 'PROJECT_ALREADY_EXISTS', message: `项目"${name}"已存在`, recoverable: true } });
   }
 
-  // Create new project DB
+  // Create new project DB. The file name is opaque; the display name is the
+  // registry key, so renaming/relocating does not depend on the path.
+  const filePath = db.newProjectFilePath();
   const pdb = db.openProjectDb(filePath);
-  const metaInsert = pdb.prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)');
-  const meta = { name, description: '', mode, language, version: '1', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), word_count: '0', author_name: '佚名', workflow_phase: 'idea' };
-  for (const [k, v] of Object.entries(meta)) metaInsert.run(k, v);
+  db.registerRecentProject(name, filePath);
+  try {
+    db.initProjectMeta(name, { mode, language });
+    db.initProjectGenres(name, genres);
 
-  // Default volume
-  pdb.prepare("INSERT INTO volumes (id, sort_order, title, summary) VALUES (1, 1, '第一卷', '')").run();
-
-  // Genres
-  for (const g of genres) {
-    pdb.prepare('INSERT OR IGNORE INTO project_genres (genre) VALUES (?)').run(g);
+    // Default volume
+    pdb.prepare("INSERT INTO volumes (id, sort_order, title, summary) VALUES (1, 1, '第一卷', '')").run();
+  } catch (err) {
+    db.closeProjectDb(filePath);
+    try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+    db.dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
+    throw err;
   }
-
-  // Config
-  const config = db.getConfigDb();
-  config.prepare('INSERT OR REPLACE INTO recent_projects (id, name, file_path, last_opened, word_count) VALUES (?, ?, ?, ?, ?)').run(name, name, filePath, new Date().toISOString(), 0);
 
   res.json({ name, filePath, mode, language, genres });
 });
 
 router.get('/projects/:name', (req, res) => {
   const { name } = req.params;
-  const filePath = db.getProjectDbPath(name);
-  if (!require('fs').existsSync(filePath)) {
+  let filePath;
+  let pdb;
+  try {
+    filePath = db.getProjectDbPath(name);
+    pdb = db.getProjectDb(name);
+  } catch {
     return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
   }
-  const pdb = db.openProjectDb(filePath);
   const meta = {};
   pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
   const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
@@ -102,40 +112,32 @@ router.get('/projects/:name', (req, res) => {
 
 router.delete('/projects/:name', (req, res) => {
   const { name } = req.params;
-  const filePath = db.getProjectDbPath(name);
+  let filePath;
+  try {
+    filePath = db.getProjectDbPath(name);
+  } catch {
+    return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
+  }
   db.closeProjectDb(filePath);
-  try { require('fs').unlinkSync(filePath); } catch(e) {}
+  try { fs.unlinkSync(filePath); } catch(e) {}
   db.dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
   res.json({ success: true });
-});
-
-// ─── Sidebar Items (genre-filtered) ───
-router.get('/:project/sidebar-items', (req, res) => {
-  const pdb = db.getProjectDb(req.params.project);
-  try {
-    const genres = pdb.prepare('SELECT genre FROM project_genres').all().map((g) => g.genre);
-    const items = pdb.prepare('SELECT * FROM sidebar_items WHERE enabled = 1 ORDER BY sort_order').all();
-    const filtered = items.filter((item) => {
-      if (item.category === 'universal') return true;
-      if (item.category === 'genre') {
-        const itemGenres = item.genres ? item.genres.split(',').map((s) => s.trim()) : [];
-        return genres.some((g) => itemGenres.includes(g));
-      }
-      return false;
-    });
-    res.json(filtered);
-  } catch (e) {
-    res.status(500).json({ error: { message: e.message } });
-  }
 });
 
 // ═══════════════════════════════════════════
 // CHAPTERS
 // ═══════════════════════════════════════════
 
+// Chapter metadata without the body — structure views and validators only need
+// these fields, and imported books can hold tens of megabytes of content.
+const SLIM_CHAPTER_COLS =
+  'c.id, c.volume_id, c.num, c.title, c.outline, c.summary, c.word_count, c.status, c.cognitive_frame, c.emotional_anchor, c.world_texture, c.concrete_mystery, c.interpersonal_tension, c.created_at, c.updated_at';
+
 router.get('/:project/chapters', (req, res) => {
+  const slim = req.query.slim === '1' || req.query.slim === 'true';
+  const cols = slim ? SLIM_CHAPTER_COLS : 'c.*';
   const rows = db.projectQuery(project(req.params.project),
-    'SELECT c.*, v.title as volume_title FROM chapters c JOIN volumes v ON c.volume_id = v.id ORDER BY c.num'
+    `SELECT ${cols}, v.title as volume_title FROM chapters c JOIN volumes v ON c.volume_id = v.id ORDER BY c.num`
   );
   res.json(rows);
 });
@@ -148,6 +150,12 @@ router.get('/:project/chapters/:num', (req, res) => {
   const params = volId ? [parseInt(req.params.num), volId] : [parseInt(req.params.num)];
   const row = db.projectGet(project(req.params.project), sql, params);
   if (!row) return res.status(404).json({ error: { code: 'DB_NOT_FOUND', message: `章节 ${req.params.num} 不存在`, recoverable: true } });
+
+  // Callers that only need a preview (e.g. outline generation) can avoid
+  // shipping a multi-megabyte imported chapter over the wire.
+  const preview = Math.min(parseInt(req.query.preview, 10) || 0, 10000);
+  if (preview > 0 && typeof row.content === 'string') row.content = row.content.slice(0, preview);
+
   res.json(row);
 });
 
@@ -168,7 +176,7 @@ router.put('/:project/chapters/:num', (req, res) => {
 
   if (content !== undefined) {
     // Update word count for Chinese text
-    const wc = content.replace(/\s/g, '').length;
+    const wc = db.countWords(content);
     fields.push('word_count = ?');
     params.push(wc);
   }
@@ -192,21 +200,11 @@ router.post('/:project/chapters', (req, res) => {
 
   // Default to the last volume so continuation chapters land at the end of
   // multi-volume (including imported) projects rather than in volume 1.
-  let volumeId = req.body?.volume_id;
-  if (volumeId === undefined || volumeId === null) {
-    const lastVol = db.projectGet(pn, 'SELECT id FROM volumes ORDER BY sort_order DESC, id DESC LIMIT 1');
-    volumeId = lastVol?.id ?? 1;
-  }
+  const volumeId = req.body?.volume_id ?? db.lastVolumeId(pn);
 
-  let num;
-  if (chapter_num !== undefined) {
-    num = chapter_num;
-  } else {
-    // Global numbering keeps chapter numbers unique across volumes, which the
-    // num-only GET/PUT/DELETE chapter endpoints rely on.
-    const maxNum = db.projectGet(pn, 'SELECT MAX(num) as mx FROM chapters');
-    num = (maxNum?.mx || 0) + 1;
-  }
+  // Global numbering keeps chapter numbers unique across volumes, which the
+  // num-only GET/PUT/DELETE chapter endpoints rely on.
+  const num = chapter_num !== undefined ? chapter_num : db.nextChapterNumber(pn);
   db.projectExecute(pn,
     'INSERT INTO chapters (volume_id, num, title, outline, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))',
     [volumeId, num, title, outline, status]
@@ -225,15 +223,17 @@ router.delete('/:project/chapters/:num', (req, res) => {
 router.get('/:project/volumes', (req, res) => {
   const pn = project(req.params.project);
   const slim = req.query.slim === '1' || req.query.slim === 'true';
-  const chapterCols = slim
-    ? 'id, volume_id, num, title, outline, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at'
-    : '*';
   const rows = db.projectQuery(pn, 'SELECT * FROM volumes ORDER BY sort_order');
-  for (const v of rows) {
-    v.chapters = db.projectQuery(pn,
-      `SELECT ${chapterCols} FROM chapters WHERE volume_id = ? ORDER BY num`, [v.id]
-    );
+  const byVolume = new Map(rows.map((v) => [v.id, []]));
+  const chapters = db.projectQuery(
+    pn,
+    `SELECT ${slim ? SLIM_CHAPTER_COLS : '*'} FROM chapters c ORDER BY num`,
+  );
+  for (const ch of chapters) {
+    if (!byVolume.has(ch.volume_id)) byVolume.set(ch.volume_id, []);
+    byVolume.get(ch.volume_id).push(ch);
   }
+  for (const v of rows) v.chapters = byVolume.get(v.id) || [];
   res.json(rows);
 });
 
@@ -266,14 +266,14 @@ router.delete('/:project/volumes/:id', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.get('/:project/characters', (req, res) => {
-  const chars = db.projectQuery(project(req.params.project), 'SELECT * FROM characters ORDER BY name');
-  // Add chapter count
-  for (const c of chars) {
-    const cc = db.projectGet(project(req.params.project),
-      'SELECT COUNT(*) as cnt FROM chapter_characters WHERE character_id = ?', [c.id]
-    );
-    c.chapterCount = cc?.cnt || 0;
-  }
+  const chars = db.projectQuery(
+    project(req.params.project),
+    `SELECT c.*, COUNT(cc.character_id) as chapterCount
+     FROM characters c
+     LEFT JOIN chapter_characters cc ON cc.character_id = c.id
+     GROUP BY c.id
+     ORDER BY c.name`,
+  );
   res.json(chars);
 });
 
@@ -508,31 +508,23 @@ router.delete('/:project/timeline/:id', (req, res) => {
 
 router.get('/settings', (req, res) => {
   const rows = db.dbQuery('SELECT key, value FROM app_settings');
-  const settings = {};
+  const settings = { ...db.DEFAULT_APP_SETTINGS };
   for (const r of rows) settings[r.key] = r.value;
-  // Fill in effective API key from env/fallback if DB entry is empty
-  if (!settings.api_key) {
-    settings.api_key = process.env.DEEPSEEK_KEY || '';
-  }
-  if (!settings.api_base_url) {
-    settings.api_base_url = 'https://api.deepseek.com';
-  }
-  if (!settings.api_model) {
-    settings.api_model = 'deepseek-flash';
-  }
-  if (!settings.max_output_tokens) {
-    settings.max_output_tokens = '8192';
-  }
-  if (settings.send_temperature === undefined) {
-    settings.send_temperature = 'true';
-  }
+  // Fill in effective API key from env if the DB entry is empty
+  if (!settings.api_key) settings.api_key = process.env.DEEPSEEK_KEY || '';
   res.json(settings);
 });
 
 router.put('/settings', (req, res) => {
   const { key, value } = req.body || {};
   if (!key) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '缺少key', recoverable: true } });
-  db.dbExecute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, String(value)]);
+  const normalized = db.normalizeSetting(key, value);
+  if (normalized === undefined) {
+    return res.status(400).json({
+      error: { code: 'INVALID_PARAMS', message: `无效的设置项或值: ${key}`, recoverable: true },
+    });
+  }
+  db.dbExecute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, normalized]);
   // Invalidate AI config cache so next AI request picks up the change
   if (db.invalidateAiConfigCache) db.invalidateAiConfigCache();
   res.json({ success: true });
@@ -579,28 +571,36 @@ router.put('/:project/workflow/phase', (req, res) => {
 
 router.get('/:project/stats', (req, res) => {
   const pn = project(req.params.project);
-  const totalWords = db.projectGet(pn, 'SELECT SUM(word_count) as total FROM chapters')?.total || 0;
-  const chCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM chapters')?.cnt || 0;
-  const acceptedCount = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM chapters WHERE status = 'accepted'")?.cnt || 0;
-  const charCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM characters')?.cnt || 0;
-  const foreshadowCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM foreshadows')?.cnt || 0;
-  const resolvedForeshadow = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM foreshadows WHERE status = 'resolved'")?.cnt || 0;
-  const overdueForeshadow = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM foreshadows WHERE status = 'planted' AND expected_resolve_chapter < (SELECT COALESCE(MAX(num), 0) FROM chapters)")?.cnt || 0;
-  const worldCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM world_entries')?.cnt || 0;
-  const sciCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM science_entries')?.cnt || 0;
-  const relCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM character_relations')?.cnt || 0;
-  const memCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM memories')?.cnt || 0;
-  const tlCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM timeline_events')?.cnt || 0;
-  const volCount = db.projectGet(pn, 'SELECT COUNT(*) as cnt FROM volumes')?.cnt || 0;
-  const clueUnresolved = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM clue_board WHERE resolved = 0")?.cnt || 0;
-  const clueResolved = db.projectGet(pn, "SELECT COUNT(*) as cnt FROM clue_board WHERE resolved = 1")?.cnt || 0;
+  // One statement for all scalar counts — this endpoint is polled by the
+  // status bar and read by the sidebar and dashboard.
+  const stats = db.projectGet(pn, `
+    SELECT
+      (SELECT COALESCE(SUM(word_count), 0) FROM chapters) AS totalWords,
+      (SELECT COUNT(*) FROM chapters) AS chapterCount,
+      (SELECT COUNT(*) FROM chapters WHERE status = 'accepted') AS acceptedCount,
+      (SELECT COUNT(*) FROM characters) AS characterCount,
+      (SELECT COUNT(*) FROM foreshadows) AS foreshadowCount,
+      (SELECT COUNT(*) FROM foreshadows WHERE status = 'resolved') AS resolvedForeshadow,
+      (SELECT COUNT(*) FROM foreshadows WHERE status = 'planted' AND expected_resolve_chapter < (SELECT COALESCE(MAX(num), 0) FROM chapters)) AS overdueForeshadow,
+      (SELECT COUNT(*) FROM world_entries) AS worldCount,
+      (SELECT COUNT(*) FROM science_entries) AS sciCount,
+      (SELECT COUNT(*) FROM character_relations) AS relationCount,
+      (SELECT COUNT(*) FROM memories) AS memoryCount,
+      (SELECT COUNT(*) FROM timeline_events) AS timelineCount,
+      (SELECT COUNT(*) FROM volumes) AS volumeCount,
+      (SELECT COUNT(*) FROM clue_board WHERE resolved = 0) AS clueUnresolved,
+      (SELECT COUNT(*) FROM clue_board WHERE resolved = 1) AS clueResolved,
+      (SELECT COALESCE(SUM(input_tokens), 0) FROM token_usage) AS tokenInput,
+      (SELECT COALESCE(SUM(output_tokens), 0) FROM token_usage) AS tokenOutput
+  `) || {};
   const genres = db.projectQuery(pn, 'SELECT genre FROM project_genres').map(g => g.genre);
-  const tokenUsage = db.projectGet(pn, 'SELECT COALESCE(SUM(input_tokens), 0) as input, COALESCE(SUM(output_tokens), 0) as output FROM token_usage') || { input: 0, output: 0 };
 
   // Target words: custom override or fallback to project mode default
-  const projectMode = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'mode'")?.value || 'medium-novel';
+  const metaRows = db.projectQuery(pn, "SELECT key, value FROM project_meta WHERE key IN ('mode', 'target_words')");
+  const meta = Object.fromEntries(metaRows.map((r) => [r.key, r.value]));
+  const projectMode = meta.mode || 'medium-novel';
   const TARGET_WORDS = { 'short-story': 30000, 'medium-novel': 100000, 'long-novel': 200000 };
-  const customTarget = db.projectGet(pn, "SELECT value FROM project_meta WHERE key = 'target_words'")?.value;
+  const customTarget = meta.target_words;
   const targetWords = customTarget ? parseInt(customTarget) : (TARGET_WORDS[projectMode] || 100000);
 
   // Volume structure summary
@@ -621,19 +621,14 @@ router.get('/:project/stats', (req, res) => {
   }
 
   res.json({
-    totalWords, chapterCount: chCount, acceptedCount, characterCount: charCount,
-    foreshadowCount, resolvedForeshadow, overdueForeshadow, worldCount, sciCount,
-    relationCount: relCount, memoryCount: memCount, timelineCount: tlCount,
-    volumeCount: volCount, volumes,
-    clueUnresolved, clueResolved,
+    ...stats,
+    volumes,
     genres,
-    tokenInput: tokenUsage.input || 0, tokenOutput: tokenUsage.output || 0,
     targetWords,
-    currentChapter: db.projectGet(pn, "SELECT * FROM chapters WHERE status = 'writing' ORDER BY num LIMIT 1"),
     chapters: db.projectQuery(pn, 'SELECT id, num, title, word_count, status FROM chapters ORDER BY num'),
     dailyWords,
-    });
   });
+});
 
 // ─── Target words ───
 
@@ -713,22 +708,6 @@ router.delete('/:project/cover', (req, res) => {
 // EXPORT
 // ═══════════════════════════════════════════
 
-// AI-generated / imported titles may already carry a label, e.g. "第一卷 · 完美样本".
-const VOLUME_LABEL_RE = /^(第\s*[\d零〇一二三四五六七八九十百千万两]+\s*[卷部集]|卷\s*[\d零〇一二三四五六七八九十百千万两]+|(volume|book|part)\s+([0-9]+|[ivxlcdm]+)\b|上卷|中卷|下卷|上部|中部|下部)/i;
-const CHAPTER_LABEL_RE = /^(第\s*[\d零〇一二三四五六七八九十百千万两]+\s*[章节回话幕集]|(chapter|ch\.?)\s*([0-9]+|[ivxlcdm]+)\b|序章|序言|楔子|引子|前言|尾声|终章|后记|番外|外传|附录|prologue|epilogue)/i;
-
-function volumeHeading(vol) {
-  const title = (vol.title || '').trim();
-  if (!title) return `第${vol.sort_order}卷`;
-  return VOLUME_LABEL_RE.test(title) ? title : `第${vol.sort_order}卷 ${title}`;
-}
-
-function chapterHeading(ch) {
-  const title = (ch.title || '').trim();
-  if (!title) return `第${ch.num}章`;
-  return CHAPTER_LABEL_RE.test(title) ? title : `第${ch.num}章 ${title}`;
-}
-
 function escapeHtml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -767,7 +746,7 @@ router.get('/:project/export', async (req, res) => {
   const meta = {};
   db.projectQuery(pn, 'SELECT key, value FROM project_meta').forEach(m => meta[m.key] = m.value);
 
-  const totalWords = chapters.reduce((s, c) => s + (c.content?.replace(/\s/g, '').length || 0), 0);
+  const totalWords = chapters.reduce((s, c) => s + db.countWords(c.content), 0);
   const EXPORT_DIR = path.join(require('os').homedir(), '.mythpen', 'exports', pn);
   if (!fs.existsSync(EXPORT_DIR)) fs.mkdirSync(EXPORT_DIR, { recursive: true });
 
@@ -790,26 +769,16 @@ router.get('/:project/export', async (req, res) => {
     const EpubGen = require('epub-gen');
 
     // Build content grouped by volume
-    const volumeMap = new Map();
-    for (const v of volumes) volumeMap.set(v.id, v);
-    const volChapters = new Map();
-    for (const ch of chapters) {
-      const vId = ch.volume_id || 1;
-      if (!volChapters.has(vId)) volChapters.set(vId, []);
-      volChapters.get(vId).push(ch);
-    }
-
     const content = [];
-
-    for (const [vId, vchs] of volChapters) {
-      const vol = volumeMap.get(vId);
-      if (volumes.length > 1 && vol) {
+    for (const group of groupChaptersByVolume(chapters, volumes)) {
+      const vol = group.volume;
+      if (vol && volumes.length > 1) {
         content.push({
           title: volumeHeading(vol),
           data: `<h2>${escapeHtml(volumeHeading(vol))}</h2>${vol.summary ? `<p>${escapeHtml(vol.summary)}</p>` : ''}`,
         });
       }
-      for (const ch of vchs) {
+      for (const ch of group.chapters) {
         content.push({
           title: chapterHeading(ch),
           data: `<h1>${escapeHtml(chapterHeading(ch))}</h1>${textToHtmlParagraphs(ch.content)}`,

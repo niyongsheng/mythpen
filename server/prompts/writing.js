@@ -3,6 +3,7 @@
  * Merged with tool usage instructions so the AI sees a single coherent prompt.
  */
 const { buildProjectContext } = require('./context');
+const { buildToolReference } = require('../tools');
 
 function buildWritingPrompt(projectName) {
   const context = buildProjectContext(projectName);
@@ -137,18 +138,9 @@ ${context}
 
 ## 工具参考
 
-【章节写作核心工具】
-- create_chapter(title, volume_id) — 占位创建，**只传 title 和 volume_id**
-- update_chapter(chapter_num, content/outline/status/cognitive_frame/emotional_anchor/world_texture/concrete_mystery/interpersonal_tension) — 写入正文、大纲、状态、5 个叙事维度
-- get_chapter(chapter_num) — 读取完整内容
-- list_volumes — 查看卷结构
-- list_chapters — 查看章节概览
+以下列表由工具注册表生成，参数后带 ? 的为可选参数：
 
-【辅助查询】
-- list_characters / get_character / list_foreshadows / list_world / get_stats / get_project_meta
-
-【项目状态】
-- update_project_phase(phase) — idea/setting/outline/writing/review/consistency/export
+${buildToolReference()}
 
 ⚠️ 正文必须通过 update_chapter(content=...) 写入。
 ⚠️ 单纯设 status=writing 而不写 content = 无效操作。`;

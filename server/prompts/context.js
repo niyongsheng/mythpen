@@ -3,6 +3,7 @@
  * from the database and formats it for injection into system prompts.
  */
 const db = require('../db');
+const { chapterHeading } = require('../titles');
 
 const GENRE_LABELS = {
   'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情',
@@ -20,14 +21,6 @@ const PHASE_LABELS = {
   idea: '选题', setting: '设定', outline: '大纲',
   writing: '写作', review: '审阅', consistency: '一致性', export: '导出',
 };
-
-const CHAPTER_LABEL_RE = /^(第\s*[\d零〇一二三四五六七八九十百千万两]+\s*[章节回话幕集]|(chapter|ch\.?)\s*([0-9]+|[ivxlcdm]+)\b|序章|序言|楔子|引子|前言|尾声|终章|后记|番外|外传|附录|prologue|epilogue)/i;
-
-function chapterLabel(ch) {
-  const title = (ch.title || '').trim();
-  if (!title) return `第${ch.num}章`;
-  return CHAPTER_LABEL_RE.test(title) ? title : `第${ch.num}章 ${title}`;
-}
 
 function buildProjectContext(projectName) {
   try {
@@ -92,7 +85,7 @@ ${chars.length ? chars.map(c => `- ${c.name}（${c.age || '?'}岁，${c.gender |
 ${worldEntries.length ? worldEntries.map(w => `- [${w.category}] ${w.name}：${w.description || ''}`).join('\n') : '（暂无）'}
 
 章节概览${chapterNote}:
-${chapters.length ? chapters.map(ch => `[${ch.status}] ${chapterLabel(ch)} - ${ch.outline || '（暂无大纲）'}`).join('\n') : '（暂无章节）'}
+${chapters.length ? chapters.map(ch => `[${ch.status}] ${chapterHeading(ch)} - ${ch.outline || '（暂无大纲）'}`).join('\n') : '（暂无章节）'}
 
 活跃伏笔:
 ${foreshadows.length ? foreshadows.map(f => `[${f.priority}] ${f.title}：${f.description || ''}`).join('\n') : '（暂无）'}`;

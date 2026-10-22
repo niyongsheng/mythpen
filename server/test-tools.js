@@ -6,7 +6,7 @@
 // Requires Express server running on :3001
 
 const http = require('http');
-const BASE = 'http://localhost:3001/api';
+const BASE = `http://localhost:${process.env.PORT || 3001}/api`;
 const PROJECT = 'test-tools-project';
 
 let passed = 0;
@@ -258,10 +258,10 @@ async function run() {
   assert('Get workflow phase returns updated value', phaseGet.status === 200 && phaseGet.body.phase === 'writing', `phase: ${JSON.stringify(phaseGet.body)}`);
 
   // ── Settings write ──
-  const setPut = await api('PUT', '/settings', { key: 'test_key', value: 'test_value' });
+  const setPut = await api('PUT', '/settings', { key: 'theme', value: 'light' });
   assert('Update settings', setPut.status === 200);
   const settingsAfter = await api('GET', '/settings');
-  assert('Settings readback shows written value', settingsAfter.status === 200 && settingsAfter.body.test_key === 'test_value', `key not found: ${JSON.stringify(settingsAfter.body)}`);
+  assert('Settings readback shows written value', settingsAfter.status === 200 && settingsAfter.body.theme === 'light', `key not found: ${JSON.stringify(settingsAfter.body)}`);
 
   // ── Error: update non-existent entity ──
   const badVol = await api('PUT', `/${e(PROJECT)}/volumes/999999`, { title: '不存在' });
@@ -299,6 +299,9 @@ async function run() {
   // which is separate from the REST API endpoints tested above.
   // ═══════════════════════════════════════════
   console.log('\n🔧 Step 4.5: AI Tool execution (executeTool)');
+  // The server flushes its config DB on a short debounce; wait so this
+  // separate process sees the project registration written above.
+  await new Promise((resolve) => setTimeout(resolve, 500));
   const { executeTool } = require('./tools');
   const { initDatabase } = require('./db');
   await initDatabase();

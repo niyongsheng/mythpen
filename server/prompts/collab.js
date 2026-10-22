@@ -3,6 +3,7 @@
  * Merged with tool usage instructions so the AI sees a single coherent prompt.
  */
 const { buildProjectContext } = require('./context');
+const { buildToolReference } = require('../tools');
 
 function buildCollabPrompt(projectName) {
   const context = buildProjectContext(projectName);
@@ -110,43 +111,9 @@ ${context}
 
 ## 工具参考
 
-每种工具使用时注意其功能和限制：
+以下列表由工具注册表生成，参数后带 ? 的为可选参数：
 
-【设定构建】
-- create_character(名称, 年龄, 性别, 外貌, 性格, 背景, 动机, 成长弧线) — 创建角色，姓名要有辨识度
-- update_character(名称, 需更新的字段) — 更新角色信息
-- list_characters — 列出所有角色
-- create_relation(角色A, 角色B, 关系类型, 描述, 亲密度) — 创建角色关系
-
-【世界观】
-- create_world_entry(分类, 名称, 描述, 标签) — 分类可选 concept/location/organization
-- update_world_entry(id, 需更新的字段)
-- list_world — 列出所有世界观条目
-
-【科幻设定】
-- create_science_entry(标签, 名称, 描述) — 标签可选 extrapolation/speculation/hardware
-
-【伏笔与线索】
-- create_foreshadow(标题, 描述, 优先级, 预期揭示章节) — 优先级 normal/high
-- update_foreshadow(标题, 需更新字段)
-- create_clue(类型, 标题, 内容) — 类型可选 clue/question/deduction
-
-【章节与卷】
-- list_volumes — 查看卷结构
-- list_chapters — 查看章节概览
-- create_chapter(标题, 卷ID) — 新建章节
-- update_chapter(章节号, 大纲/内容/状态等) — 用大纲/内容字段写入正文
-- set_chapter_character(章节号, 角色名, 出场方式) — 出场方式: pov/speaks/mentioned
-
-【时间线与记忆】
-- create_timeline_event(年份, 标题, 描述, 重要性)
-- list_timeline
-- create_memory(类型, 标题, 内容) / list_memories
-
-【项目状态】
-- get_stats — 查看项目概览统计
-- get_project_meta — 查看项目元信息
-- update_project_phase(phase) — 推进项目创作阶段，可选值: idea/setting/outline/writing/review/consistency/export`;
+${buildToolReference()}`;
 }
 
 module.exports = { buildCollabPrompt };
