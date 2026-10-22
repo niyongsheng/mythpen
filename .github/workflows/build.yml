@@ -167,10 +167,25 @@ jobs:
           mv src-tauri/binaries/mythpen-server src-tauri/binaries/mythpen-server-x86_64-unknown-linux-gnu
 
       - name: Build Tauri app (deb / rpm / AppImage)
-        run: pnpm tauri build --bundles deb,rpm,appimage
+        run: pnpm tauri build --bundles deb,rpm,appimage --verbose
         env:
           # appimagetool is shipped as an AppImage; extract-and-run avoids
           # requiring FUSE on the runner.
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          NO_STRIP: true
+
+      - name: Diagnose AppImage failure
+        if: failure()
+        run: |
+          ls -la src-tauri/target/release/bundle/appimage || true
+          find "$HOME/.cache/tauri" -maxdepth 1 -type f -printf '%f\n' 2>/dev/null || true
+          APPDIR=$(find src-tauri/target/release/bundle/appimage -maxdepth 1 -name '*.AppDir' -print -quit)
+          echo "APPDIR=$APPDIR"
+          if [ -n "$APPDIR" ]; then
+            "$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage" \
+              --appdir "$APPDIR" --plugin gtk --output appimage 2>&1 | tail -200 || true
+          fi
+        env:
           APPIMAGE_EXTRACT_AND_RUN: 1
           NO_STRIP: true
 
