@@ -614,6 +614,8 @@
   "about": {
     "version": "Version",
     "sourceCode": "Source Code",
+    "support": "Support the Author",
+    "supportDesc": "If Mythpen helps you, consider buying me a coffee via 爱发电",
     "contact": "Contact",
     "techStack": "Tech Stack",
     "openLink": "Open"

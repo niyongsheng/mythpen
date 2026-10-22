@@ -1,5 +1,5 @@
 import { open } from '@tauri-apps/plugin-shell'
-import { Info, Mail } from 'lucide-react'
+import { Coffee, Info, Mail } from 'lucide-react'
 import { useCallback } from 'react'
 import { useT } from '@/hooks/useT'
 
@@ -13,11 +13,18 @@ function GithubIcon({ className }: { className?: string }) {
   )
 }
 
+const SPONSOR_URL = 'https://ifdian.net/a/nico2026'
+
 export function About() {
   const { t } = useT()
   const handleOpenGithub = useCallback(() => {
     open('https://github.com/niyongsheng/mythpen').catch(() => {
       window.open('https://github.com/niyongsheng/mythpen', '_blank')
+    })
+  }, [])
+  const handleOpenSponsor = useCallback(() => {
+    open(SPONSOR_URL).catch(() => {
+      window.open(SPONSOR_URL, '_blank')
     })
   }, [])
 
@@ -58,6 +65,24 @@ export function About() {
               <div className="flex-1 min-w-0">
                 <div className="text-[14px] text-[var(--ink)]">{t('about.sourceCode')}</div>
                 <div className="text-[12px] text-[var(--ink-tertiary)] truncate">github.com/niyongsheng/mythpen</div>
+              </div>
+              <span className="text-[12px] text-[var(--accent-gold)]">{t('about.openLink')} →</span>
+            </div>
+
+            {/* Sponsor */}
+            <div
+              role="button"
+              tabIndex={0}
+              className="block bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 flex items-center gap-3 no-underline hover:bg-[var(--canvas-mid)] transition-colors cursor-pointer"
+              onClick={handleOpenSponsor}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') handleOpenSponsor()
+              }}
+            >
+              <Coffee className="w-5 h-5 text-[var(--ink-secondary)] shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-[14px] text-[var(--ink)]">{t('about.support')}</div>
+                <div className="text-[12px] text-[var(--ink-tertiary)] truncate">{t('about.supportDesc')}</div>
               </div>
               <span className="text-[12px] text-[var(--accent-gold)]">{t('about.openLink')} →</span>
             </div>

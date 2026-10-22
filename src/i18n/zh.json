@@ -614,6 +614,8 @@
   "about": {
     "version": "版本号",
     "sourceCode": "源代码",
+    "support": "打赏支持",
+    "supportDesc": "如果 Mythpen 对你有帮助，欢迎通过爱发电请我喝杯咖啡",
     "contact": "联系作者",
     "techStack": "技术栈",
     "openLink": "打开"
