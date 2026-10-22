@@ -146,7 +146,11 @@ jobs:
             libxdo-dev \
             libssl-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev
+            librsvg2-dev \
+            patchelf
+          # AppImage bundling (linuxdeploy) needs FUSE. The package name changed
+          # with the t64 ABI transition on Ubuntu 24.04+.
+          sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2
 
       - name: Install bun (for sidecar)
         uses: oven-sh/setup-bun@v2
@@ -168,6 +172,7 @@ jobs:
           # appimagetool is shipped as an AppImage; extract-and-run avoids
           # requiring FUSE on the runner.
           APPIMAGE_EXTRACT_AND_RUN: 1
+          NO_STRIP: true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
