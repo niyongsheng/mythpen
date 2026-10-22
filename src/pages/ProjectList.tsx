@@ -106,7 +106,7 @@ export function ProjectList() {
                     <span>{t('project.updatedAt', { date: formatDate(p.lastOpened) })}</span>
                   </div>
                   <div className="text-[11px] text-[var(--ink-mute)]">
-                    {t(`project.mode.${p.mode}`)} · {t(`status.${p.status}`)}
+                    {t(`project.mode.${p.mode}`)} · {t(`project.status.${p.status}`)}
                   </div>
                 </div>
               ))}

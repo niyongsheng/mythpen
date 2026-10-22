@@ -1,9 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { apiUrl } from '@/lib/api'
 
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
-const HEALTH_URL = `${API_BASE}/health`
+const HEALTH_URL = apiUrl('/health')
 
 const MAX_RETRIES = 20
 

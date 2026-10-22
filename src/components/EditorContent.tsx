@@ -3,14 +3,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { formatChapterTitle } from '@/lib/chapterTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
-import { useEditorStore } from '@/stores/useEditorStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 
 export function EditorContent() {
-  const { fontSize, fontFamily } = useEditorStore()
-  const { currentChapter, volumes, updateChapter, createChapter, setSaveStatus } = useChapterStore()
+  const fontSize = useSettingsStore((s) => s.settings.editorFontSize)
+  const fontFamily = useSettingsStore((s) => s.settings.editorFontFamily)
+  const currentChapter = useChapterStore((s) => s.currentChapter)
+  const volumes = useChapterStore((s) => s.volumes)
+  const updateChapter = useChapterStore((s) => s.updateChapter)
+  const createChapter = useChapterStore((s) => s.createChapter)
+  const setSaveStatus = useChapterStore((s) => s.setSaveStatus)
   const currentProject = useProjectStore((s) => s.currentProject)
   const setActivePage = useSidebarStore((s) => s.setActivePage)
   const { t } = useT()

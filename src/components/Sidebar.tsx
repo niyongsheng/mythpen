@@ -20,10 +20,10 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
-import { projectsApi, statsApi } from '@/lib/api'
+import { useTargetWordsEditor } from '@/hooks/useTargetWordsEditor'
 import { formatChapterTitle } from '@/lib/chapterTitle'
 import { refreshAllData } from '@/lib/dataEvents'
 import { NEXT_STATUS } from '@/lib/status'
@@ -32,9 +32,32 @@ import { formatVolumeTitle } from '@/lib/volumeTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
-import type { SidebarItem } from '@/types'
+import type { Chapter } from '@/types'
 
-// Map icon string names from backend to Lucide components
+interface NavItem {
+  id: string
+  labelKey: string
+  icon: string
+  route: string
+  /** Only show for projects with one of these genres. */
+  genres?: string[]
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: 'LayoutDashboard', route: 'page-dashboard' },
+  { id: 'characters', labelKey: 'sidebar.characters', icon: 'Users', route: 'page-characters' },
+  { id: 'world', labelKey: 'sidebar.world', icon: 'Globe', route: 'page-world' },
+  { id: 'science', labelKey: 'sidebar.science', icon: 'FlaskConical', route: 'page-science', genres: ['sci-fi'] },
+  { id: 'outline_page', labelKey: 'sidebar.outline_page', icon: 'ScrollText', route: 'page-outline' },
+  { id: 'foreshadow', labelKey: 'sidebar.foreshadow', icon: 'Link2', route: 'page-foreshadow' },
+  { id: 'memory', labelKey: 'sidebar.memory', icon: 'Brain', route: 'page-memory' },
+  { id: 'relations', labelKey: 'sidebar.relations', icon: 'HeartHandshake', route: 'page-relations' },
+  { id: 'timeline', labelKey: 'sidebar.timeline', icon: 'CalendarDays', route: 'page-timeline' },
+  { id: 'consistency', labelKey: 'sidebar.consistency', icon: 'ShieldCheck', route: 'page-consistency' },
+  { id: 'export', labelKey: 'sidebar.export', icon: 'Download', route: 'page-export' },
+]
+
+// Map icon names to Lucide components
 const ICON_MAP: Record<string, LucideIcon> = {
   LayoutDashboard,
   Users,
@@ -51,52 +74,27 @@ const ICON_MAP: Record<string, LucideIcon> = {
 }
 
 export function Sidebar() {
-  const { volumes, currentChapter, setCurrentChapter, loadChapterContent, createChapter } = useChapterStore()
+  const volumes = useChapterStore((s) => s.volumes)
+  const currentChapter = useChapterStore((s) => s.currentChapter)
+  const setCurrentChapter = useChapterStore((s) => s.setCurrentChapter)
+  const loadChapterContent = useChapterStore((s) => s.loadChapterContent)
+  const createChapter = useChapterStore((s) => s.createChapter)
   const { activePage, setActivePage } = useSidebarStore()
   const currentProject = useProjectStore((s) => s.currentProject)
-  const projectLoading = useProjectStore((s) => s.loading)
   const { data: stats, reload: reloadStats } = useStats()
   useDataRefresh('stats', reloadStats)
   const { t } = useT()
-  const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([])
   const [spinKey, setSpinKey] = useState(0)
   const [collapsedVols, setCollapsedVols] = useState<Set<number>>(new Set())
-  const [editingTarget, setEditingTarget] = useState(false)
-  const [targetInput, setTargetInput] = useState('')
-  const targetInputRef = useRef<HTMLInputElement>(null)
-
-  const handleSaveTargetWords = useCallback(async () => {
-    const val = parseInt(targetInput)
-    if (!isNaN(val) && val >= 1000 && currentProject) {
-      try {
-        await statsApi.updateTargetWords(currentProject, val)
-        reloadStats()
-      } catch {
-        /* ignore */
-      }
-    }
-    setEditingTarget(false)
-    setTargetInput('')
-  }, [targetInput, currentProject, reloadStats])
-
-  const handleResetTargetWords = useCallback(async () => {
-    if (!currentProject) return
-    try {
-      await statsApi.resetTargetWords(currentProject)
-      reloadStats()
-    } catch {
-      /* ignore */
-    }
-    setEditingTarget(false)
-    setTargetInput('')
-  }, [currentProject, reloadStats])
-
-  useEffect(() => {
-    if (editingTarget && targetInputRef.current) {
-      targetInputRef.current.focus()
-      targetInputRef.current.select()
-    }
-  }, [editingTarget])
+  const {
+    editing: editingTarget,
+    setEditing: setEditingTarget,
+    input: targetInput,
+    setInput: setTargetInput,
+    inputRef: targetInputRef,
+    save: handleSaveTargetWords,
+    reset: handleResetTargetWords,
+  } = useTargetWordsEditor(currentProject, reloadStats)
 
   const toggleVolume = (volId: number) => {
     setCollapsedVols((prev) => {
@@ -108,25 +106,10 @@ export function Sidebar() {
   }
 
   // Load sidebar items filtered by project genre
-  const loadSidebarItems = useCallback(async () => {
-    if (!currentProject) {
-      setSidebarItems([])
-      return
-    }
-    try {
-      const items = await projectsApi.getSidebarItems(currentProject)
-      setSidebarItems(items)
-    } catch {
-      setSidebarItems([])
-    }
-  }, [currentProject])
-
-  // Load sidebar items when project is ready; retry once loaded (race guard)
-  useEffect(() => {
-    if (!projectLoading && currentProject && sidebarItems.length === 0) {
-      void loadSidebarItems()
-    }
-  }, [projectLoading, currentProject, sidebarItems.length, loadSidebarItems])
+  const projectGenres = stats?.genres ?? []
+  const sidebarItems = NAV_ITEMS.filter(
+    (item) => !item.genres || item.genres.some((genre) => projectGenres.includes(genre)),
+  )
 
   const handleNewChapter = async (volumeId: number) => {
     if (!currentProject) return
@@ -204,12 +187,6 @@ export function Sidebar() {
                         useChapterStore
                           .getState()
                           .updateChapter(currentProject!, ch.num, { status: next })
-                          .catch(() => {})
-                        // Update local state immediately for UI responsiveness
-                        ch.status = next
-                        useChapterStore
-                          .getState()
-                          .loadChapters(currentProject!)
                           .catch(() => {})
                       }}
                     />
@@ -413,7 +390,7 @@ function StatusBadge({
   t: translate,
   onCycle,
 }: {
-  status: string
+  status: Chapter['status']
   t: (path: string, params?: Record<string, string | number>) => string
   onCycle?: () => void
 }) {

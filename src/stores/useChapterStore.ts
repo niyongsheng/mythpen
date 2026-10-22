@@ -1,31 +1,10 @@
 import { create } from 'zustand'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
-import { chaptersApi, statsApi, volumesApi } from '@/lib/api'
+import { chaptersApi, volumesApi } from '@/lib/api'
+import { toChapter } from '@/lib/dto'
 import { useProjectStore } from '@/stores/useProjectStore'
-
-interface Chapter {
-  id: number
-  volumeId: number
-  num: number
-  title: string
-  outline: string
-  content: string
-  wordCount: number
-  status: string
-  cognitiveFrame?: string
-  emotionalAnchor?: string
-  worldTexture?: string
-  concreteMystery?: string
-  interpersonalTension?: string
-}
-
-interface Volume {
-  id: number
-  sortOrder: number
-  title: string
-  chapters: Chapter[]
-}
+import type { Chapter, Volume } from '@/types'
 
 interface ChapterState {
   volumes: Volume[]
@@ -72,21 +51,8 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
         id: v.id,
         sortOrder: v.sort_order,
         title: v.title,
-        chapters: (v.chapters || []).map((c: any) => ({
-          id: c.id,
-          volumeId: c.volume_id,
-          num: c.num,
-          title: c.title,
-          outline: c.outline || '',
-          content: c.content || '',
-          wordCount: c.word_count || 0,
-          status: c.status,
-          cognitiveFrame: c.cognitive_frame || '',
-          emotionalAnchor: c.emotional_anchor || '',
-          worldTexture: c.world_texture || '',
-          concreteMystery: c.concrete_mystery || '',
-          interpersonalTension: c.interpersonal_tension || '',
-        })),
+        summary: v.summary ?? '',
+        chapters: (v.chapters || []).map(toChapter),
       }))
 
       const allChapters = volumes.flatMap((v) => v.chapters)
@@ -112,15 +78,7 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
       if (currentChapter) {
         try {
           const full = await chaptersApi.get(project, currentChapter.num, currentChapter.volumeId)
-          if (full) {
-            loadedChapter = {
-              ...currentChapter,
-              content: full.content || '',
-              outline: full.outline || currentChapter.outline,
-              wordCount: full.word_count || currentChapter.wordCount,
-              status: full.status || currentChapter.status,
-            }
-          }
+          if (full) loadedChapter = { ...currentChapter, content: full.content ?? '' }
         } catch {
           /* keep the slim chapter if the body request fails */
         }
@@ -142,26 +100,7 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
   loadChapterContent: async (project, num, volumeId) => {
     try {
       const ch = await chaptersApi.get(project, num, volumeId)
-      if (ch) {
-        set((s) => {
-          const chapter = {
-            id: ch.id,
-            volumeId: ch.volume_id,
-            num: ch.num,
-            title: ch.title,
-            outline: ch.outline || '',
-            content: ch.content || '',
-            wordCount: ch.word_count || 0,
-            status: ch.status,
-            cognitiveFrame: ch.cognitive_frame || '',
-            emotionalAnchor: ch.emotional_anchor || '',
-            worldTexture: ch.world_texture || '',
-            concreteMystery: ch.concrete_mystery || '',
-            interpersonalTension: ch.interpersonal_tension || '',
-          }
-          return { currentChapter: chapter }
-        })
-      }
+      if (ch) set({ currentChapter: ch })
     } catch (err) {
       console.error('Failed to load chapter content:', err)
     }
@@ -180,12 +119,15 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
       if (data.concreteMystery !== undefined) apiData.concrete_mystery = data.concreteMystery
       if (data.interpersonalTension !== undefined) apiData.interpersonal_tension = data.interpersonalTension
 
-      await chaptersApi.update(project, num, apiData)
-      // Only reload if user is still on this chapter (avoid overwriting after sidebar nav)
-      const currentAfterSave = useChapterStore.getState().currentChapter
-      if (currentAfterSave?.num === num) {
-        await useChapterStore.getState().loadChapterContent(project, num, currentAfterSave.volumeId)
-      }
+      const updated = await chaptersApi.update(project, num, apiData)
+      // Apply the PUT response directly instead of re-fetching the chapter.
+      set((s) => ({
+        currentChapter: s.currentChapter?.id === updated.id ? updated : s.currentChapter,
+        volumes: s.volumes.map((volume) => ({
+          ...volume,
+          chapters: volume.chapters.map((ch) => (ch.id === updated.id ? updated : ch)),
+        })),
+      }))
     } catch (err) {
       console.error('Failed to update chapter:', err)
     }

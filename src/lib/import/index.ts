@@ -43,6 +43,3 @@ export async function parseImportFile(file: File, options: ParseImportOptions = 
   book.fileName = file.name
   return book
 }
-
-export type { ImportWarning, ParsedBook, ParsedChapter, ParsedVolume, TextEncoding } from './types'
-export { ImportError }

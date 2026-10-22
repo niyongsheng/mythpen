@@ -1,3 +1,4 @@
+import { BookOpen, Building, Heart, Landmark, type LucideIcon, Rocket, Scroll, Wand, Zap } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ImportBookPanel } from '@/components/ImportBookPanel'
 import { ToastContainer } from '@/components/ToastContainer'
@@ -10,15 +11,15 @@ import type { ParsedBook, TextEncoding } from '@/lib/import/types'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useUIStore } from '@/stores/useUIStore'
 
-const GENRES = [
-  { key: 'sci-fi', icon: '🎭' },
-  { key: 'fantasy', icon: '🧙' },
-  { key: 'romance', icon: '💕' },
-  { key: 'history', icon: '🏛️' },
-  { key: 'urban', icon: '🌆' },
-  { key: 'power-fantasy', icon: '⚡' },
-  { key: 'biography', icon: '📖' },
-  { key: 'other', icon: '📜' },
+const GENRES: { key: string; icon: LucideIcon }[] = [
+  { key: 'sci-fi', icon: Rocket },
+  { key: 'fantasy', icon: Wand },
+  { key: 'romance', icon: Heart },
+  { key: 'history', icon: Landmark },
+  { key: 'urban', icon: Building },
+  { key: 'power-fantasy', icon: Zap },
+  { key: 'biography', icon: BookOpen },
+  { key: 'other', icon: Scroll },
 ]
 
 const MODES = [
@@ -225,7 +226,6 @@ export function NewProjectDialog() {
                 book={book}
                 file={file}
                 parsing={parsing}
-                error={null}
                 encoding={encoding}
                 disabled={loading}
                 onFileSelected={handleFileSelected}
@@ -261,13 +261,14 @@ export function NewProjectDialog() {
               {t('project.genresLabel')}
             </label>
             <div className="flex flex-wrap gap-2">
-              {GENRES.map((g) => (
+              {GENRES.map(({ key, icon: Icon }) => (
                 <button
-                  key={g.key}
-                  className={selectedGenres.includes(g.key) ? activeBtn : inactiveBtn}
-                  onClick={() => toggleGenre(g.key)}
+                  key={key}
+                  className={`${selectedGenres.includes(key) ? activeBtn : inactiveBtn} inline-flex items-center gap-1.5`}
+                  onClick={() => toggleGenre(key)}
                 >
-                  {g.icon} {t(`project.genre.${g.key}`)}
+                  <Icon size={14} strokeWidth={2.25} className="shrink-0" />
+                  {t(`project.genre.${key}`)}
                 </button>
               ))}
             </div>

@@ -90,15 +90,15 @@ function computeCircleLayout(
   const nodeMap = new Map(characters.map((c) => [c.id, c.name]))
 
   const links: PositionedLink[] = relations
-    .filter((r) => nodeMap.has(r.character_a_id) && nodeMap.has(r.character_b_id))
+    .filter((r) => nodeMap.has(r.characterAId) && nodeMap.has(r.characterBId))
     .map((r) => ({
-      source: r.character_a_id,
-      target: r.character_b_id,
-      type: r.relation_type,
+      source: r.characterAId,
+      target: r.characterBId,
+      type: r.relationType,
       intensity: r.intensity || 3,
-      color: getEdgeColor(r.relation_type),
-      dashed: !!r.ended_at,
-      label: r.relation_type,
+      color: getEdgeColor(r.relationType),
+      dashed: !!r.endedAt,
+      label: r.relationType,
     }))
 
   return { nodes, links }
@@ -140,9 +140,9 @@ export function Relations() {
         .join('、')
       const existingRels = rels
         .map((r: any) => {
-          const a = chars.find((c: any) => c.id === r.character_a_id)?.name || r.character_a_id
-          const b = chars.find((c: any) => c.id === r.character_b_id)?.name || r.character_b_id
-          return `${a} → ${b}: ${r.relation_type}`
+          const a = chars.find((c: any) => c.id === r.characterAId)?.name || r.characterAId
+          const b = chars.find((c: any) => c.id === r.characterBId)?.name || r.characterBId
+          return `${a} → ${b}: ${r.relationType}`
         })
         .join('\n')
 
@@ -172,7 +172,7 @@ export function Relations() {
       let created = 0
 
       const charMap = new Map(chars.map((c: any) => [c.name, c]))
-      const existingPairs = new Set(rels.map((r: any) => [r.character_a_id, r.character_b_id].sort().join(':')))
+      const existingPairs = new Set(rels.map((r: any) => [r.characterAId, r.characterBId].sort().join(':')))
       const createOps = []
       for (const s of suggestions) {
         const a = charMap.get(s.character_a_name)
@@ -223,7 +223,7 @@ export function Relations() {
 
   const sortedByChapter = [...chars].sort((a, b) => (b.chapterCount || 0) - (a.chapterCount || 0))
   const relTypeCount = new Map<string, number>()
-  rels.forEach((r: any) => relTypeCount.set(r.relation_type, (relTypeCount.get(r.relation_type) || 0) + 1))
+  rels.forEach((r: any) => relTypeCount.set(r.relationType, (relTypeCount.get(r.relationType) || 0) + 1))
   const sortedRelTypes = [...relTypeCount.entries()].sort((a, b) => b[1] - a[1])
 
   return (

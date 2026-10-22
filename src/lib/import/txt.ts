@@ -1,11 +1,16 @@
 import { decodeTextBuffer } from './decode'
-import { matchChapterHeading, matchVolumeHeading, normalizeLine } from './headings'
+import {
+  matchChapterHeading,
+  matchNormalizedChapterHeading,
+  matchNormalizedVolumeHeading,
+  matchVolumeHeading,
+  normalizeLine,
+} from './headings'
 import { BIG_CHAPTER_CHARS } from './limits'
 import type { ImportWarning, ParsedBook, ParsedChapter, ParsedVolume, TextEncoding } from './types'
 
 export interface TxtParseOptions {
   encoding?: TextEncoding
-  title?: string
 }
 
 interface ChapterAcc {
@@ -152,7 +157,7 @@ function parseWithMarkers(lines: string[], defaultTitle: string, warnings: Impor
     // Preserve leading indentation in body text; only headings are trimmed.
     const line = rawLine.replace(/ /g, ' ').replace(/[ \t]+$/g, '')
     const headingLine = normalizeLine(rawLine)
-    const volumeTitle = matchVolumeHeading(headingLine)
+    const volumeTitle = matchNormalizedVolumeHeading(headingLine)
     if (volumeTitle) {
       flushVolume()
       flushPreface()
@@ -161,7 +166,7 @@ function parseWithMarkers(lines: string[], defaultTitle: string, warnings: Impor
       continue
     }
 
-    const chapterTitle = matchChapterHeading(headingLine)
+    const chapterTitle = matchNormalizedChapterHeading(headingLine)
     if (chapterTitle) {
       flushPreface()
       flushChapter()
@@ -230,7 +235,6 @@ export function finalizeBook(
 export function parseTxtText(
   rawText: string,
   fileName: string,
-  encoding: string,
   initialWarnings: ImportWarning[],
   title?: string,
 ): ParsedBook {
@@ -261,13 +265,10 @@ export function parseTxtText(
     if (content) volumes = [{ title: '正文', chapters: [{ title: bookTitle, content }] }]
   }
 
-  // The detected encoding is informational; keep it in the warnings pipeline
-  // only when a fallback was used.
-  void encoding
   return finalizeBook(volumes, { title: bookTitle, format: 'txt', warnings })
 }
 
 export function parseTxt(buffer: ArrayBuffer, fileName: string, options: TxtParseOptions = {}): ParsedBook {
   const decoded = decodeTextBuffer(buffer, options.encoding || 'auto')
-  return parseTxtText(decoded.text, fileName, decoded.encoding, decoded.warnings, options.title)
+  return parseTxtText(decoded.text, fileName, decoded.warnings)
 }

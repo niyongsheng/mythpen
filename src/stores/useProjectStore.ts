@@ -42,6 +42,16 @@ interface ProjectState {
   deleteProject: (name: string) => Promise<void>
 }
 
+/** Shared post-create flow: refresh the list, select, load chapters, navigate. */
+async function activateProject(name: string, phase: WorkflowPhase) {
+  const store = useProjectStore.getState()
+  await store.loadProjects()
+  store.setCurrentProject(name)
+  useProjectStore.setState({ loading: false, workflowPhase: phase })
+  await useChapterStore.getState().loadChapters(name)
+  useSidebarStore.getState().setActivePage('page-writing')
+}
+
 export const useProjectStore = create<ProjectState>((set) => ({
   currentProject: null,
   projects: [],
@@ -107,13 +117,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // 2. Auto-create Chapter 1 so user can start writing immediately
       await chaptersApi.create(name, { title: t('chapter.firstChapterTitle') })
 
-      // 3. Reload project list & set current
-      await useProjectStore.getState().loadProjects()
-      set({ currentProject: name, showProjectList: false, loading: false, workflowPhase: 'idea' })
-
-      // 4. Load chapters into sidebar & navigate to Writing page
-      await useChapterStore.getState().loadChapters(name)
-      useSidebarStore.getState().setActivePage('page-writing')
+      // 3. Reload project list, select it, load chapters & navigate to Writing
+      await activateProject(name, 'idea')
 
       track('project_created', { mode, language, genres: genres.join(',') })
     } catch (err) {
@@ -149,14 +154,9 @@ export const useProjectStore = create<ProjectState>((set) => ({
         })),
       })
 
-      await useProjectStore.getState().loadProjects()
-      set({ currentProject: name, showProjectList: false, loading: false, workflowPhase: 'writing' })
-      localStorage.setItem('mythpen-current-project', name)
-
       // loadChapters keeps the current chapter when possible; for a brand-new
       // import it falls back to the last chapter (the end of the source book).
-      await useChapterStore.getState().loadChapters(name)
-      useSidebarStore.getState().setActivePage('page-writing')
+      await activateProject(name, 'writing')
 
       track('project_imported', {
         format: book.format,

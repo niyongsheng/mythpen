@@ -72,13 +72,6 @@ interface TocEntry {
   volumeTitle: string
 }
 
-interface SpineDoc {
-  path: string
-  html: string
-  text: string
-  title: string
-}
-
 function normalizeZipPath(path: string): string {
   return path.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase()
 }
@@ -309,7 +302,7 @@ function findAnchor(doc: Document, fragment: string): Element | null {
 }
 
 function splitDocByEntries(
-  html: string,
+  doc: Document,
   entries: TocEntry[],
   fallbackText: string,
   warnings: ImportWarning[],
@@ -318,7 +311,6 @@ function splitDocByEntries(
     return [{ title: entries[0].title, text: fallbackText }]
   }
 
-  const doc = parseHtmlDocument(html)
   const anchors = entries.map((entry) => findAnchor(doc, entry.fragment))
   if (anchors.every((anchor) => anchor !== null)) {
     const parts: { title: string; text: string }[] = []
@@ -491,7 +483,26 @@ export async function parseEpub(file: File): Promise<ParsedBook> {
     }
   }
 
-  const spineDocs: SpineDoc[] = []
+  const fallbackTitle = bookTitle || titleFromFileName(file.name)
+  const chapterMap = new Map<string, ParsedChapter[]>()
+
+  const entriesByPath = new Map<string, TocEntry[]>()
+  for (const entry of tocEntries) {
+    const key = normalizeZipPath(entry.path)
+    if (!entriesByPath.has(key)) entriesByPath.set(key, [])
+    entriesByPath.get(key)?.push(entry)
+  }
+
+  if (tocEntries.length === 0) {
+    // No usable TOC: treat each spine document as a chapter, merging very
+    // short documents into the previous one. If a document contains several
+    // "Chapter N" headings, split it with the TXT parser.
+    warnings.push({ code: 'tocIncomplete' })
+  }
+
+  // Process one spine document at a time so the raw XHTML and DOM of the
+  // whole book are not kept alive while parsing.
+  let spineIndex = 0
   for (const spineItem of spineItems) {
     if (spineItem.linear === 'no') continue
     const item = manifest.get(spineItem.idref)
@@ -501,52 +512,33 @@ export async function parseEpub(file: File): Promise<ParsedBook> {
     const docPath = resolveZipPath(opfDir, item.href)
     const docBytes = await readBytes(docPath)
     if (!docBytes) continue
-    const html = decodeDocument(docBytes)
-    const doc = parseHtmlDocument(html)
+    const doc = parseHtmlDocument(decodeDocument(docBytes))
     const text = extractTextFromElement(doc.body || doc.documentElement)
     if (text.length < 20) continue
-    spineDocs.push({ path: docPath, html, text, title: firstHeading(doc) })
-  }
+    spineIndex += 1
+    const title = firstHeading(doc) || `第${spineIndex}章`
 
-  const fallbackTitle = bookTitle || titleFromFileName(file.name)
-  const chapterMap = new Map<string, ParsedChapter[]>()
-
-  if (tocEntries.length === 0) {
-    // No usable TOC: treat each spine document as a chapter, merging very
-    // short documents into the previous one. If a document contains several
-    // "Chapter N" headings, split it with the TXT parser.
-    warnings.push({ code: 'tocIncomplete' })
-    let index = 0
-    for (const doc of spineDocs) {
-      index += 1
-      const split = parseTxtText(doc.text, file.name, '', [], doc.title || `第${index}章`)
+    if (tocEntries.length === 0) {
+      const split = parseTxtText(text, file.name, [], title)
       const splitChapters = split.volumes.flatMap((volume) => volume.chapters)
       if (splitChapters.length > 1) {
         for (const chapter of splitChapters) appendToVolumes(chapterMap, '正文', chapter.title, chapter.content)
       } else {
-        appendToVolumes(chapterMap, '正文', doc.title || `第${index}章`, doc.text)
+        appendToVolumes(chapterMap, '正文', title, text)
       }
-    }
-  } else {
-    const entriesByPath = new Map<string, TocEntry[]>()
-    for (const entry of tocEntries) {
-      const key = normalizeZipPath(entry.path)
-      if (!entriesByPath.has(key)) entriesByPath.set(key, [])
-      entriesByPath.get(key)?.push(entry)
+      continue
     }
 
-    for (const doc of spineDocs) {
-      const entries = entriesByPath.get(normalizeZipPath(doc.path))
-      if (entries && entries.length > 0) {
-        const parts = splitDocByEntries(doc.html, entries, doc.text, warnings)
-        for (let i = 0; i < parts.length; i++) {
-          appendToVolumes(chapterMap, entries[i].volumeTitle, parts[i].title, parts[i].text)
-        }
-      } else {
-        // Content not covered by the TOC: keep it as a chapter so nothing is lost.
-        warnings.push({ code: 'tocIncomplete' })
-        appendToVolumes(chapterMap, '', doc.title || `第${spineDocs.indexOf(doc) + 1}章`, doc.text)
+    const entries = entriesByPath.get(normalizeZipPath(docPath))
+    if (entries && entries.length > 0) {
+      const parts = splitDocByEntries(doc, entries, text, warnings)
+      for (let i = 0; i < parts.length; i++) {
+        appendToVolumes(chapterMap, entries[i].volumeTitle, parts[i].title, parts[i].text)
       }
+    } else {
+      // Content not covered by the TOC: keep it as a chapter so nothing is lost.
+      warnings.push({ code: 'tocIncomplete' })
+      appendToVolumes(chapterMap, '', title, text)
     }
   }
 

@@ -1,7 +1,7 @@
 import { BookOpen, Database, Pen } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
-import { projectsApi } from '@/lib/api'
+import { apiUrl, projectsApi } from '@/lib/api'
 import { useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
@@ -38,7 +38,7 @@ export function BottomStatusbar() {
       try {
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), 3000)
-        const res = await fetch('/api/health', { signal: controller.signal })
+        const res = await fetch(apiUrl('/health'), { signal: controller.signal })
         clearTimeout(timer)
         if (mountedRef.current) setBackendOnline(res.ok)
       } catch {

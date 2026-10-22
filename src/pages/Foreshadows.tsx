@@ -5,7 +5,8 @@ import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { aiApi, extractAIJsonArray, foreshadowsApi, getAIResponseText } from '@/lib/api'
-import { useChapters, useForeshadows, useProjectName } from '@/lib/useProjectData'
+import { useForeshadows, useProjectName } from '@/lib/useProjectData'
+import { useChapterStore } from '@/stores/useChapterStore'
 
 interface Column {
   key: string
@@ -22,7 +23,7 @@ const COLUMNS: Column[] = [
 export function Foreshadows() {
   const { data: foreshadows, loading, reload } = useForeshadows()
   useDataRefresh('foreshadow', reload)
-  const { chapters } = useChapters()
+  const chapters = useChapterStore((s) => s.volumes).flatMap((volume) => volume.chapters)
   const { t } = useT()
   const project = useProjectName()
   const [showCreate, setShowCreate] = useState(false)
@@ -78,7 +79,7 @@ export function Foreshadows() {
       value: String(
         list.filter(
           (f: any) =>
-            f.status === 'planted' && f.expected_resolve_chapter > 0 && f.expected_resolve_chapter < maxChapterNum,
+            f.status === 'planted' && f.expectedResolveChapter > 0 && f.expectedResolveChapter < maxChapterNum,
         ).length,
       ),
       color: 'var(--error)',
@@ -198,9 +199,9 @@ export function Foreshadows() {
                       {f.description && (
                         <div className="text-[12px] text-[var(--ink-tertiary)] mt-1 line-clamp-2">{f.description}</div>
                       )}
-                      {f.expected_resolve_chapter > 0 && (
+                      {f.expectedResolveChapter > 0 && (
                         <div className="text-[10px] text-[var(--ink-mute)] mt-1 font-mono">
-                          {t('foreshadow.expectedResolve', { n: f.expected_resolve_chapter })}
+                          {t('foreshadow.expectedResolve', { n: f.expectedResolveChapter })}
                         </div>
                       )}
                     </div>

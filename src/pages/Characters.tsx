@@ -132,7 +132,7 @@ export function Characters() {
                 <div className="flex gap-5">
                   <div className="text-center">
                     <div className="font-mono text-lg text-[var(--accent-gold)]">{selected.chapterCount || 0}</div>
-                    <div className="text-[11px] text-[var(--ink-tertiary)] mt-0.5">{t('chapters')}</div>
+                    <div className="text-[11px] text-[var(--ink-tertiary)] mt-0.5">{t('project.chapterUnit')}</div>
                   </div>
                 </div>
               </div>

@@ -16,7 +16,6 @@ export function EditorStatusbar() {
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const saveStatus = useChapterStore((s) => s.saveStatus)
   const updateChapter = useChapterStore((s) => s.updateChapter)
-  const loadChapters = useChapterStore((s) => s.loadChapters)
   const project = useProjectName()
   const { t } = useT()
 
@@ -27,7 +26,6 @@ export function EditorStatusbar() {
     updateChapter(project, currentChapter.num, { status: next })
       .then(() => track('chapter_status_changed', { from, to: next }))
       .catch(() => {})
-    loadChapters(project).catch(() => {})
   }
 
   if (!currentChapter) {

@@ -1,8 +1,6 @@
-type Translate = (path: string, params?: Record<string, string | number>) => string
+import { isStandaloneVolumeHeading } from './import/headings'
 
-/** Titles that already carry a volume label, e.g. "第一卷 · 完美样本". */
-const VOLUME_LABEL_RE =
-  /^(第\s*[\d零〇一二三四五六七八九十百千万两]+\s*[卷部集]|卷\s*[\d零〇一二三四五六七八九十百千万两]+|(volume|book|part)\s+([0-9]+|[ivxlcdm]+)\b|上卷|中卷|下卷|上部|中部|下部)/i
+type Translate = (path: string, params?: Record<string, string | number>) => string
 
 /**
  * Formats a volume heading without duplicating its numeric label.
@@ -14,6 +12,5 @@ const VOLUME_LABEL_RE =
 export function formatVolumeTitle(title: string, sortOrder: number, t: Translate): string {
   const trimmed = (title || '').trim()
   if (!trimmed) return t('sidebar.volumeTitle', { order: sortOrder, title: '' }).trim()
-  if (VOLUME_LABEL_RE.test(trimmed)) return trimmed
-  return t('sidebar.volumeTitle', { order: sortOrder, title: trimmed })
+  return isStandaloneVolumeHeading(trimmed) ? trimmed : t('sidebar.volumeTitle', { order: sortOrder, title: trimmed })
 }

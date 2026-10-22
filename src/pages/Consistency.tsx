@@ -16,21 +16,21 @@ export function Consistency() {
     if (!project) return
     setLoading(true)
     try {
-      const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project), foreshadowsApi.list(project)])
+      const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project, true), foreshadowsApi.list(project)])
       const found: any[] = []
       let conflicts = 0,
         warnings = 0
 
       const maxChapterNum = Math.max(...chapters.map((c: any) => c.num), 0)
       for (const f of foreshadows || []) {
-        if (f.status === 'planted' && f.expected_resolve_chapter && f.expected_resolve_chapter <= maxChapterNum) {
+        if (f.status === 'planted' && f.expectedResolveChapter && f.expectedResolveChapter <= maxChapterNum) {
           found.push({
             tag: t('consistency.foreshadowAlert'),
             severity: 'warn',
             title: t('consistency.foreshadowLate', { title: f.title }),
             desc: t('consistency.foreshadowDesc', {
-              planted: f.planted_chapter_id,
-              expected: f.expected_resolve_chapter,
+              planted: f.plantedChapterId ?? '',
+              expected: f.expectedResolveChapter,
               current: maxChapterNum,
             }),
             loc: t('consistency.foreshadowLoc', { id: (f.id || '').slice(0, 8) }),
@@ -40,12 +40,12 @@ export function Consistency() {
       }
 
       for (const ch of chapters || []) {
-        if (ch.status === 'pending' && (ch.word_count || 0) > 0) {
+        if (ch.status === 'pending' && (ch.wordCount || 0) > 0) {
           found.push({
             tag: t('consistency.statusAbnormal'),
             severity: 'warn',
             title: t('consistency.chapterAbnormal', { num: ch.num, title: ch.title }),
-            desc: t('consistency.chapterAbnormalDesc', { wordCount: ch.word_count }),
+            desc: t('consistency.chapterAbnormalDesc', { wordCount: ch.wordCount }),
             loc: t('consistency.chapterLoc', { num: ch.num }),
           })
           warnings++
@@ -62,11 +62,11 @@ export function Consistency() {
     if (!project) return
     setDeepChecking(true)
     try {
-      const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project), foreshadowsApi.list(project)])
+      const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project, true), foreshadowsApi.list(project)])
 
       const chSummary = (chapters || [])
         .map((c: any) =>
-          t('consistency.chapterSummary', { num: c.num, title: c.title, status: c.status, wordCount: c.word_count }),
+          t('consistency.chapterSummary', { num: c.num, title: c.title, status: c.status, wordCount: c.wordCount }),
         )
         .join('\n')
       const fSummary = (foreshadows || [])

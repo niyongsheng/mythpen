@@ -1,31 +1,3 @@
-// ─── Project ───
-export interface ProjectInfo {
-  id: string
-  name: string
-  iconName: string
-  genres: string[]
-  mode: 'short-story' | 'medium-novel' | 'long-novel'
-  language: string
-  wordCount: number
-  chapterCount: number
-  lastOpened: string
-  status: string
-}
-
-export interface ProjectMeta {
-  name: string
-  description: string
-  mode: string
-  language: string
-  version: string
-  createdAt: string
-  updatedAt: string
-  wordCount: number
-  authorName: string
-  autoConfirm: boolean
-  embeddingEnabled: boolean
-}
-
 // ─── Chapters ───
 export interface Chapter {
   id: number
@@ -125,27 +97,6 @@ export interface CharacterRelation {
   layoutY?: number
 }
 
-// ─── Graph Nodes ───
-export interface GraphNode {
-  id: string
-  name: string
-  radius: number
-  color: string
-  x: number
-  y: number
-  fixed?: boolean
-}
-
-export interface GraphLink {
-  source: string
-  target: string
-  type: string
-  intensity: number
-  color: string
-  dashed: boolean
-  label: string
-}
-
 // ─── Timeline ───
 export interface TimelineEvent {
   id: string
@@ -211,44 +162,13 @@ export interface ProjectStats {
   memoryCount?: number
   timelineCount?: number
   volumeCount?: number
-  volumes?: { id: number; title: string; sort_order: number; chapter_count: number; word_count: number }[]
+  volumes?: { id: number; title: string; sortOrder: number; chapterCount: number; wordCount: number }[]
   clueUnresolved?: number
   clueResolved?: number
   genres?: string[]
   tokenInput: number
   tokenOutput: number
-  currentChapter?: { id: number; num: number; title: string; word_count: number; status: string; content: string }
-  chapters: { id: number; num: number; title: string; word_count: number; status: string }[]
+  chapters: { id: number; num: number; title: string; wordCount: number; status: string }[]
   dailyWords: number[]
   targetWords: number
-}
-
-// ─── Export ───
-export interface ExportRecord {
-  id: string
-  format: 'txt' | 'markdown' | 'epub' | 'pdf'
-  filePath: string
-  wordCount: number
-  exportedAt: string
-}
-
-// ─── Consistency ───
-export interface ConsistencyIssue {
-  type: 'conflict' | 'timeline' | 'foreshadow' | 'science'
-  severity: 'error' | 'warn'
-  title: string
-  description: string
-  location: string
-}
-
-// ─── Sidebar ───
-export interface SidebarItem {
-  id: string
-  labelKey: string
-  icon: string
-  category: 'universal' | 'genre' | 'optional'
-  genres: string
-  sortOrder: number
-  route: string
-  enabled: boolean
 }

@@ -6,7 +6,7 @@ import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
 import { track } from '@/lib/analytics'
 import { aiApi, chatApi } from '@/lib/api'
-import { getModifiedEntities, notifyDataChanged } from '@/lib/dataEvents'
+import { type EntityType, notifyDataChanged } from '@/lib/dataEvents'
 import { useProjectName } from '@/lib/useProjectData'
 import { useAgentStore } from '@/stores/useAgentStore'
 import { useChapterStore } from '@/stores/useChapterStore'
@@ -49,6 +49,7 @@ export function AIPanel() {
   const [mode, setMode] = useState<'writing' | 'collab'>('collab')
   const [toolCalls, setToolCalls] = useState<any[]>([])
   const toolCallsRef = useRef<any[]>([])
+  const modifiedEntitiesRef = useRef<Set<EntityType>>(new Set())
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { toasts, show: showToast } = useToast()
   const { t } = useT()
@@ -192,6 +193,7 @@ export function AIPanel() {
     streamRef.current = ''
     setToolCalls([])
     toolCallsRef.current = []
+    modifiedEntitiesRef.current = new Set()
   }
 
   const stopTask = () => {
@@ -205,6 +207,7 @@ export function AIPanel() {
     setTaskName('')
     setToolCalls([])
     toolCallsRef.current = []
+    modifiedEntitiesRef.current = new Set()
   }
 
   const handleSend = () => {
@@ -262,15 +265,14 @@ export function AIPanel() {
         addMessage({ id: nextMsgId(), ...aiMsg })
         saveMsg(aiMsg).catch(() => {})
         const hadToolCalls = toolCallsRef.current.length > 0
+        const modifiedEntities = [...modifiedEntitiesRef.current]
         done()
         if (fullText) {
           showToast(t('ai.responseComplete'), 'success')
         }
         generateAITitle(userMsg, fullText || undefined)
         if (hadToolCalls) {
-          const toolNames = toolCallsRef.current.map((tc: any) => tc.name)
-          const entities = getModifiedEntities(toolNames)
-          for (const entity of entities) {
+          for (const entity of modifiedEntities) {
             notifyDataChanged(entity)
           }
           if (isChat) {
@@ -299,6 +301,7 @@ export function AIPanel() {
         setToolCalls(updated)
       },
       (tr: any) => {
+        if (tr.entity) modifiedEntitiesRef.current.add(tr.entity as EntityType)
         const updated = toolCallsRef.current.map((tc) =>
           tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc,
         )

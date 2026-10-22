@@ -39,19 +39,27 @@ function isPlausibleHeading(line: string, maxLength: number): boolean {
 }
 
 export function matchChapterHeading(line: string): string | null {
-  const trimmed = normalizeLine(line)
-  if (!isPlausibleHeading(trimmed, 40)) return null
-  const match = trimmed.match(CHAPTER_RE)
-  if (!match) return null
-  const tail = (match[1] || '').trim()
-  if (tail && NARRATIVE_TAIL_RE.test(tail)) return null
-  return trimmed
+  return matchNormalizedChapterHeading(normalizeLine(line))
 }
 
 export function matchVolumeHeading(line: string): string | null {
-  const trimmed = normalizeLine(line)
-  if (!isPlausibleHeading(trimmed, 50)) return null
-  return VOLUME_RE.test(trimmed) ? trimmed : null
+  return matchNormalizedVolumeHeading(normalizeLine(line))
+}
+
+/** Same as `matchChapterHeading`, for callers that already normalized the line. */
+export function matchNormalizedChapterHeading(line: string): string | null {
+  if (!isPlausibleHeading(line, 40)) return null
+  const match = line.match(CHAPTER_RE)
+  if (!match) return null
+  const tail = (match[1] || '').trim()
+  if (tail && NARRATIVE_TAIL_RE.test(tail)) return null
+  return line
+}
+
+/** Same as `matchVolumeHeading`, for callers that already normalized the line. */
+export function matchNormalizedVolumeHeading(line: string): string | null {
+  if (!isPlausibleHeading(line, 50)) return null
+  return VOLUME_RE.test(line) ? line : null
 }
 
 /** True when a stored chapter title already carries its own numbering. */

@@ -41,15 +41,20 @@ export function EditorToolbar() {
     const handler = () => {
       const editor = document.querySelector('[contenteditable]')
       if (editor !== document.activeElement) {
-        if (fmt.bold || fmt.italic || fmt.underline) setFmt({ bold: false, italic: false, underline: false })
+        setFmt((prev) =>
+          prev.bold || prev.italic || prev.underline ? { bold: false, italic: false, underline: false } : prev,
+        )
         return
       }
       try {
-        setFmt({
+        const next = {
           bold: document.queryCommandState('bold'),
           italic: document.queryCommandState('italic'),
           underline: document.queryCommandState('underline'),
-        })
+        }
+        setFmt((prev) =>
+          prev.bold === next.bold && prev.italic === next.italic && prev.underline === next.underline ? prev : next,
+        )
       } catch {}
     }
     document.addEventListener('selectionchange', handler)

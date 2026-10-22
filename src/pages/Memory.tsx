@@ -177,7 +177,7 @@ export function Memory() {
                 </span>
                 <div className="text-[13px] text-[var(--ink-secondary)] leading-[1.6]">{m.content}</div>
                 <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
-                  {m.source_chapter_id ? t('memory.sourceChapter', { n: m.source_chapter_id }) : ''}
+                  {m.sourceChapterId ? t('memory.sourceChapter', { n: m.sourceChapterId }) : ''}
                 </div>
               </div>
             )

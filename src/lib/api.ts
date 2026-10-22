@@ -2,17 +2,16 @@
 // Dev: /api is proxied by Vite to localhost:3001
 // Tauri production: sidecar server runs on 127.0.0.1:3001
 
-// In Tauri v2, __TAURI_INTERNALS__ is injected by the runtime automatically.
-// No npm package needed for this detection.
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+import { toChapter, toCharacter, toForeshadow, toMemory, toRelation, toStats } from './dto'
+import { isTauri } from './runtime'
+
 const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
 
 // Normalize double slashes (e.g. /api//stats → /api/stats) that happen
 // when a project name is empty. Skip the protocol colon so http:// stays.
-const apiUrl = (path: string) => `${API_BASE}${path}`.replace(/([^:]\/)\/+/g, '$1')
+export const apiUrl = (path: string) => `${API_BASE}${path}`.replace(/([^:]\/)\/+/g, '$1')
 
-async function request(path: string, options: any = {}) {
-  const url = apiUrl(path)
+function requestConfig(options: any = {}) {
   const config: any = {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
@@ -20,7 +19,11 @@ async function request(path: string, options: any = {}) {
   if (config.body && typeof config.body === 'object') {
     config.body = JSON.stringify(config.body)
   }
-  const res = await fetch(url, config)
+  return config
+}
+
+async function request(path: string, options: any = {}) {
+  const res = await fetch(apiUrl(path), requestConfig(options))
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: { message: res.statusText } }))
     throw new Error(err.error?.message || err.message || `HTTP ${res.status}`)
@@ -39,33 +42,26 @@ export const projectsApi = {
   getPhase: (name: string) => request(`/${encodeURIComponent(name)}/workflow/phase`),
   setPhase: (name: string, phase: string) =>
     request(`/${encodeURIComponent(name)}/workflow/phase`, { method: 'PUT', body: { phase } }),
-  getSidebarItems: async (name: string) => {
-    const items: any[] = await request(`/${encodeURIComponent(name)}/sidebar-items`)
-    return items.map((item: any) => ({
-      id: item.id,
-      labelKey: item.label_key,
-      icon: item.icon,
-      category: item.category,
-      genres: item.genres,
-      sortOrder: item.sort_order,
-      route: item.route,
-      enabled: !!item.enabled,
-    }))
-  },
   uploadCover: (name: string, data: string, mime: string) =>
     request(`/${encodeURIComponent(name)}/cover`, { method: 'POST', body: { data, mime } }),
   deleteCover: (name: string) => request(`/${encodeURIComponent(name)}/cover`, { method: 'DELETE' }),
-  getCoverUrl: (name: string) => `/api/${encodeURIComponent(name)}/cover`,
+  getCoverUrl: (name: string) => apiUrl(`/${encodeURIComponent(name)}/cover`),
 }
 
 // ─── Chapters ───
 
 export const chaptersApi = {
-  list: (project: string) => request(`/${encodeURIComponent(project)}/chapters`),
-  get: (project: string, num: number, volumeId?: number) =>
-    request(`/${encodeURIComponent(project)}/chapters/${num}${volumeId ? `?volume_id=${volumeId}` : ''}`),
-  update: (project: string, num: number, data: any) =>
-    request(`/${encodeURIComponent(project)}/chapters/${num}`, { method: 'PUT', body: data }),
+  list: async (project: string, slim = false) =>
+    ((await request(`/${encodeURIComponent(project)}/chapters${slim ? '?slim=1' : ''}`)) as any[]).map(toChapter),
+  get: async (project: string, num: number, volumeId?: number, previewChars?: number) => {
+    const params = new URLSearchParams()
+    if (volumeId) params.set('volume_id', String(volumeId))
+    if (previewChars) params.set('preview', String(previewChars))
+    const query = params.toString()
+    return toChapter(await request(`/${encodeURIComponent(project)}/chapters/${num}${query ? `?${query}` : ''}`))
+  },
+  update: async (project: string, num: number, data: any) =>
+    toChapter(await request(`/${encodeURIComponent(project)}/chapters/${num}`, { method: 'PUT', body: data })),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/chapters`, { method: 'POST', body: data }),
 }
@@ -79,7 +75,8 @@ export const volumesApi = {
 // ─── Characters ───
 
 export const charactersApi = {
-  list: (project: string) => request(`/${encodeURIComponent(project)}/characters`),
+  list: async (project: string) =>
+    ((await request(`/${encodeURIComponent(project)}/characters`)) as any[]).map(toCharacter),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/characters`, { method: 'POST', body: data }),
 }
@@ -103,9 +100,9 @@ export const scienceApi = {
 // ─── Foreshadows ───
 
 export const foreshadowsApi = {
-  list: (project: string, status?: string) => {
+  list: async (project: string, status?: string) => {
     const qs = status ? `?status=${encodeURIComponent(status)}` : ''
-    return request(`/${encodeURIComponent(project)}/foreshadows${qs}`)
+    return ((await request(`/${encodeURIComponent(project)}/foreshadows${qs}`)) as any[]).map(toForeshadow)
   },
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/foreshadows`, { method: 'POST', body: data }),
@@ -114,7 +111,8 @@ export const foreshadowsApi = {
 // ─── Relations ───
 
 export const relationsApi = {
-  list: (project: string) => request(`/${encodeURIComponent(project)}/relations`),
+  list: async (project: string) =>
+    ((await request(`/${encodeURIComponent(project)}/relations`)) as any[]).map(toRelation),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/relations`, { method: 'POST', body: data }),
 }
@@ -122,11 +120,13 @@ export const relationsApi = {
 // ─── Memories ───
 
 export const memoriesApi = {
-  list: (project: string) => request(`/${encodeURIComponent(project)}/memories`),
+  list: async (project: string) => ((await request(`/${encodeURIComponent(project)}/memories`)) as any[]).map(toMemory),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/memories`, { method: 'POST', body: data }),
-  search: (project: string, query: string) =>
-    request(`/${encodeURIComponent(project)}/memories/search`, { method: 'POST', body: { query } }),
+  search: async (project: string, query: string) =>
+    (
+      (await request(`/${encodeURIComponent(project)}/memories/search`, { method: 'POST', body: { query } })) as any[]
+    ).map(toMemory),
 }
 
 // ─── Timeline ───
@@ -140,7 +140,7 @@ export const timelineApi = {
 // ─── Stats ───
 
 export const statsApi = {
-  get: (project: string) => request(`/${encodeURIComponent(project)}/stats`),
+  get: async (project: string) => toStats(await request(`/${encodeURIComponent(project)}/stats`)),
   updateTargetWords: (project: string, targetWords: number) =>
     request(`/${encodeURIComponent(project)}/target-words`, { method: 'PUT', body: { targetWords } }),
   resetTargetWords: (project: string) => request(`/${encodeURIComponent(project)}/target-words`, { method: 'DELETE' }),
@@ -156,15 +156,7 @@ export const settingsApi = {
 // ─── Chat / AI (always uses HTTP) ───
 
 function aiRequest(path: string, options: any = {}) {
-  const url = apiUrl(path)
-  const config: any = {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
-    ...options,
-  }
-  if (config.body && typeof config.body === 'object') {
-    config.body = JSON.stringify(config.body)
-  }
-  return fetch(url, config)
+  return fetch(apiUrl(path), requestConfig(options))
 }
 
 // Shared SSE stream reader — handles buffering, line splitting, event dispatch
@@ -201,12 +193,7 @@ export const aiApi = {
   chat: (messages: any[], project: string) =>
     aiRequest('/ai/chat', { method: 'POST', body: { messages, project } }).then((r) => r.json()),
 
-  analyzeImport: (project: string) =>
-    aiRequest('/ai/analyze-import', { method: 'POST', body: { project } }).then(async (r) => {
-      const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data.error?.message || `HTTP ${r.status}`)
-      return data
-    }),
+  analyzeImport: (project: string) => request('/ai/analyze-import', { method: 'POST', body: { project } }),
 
   chatStream: (
     messages: any[],
@@ -219,10 +206,9 @@ export const aiApi = {
     onToolResult?: (tr: any) => void,
   ) => {
     const controller = new AbortController()
-    fetch(`${API_BASE}/ai/chat/stream`, {
+    aiRequest('/ai/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages, project, mode }),
+      body: { messages, project, mode },
       signal: controller.signal,
     })
       .then(async (response) => {
@@ -232,6 +218,10 @@ export const aiApi = {
           tool_call: (data) => onToolCall?.(data),
           tool_result: (data) => onToolResult?.(data),
           error: (data) => {
+            gotError = true
+            onError(data)
+          },
+          task_error: (data) => {
             gotError = true
             onError(data)
           },
@@ -252,22 +242,23 @@ export const aiApi = {
   ) => {
     const controller = new AbortController()
     let finished = false
-    fetch(`${API_BASE}/ai/continue`, {
+    aiRequest('/ai/continue', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chapterNum, context, project }),
+      body: { chapterNum, context, project },
       signal: controller.signal,
     })
       .then(async (response) => {
-        let gotError = false
         await readSSEStream(response, {
           content_chunk: (data) => onChunk(data.text || ''),
-          done: (data) => {
+          task_end: (data) => {
             finished = true
             onEnd(data)
           },
           error: (data) => {
-            gotError = true
+            finished = true
+            onError(data)
+          },
+          task_error: (data) => {
             finished = true
             onError(data)
           },

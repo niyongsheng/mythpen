@@ -7,7 +7,6 @@ interface ImportBookPanelProps {
   book: ParsedBook | null
   file: File | null
   parsing: boolean
-  error: string | null
   encoding: TextEncoding
   disabled?: boolean
   onFileSelected: (file: File) => void
@@ -15,26 +14,10 @@ interface ImportBookPanelProps {
 }
 
 function warningText(warning: ImportWarning, t: ReturnType<typeof useT>['t']): string {
-  switch (warning.code) {
-    case 'noChapterMarkers':
-      return t('project.import.noChapterMarkers')
-    case 'perVolumeSingleChapter':
-      return t('project.import.perVolumeSingleChapter')
-    case 'emptyChaptersSkipped':
-      return t('project.import.emptyChaptersSkipped', { count: warning.count || 0 })
-    case 'bigChapter':
-      return t('project.import.bigChapter', { value: (warning.value || 0).toLocaleString() })
-    case 'encodingFallback':
-      return t('project.import.encodingFallback')
-    case 'unknownEncoding':
-      return t('project.import.unknownEncoding')
-    case 'tocIncomplete':
-      return t('project.import.tocIncomplete')
-    case 'fragmentFallback':
-      return t('project.import.fragmentFallback')
-    default:
-      return ''
-  }
+  return t(`project.import.${warning.code}`, {
+    count: warning.count ?? 0,
+    value: (warning.value ?? 0).toLocaleString(),
+  })
 }
 
 function isTxtFile(file: File | null): boolean {
@@ -45,7 +28,6 @@ export function ImportBookPanel({
   book,
   file,
   parsing,
-  error,
   encoding,
   disabled,
   onFileSelected,
@@ -146,12 +128,6 @@ export function ImportBookPanel({
         <div className="flex items-center gap-2 text-[13px] text-[var(--ink-secondary)]">
           <Loader className="w-4 h-4 animate-spin" />
           {t('project.import.parsing')}
-        </div>
-      )}
-
-      {error && (
-        <div className="px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-[13px] text-red-500">
-          {error}
         </div>
       )}
 

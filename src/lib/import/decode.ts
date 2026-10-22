@@ -5,7 +5,6 @@ const REPLACEMENT = '�'
 
 export interface DecodeResult {
   text: string
-  encoding: string
   warnings: ImportWarning[]
 }
 
@@ -75,50 +74,46 @@ export function decodeTextBuffer(buffer: ArrayBuffer, encoding: TextEncoding = '
     const label = normalizeLabel(encoding)
     if (label) {
       const text = tryDecode(bytes, label)
-      if (text != null) return { text, encoding: label, warnings }
+      if (text != null) return { text, warnings }
     }
     warnings.push({ code: 'unknownEncoding' })
   }
 
   if (hasBom(bytes, 0xef, 0xbb, 0xbf)) {
-    const text = new TextDecoder('utf-8').decode(bytes.subarray(3))
-    return { text, encoding: 'utf-8', warnings }
+    return { text: new TextDecoder('utf-8').decode(bytes.subarray(3)), warnings }
   }
   if (hasBom(bytes, 0xff, 0xfe)) {
     const text = tryDecode(bytes.subarray(2), 'utf-16le')
-    if (text != null) return { text, encoding: 'utf-16le', warnings }
+    if (text != null) return { text, warnings }
   }
   if (hasBom(bytes, 0xfe, 0xff)) {
     const text = tryDecode(bytes.subarray(2), 'utf-16be')
-    if (text != null) return { text, encoding: 'utf-16be', warnings }
+    if (text != null) return { text, warnings }
   }
 
   const utf16 = looksUtf16(bytes)
   if (utf16) {
     const text = tryDecode(bytes, utf16)
-    if (text != null) return { text, encoding: utf16, warnings }
+    if (text != null) return { text, warnings }
   }
 
   const strictUtf8 = tryDecode(bytes, 'utf-8', true)
-  if (strictUtf8 != null) return { text: strictUtf8, encoding: 'utf-8', warnings }
+  if (strictUtf8 != null) return { text: strictUtf8, warnings }
 
-  const gb = tryDecode(bytes, 'gb18030')
-  const big5 = tryDecode(bytes, 'big5')
-  if (gb == null && big5 == null) {
-    return { text: new TextDecoder('utf-8').decode(bytes), encoding: 'utf-8', warnings }
+  // Score a sample first: decoding a multi-megabyte novel twice just to pick
+  // between GB18030 and Big5 blocks the main thread for seconds.
+  const SAMPLE_BYTES = 256 * 1024
+  const sample = bytes.subarray(0, Math.min(bytes.length, SAMPLE_BYTES))
+  const gbSample = tryDecode(sample, 'gb18030')
+  const big5Sample = tryDecode(sample, 'big5')
+  if (gbSample == null && big5Sample == null) {
+    return { text: new TextDecoder('utf-8').decode(bytes), warnings }
   }
-  if (gb != null && big5 != null) {
-    const gbScore = scoreText(gb)
-    const big5Score = scoreText(big5)
-    if (big5Score > gbScore + 20) {
-      return { text: big5, encoding: 'big5', warnings: [...warnings, { code: 'encodingFallback', value: 2 }] }
-    }
-    return { text: gb, encoding: 'gb18030', warnings: [...warnings, { code: 'encodingFallback', value: 1 }] }
-  }
-  const text = gb ?? big5 ?? ''
+
+  const preferBig5 = gbSample != null && big5Sample != null && scoreText(big5Sample) > scoreText(gbSample) + 20
+  const fallback = preferBig5 || gbSample == null ? 'big5' : 'gb18030'
   return {
-    text,
-    encoding: gb != null ? 'gb18030' : 'big5',
-    warnings: [...warnings, { code: 'encodingFallback', value: gb != null ? 1 : 2 }],
+    text: tryDecode(bytes, fallback) ?? new TextDecoder('utf-8').decode(bytes),
+    warnings: [...warnings, { code: 'encodingFallback', value: fallback === 'big5' ? 2 : 1 }],
   }
 }

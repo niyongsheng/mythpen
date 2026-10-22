@@ -16,10 +16,10 @@ import {
   Users,
   Waypoints,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
-import { statsApi } from '@/lib/api'
+import { useTargetWordsEditor } from '@/hooks/useTargetWordsEditor'
 import { formatChapterTitle } from '@/lib/chapterTitle'
 import { useProjectName, useStats } from '@/lib/useProjectData'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -107,42 +107,15 @@ export function Dashboard() {
   }
 
   // ── Target words editing ──
-  const [editingTarget, setEditingTarget] = useState(false)
-  const [targetInput, setTargetInput] = useState('')
-  const targetInputRef = useRef<HTMLInputElement>(null)
-
-  const handleSaveTargetWords = useCallback(async () => {
-    const val = parseInt(targetInput)
-    if (!isNaN(val) && val >= 1000 && project) {
-      try {
-        await statsApi.updateTargetWords(project, val)
-        reloadStats()
-      } catch {
-        /* ignore */
-      }
-    }
-    setEditingTarget(false)
-    setTargetInput('')
-  }, [targetInput, project, reloadStats])
-
-  const handleResetTargetWords = useCallback(async () => {
-    if (!project) return
-    try {
-      await statsApi.resetTargetWords(project)
-      reloadStats()
-    } catch {
-      /* ignore */
-    }
-    setEditingTarget(false)
-    setTargetInput('')
-  }, [project, reloadStats])
-
-  useEffect(() => {
-    if (editingTarget && targetInputRef.current) {
-      targetInputRef.current.focus()
-      targetInputRef.current.select()
-    }
-  }, [editingTarget])
+  const {
+    editing: editingTarget,
+    setEditing: setEditingTarget,
+    input: targetInput,
+    setInput: setTargetInput,
+    inputRef: targetInputRef,
+    save: handleSaveTargetWords,
+    reset: handleResetTargetWords,
+  } = useTargetWordsEditor(project, reloadStats)
 
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
@@ -365,7 +338,7 @@ export function Dashboard() {
                 <div key={v.id} className="flex items-center justify-between text-[12px]">
                   <span className="text-[var(--ink)] truncate mr-2">{v.title}</span>
                   <span className="text-[var(--ink-tertiary)] shrink-0 font-mono">
-                    {t('dashboard.volumeStats', { n: v.chapter_count, m: (v.word_count || 0).toLocaleString() })}
+                    {t('dashboard.volumeStats', { n: v.chapterCount, m: (v.wordCount || 0).toLocaleString() })}
                   </span>
                 </div>
               ))}
@@ -441,7 +414,7 @@ export function Dashboard() {
                 key={ch.num}
                 formattedTitle={formatChapterTitle(ch.num, ch.title, t)}
                 status={ch.status}
-                words={`${(ch.word_count || 0).toLocaleString()}${t('dashboard.wordCountSuffix')}`}
+                words={`${(ch.wordCount || 0).toLocaleString()}${t('dashboard.wordCountSuffix')}`}
               />
             ))}
           </div>

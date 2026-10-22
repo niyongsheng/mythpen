@@ -9,7 +9,9 @@ import { useProjectStore } from '@/stores/useProjectStore'
 
 export function Outline() {
   const { t } = useT()
-  const { volumes, updateChapter, createChapter, loadChapters } = useChapterStore()
+  const volumes = useChapterStore((s) => s.volumes)
+  const updateChapter = useChapterStore((s) => s.updateChapter)
+  const createChapter = useChapterStore((s) => s.createChapter)
   const currentProject = useProjectStore((s) => s.currentProject)
   const [activeChapterId, setActiveChapterId] = useState<number | null>(null)
   const [collapsedVolumes, setCollapsedVolumes] = useState<Set<number>>(new Set())
@@ -59,7 +61,6 @@ export function Outline() {
         outline: outlineText,
         ...dimensions,
       })
-      await loadChapters(currentProject)
     } catch (e) {
       console.error('Save failed:', e)
     }
@@ -102,7 +103,7 @@ export function Outline() {
       let chapterContent = activeChapter.content
       if (!chapterContent) {
         try {
-          const full = await chaptersApi.get(currentProject, activeChapter.num, activeChapter.volumeId)
+          const full = await chaptersApi.get(currentProject, activeChapter.num, activeChapter.volumeId, 1000)
           chapterContent = full?.content || ''
         } catch {
           /* preview falls back to the empty marker */
@@ -155,7 +156,6 @@ export function Outline() {
     if (!currentProject || !activeChapter) return
     try {
       await updateChapter(currentProject, activeChapter.num, { title })
-      await loadChapters(currentProject)
     } catch (e) {
       console.error('Save title failed:', e)
     }
