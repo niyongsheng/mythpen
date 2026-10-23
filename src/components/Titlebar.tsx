@@ -17,7 +17,7 @@ export function Titlebar() {
         className="font-display text-[13px] text-[var(--ink-tertiary)] tracking-[0.04em] uppercase ml-1 cursor-pointer"
         onClick={showProjectListFn}
       >
-        mythpen
+        Mythpen
       </span>
 
       <span className="w-px h-[18px] bg-[var(--hairline)]" />

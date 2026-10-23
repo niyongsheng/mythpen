@@ -53,7 +53,7 @@ export function setLanguage(lang: Lang) {
   if (typeof document !== 'undefined') {
     const htmlLang = LANGUAGES.find((item) => item.code === lang)?.htmlLang || lang
     document.documentElement.setAttribute('lang', htmlLang)
-    document.title = `mythpen — ${t('app.tagline')}`
+    document.title = `Mythpen — ${t('app.tagline')}`
   }
 }
 
