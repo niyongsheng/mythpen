@@ -937,6 +937,8 @@ POST /api/ai/chat/stream
 - tool_result 消息格式适配
 - role 映射（system/history/tool）
 
+**请求参数**：不发送 `temperature` —— Claude Opus 5、Kimi K3 等新模型会以 400 拒绝该参数（#4），统一使用提供商默认值；输出长度由 `max_tokens`（配置项 `max_output_tokens`）控制。
+
 #### 6.4.4 AI 配置
 
 从 `config.db` 的 `app_settings` 表读取：
