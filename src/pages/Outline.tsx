@@ -224,7 +224,7 @@ export function Outline() {
       </div>
       <div className="flex flex-1 min-h-0">
         {/* Chapter list */}
-        <div className="w-[320px] shrink-0 border-r border-[var(--hairline)] overflow-y-auto py-3 custom-scrollbar">
+        <div className="w-[260px] shrink-0 border-r border-[var(--hairline)] overflow-y-auto py-3 custom-scrollbar">
           {volumes.map((vol) => {
             const collapsed = collapsedVolumes.has(vol.id)
             return (

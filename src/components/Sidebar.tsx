@@ -33,6 +33,7 @@ import { formatVolumeTitle } from '@/lib/volumeTitle'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
+import { useUIStore } from '@/stores/useUIStore'
 import type { Chapter } from '@/types'
 
 interface NavItem {
@@ -86,6 +87,7 @@ export function Sidebar() {
   const currentProject = useProjectStore((s) => s.currentProject)
   const { data: stats, reload: reloadStats } = useStats()
   useDataRefresh('stats', reloadStats)
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const { t } = useT()
   const [spinKey, setSpinKey] = useState(0)
   const [collapsedVols, setCollapsedVols] = useState<Set<number>>(new Set())
@@ -98,6 +100,28 @@ export function Sidebar() {
     save: handleSaveTargetWords,
     reset: handleResetTargetWords,
   } = useTargetWordsEditor(currentProject, reloadStats)
+
+  // Drag the right edge to resize the sidebar. Mirrors the AI panel handle.
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w')) || 260
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      setSidebarWidth(startWidth + (ev.clientX - startX))
+    }
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
 
   const toggleVolume = (volId: number) => {
     setCollapsedVols((prev) => {
@@ -137,7 +161,11 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-[var(--sidebar-w)] bg-[var(--canvas-soft)] border-r border-[var(--hairline)] shrink-0 flex flex-col">
+    <aside className="w-[var(--sidebar-w)] bg-[var(--canvas-soft)] border-r border-[var(--hairline)] shrink-0 flex flex-col relative">
+      <div
+        className="absolute right-0 top-0 bottom-0 w-[4px] cursor-col-resize z-10 transition-colors hover:bg-[var(--accent-gold)] active:bg-[var(--accent-gold)]"
+        onMouseDown={handleResizeMouseDown}
+      />
       {/* Scrollable top section */}
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
         {/* Outline Section */}

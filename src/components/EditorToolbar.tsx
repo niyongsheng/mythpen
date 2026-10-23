@@ -1,8 +1,9 @@
-import { Loader, Pen, RemoveFormatting, Sparkles } from 'lucide-react'
+import { Loader, Pen, Redo2, RemoveFormatting, Save, Sparkles, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { track } from '@/lib/analytics'
 import { aiApi } from '@/lib/api'
+import { performHistory } from '@/lib/editorHistory'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 
@@ -77,6 +78,19 @@ export function EditorToolbar() {
     },
     [exec],
   )
+
+  const handleHistory = useCallback((command: 'undo' | 'redo') => {
+    const editor = document.querySelector('[contenteditable]') as HTMLElement | null
+    if (!editor) return
+    if (document.activeElement !== editor) editor.focus()
+    performHistory(editor, command)
+  }, [])
+
+  // Manual save — useful when auto-save is disabled in Settings.
+  const requestSave = useCallback(() => {
+    window.dispatchEvent(new Event('mythpen:save-chapter'))
+  }, [])
+  const saveShortcut = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '⌘S' : 'Ctrl+S'
 
   const handleBlock = useCallback((tag: string) => {
     const editor = document.querySelector('[contenteditable]') as HTMLElement | null
@@ -236,6 +250,15 @@ export function EditorToolbar() {
   return (
     <div className="h-[var(--toolbar-h)] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] flex items-center px-3 gap-0.5 shrink-0">
       <div className="flex gap-[1px] items-center">
+        <ToolBtn title={t('editor.undo')} onClick={() => handleHistory('undo')}>
+          <Undo2 className="w-3.5 h-3.5" />
+        </ToolBtn>
+        <ToolBtn title={t('editor.redo')} onClick={() => handleHistory('redo')}>
+          <Redo2 className="w-3.5 h-3.5" />
+        </ToolBtn>
+      </div>
+      <span className="w-px h-5 bg-[var(--hairline)] mx-1.5" />
+      <div className="flex gap-[1px] items-center">
         <ToolBtn onClick={() => handleBlock('h1')}>H1</ToolBtn>
         <ToolBtn onClick={() => handleBlock('h2')}>H2</ToolBtn>
       </div>
@@ -262,6 +285,10 @@ export function EditorToolbar() {
         </ToolBtn>
       </div>
       <div className="ml-auto flex items-center gap-1">
+        <ToolBtn title={`${t('common.save')} (${saveShortcut})`} onClick={requestSave}>
+          <Save className="w-3.5 h-3.5" />
+        </ToolBtn>
+        <span className="w-px h-5 bg-[var(--hairline)] mx-1.5" />
         <button
           className={`tool-btn-ai-pill inline-flex items-center gap-1 ${loading === 'polish' ? 'opacity-60 pointer-events-none' : ''}`}
           onClick={handlePolish}
@@ -287,9 +314,22 @@ export function EditorToolbar() {
   )
 }
 
-function ToolBtn({ children, onClick, active }: { children: React.ReactNode; onClick?: () => void; active?: boolean }) {
+function ToolBtn({
+  children,
+  onClick,
+  active,
+  title,
+}: {
+  children: React.ReactNode
+  onClick?: () => void
+  active?: boolean
+  title?: string
+}) {
   return (
     <button
+      type="button"
+      title={title}
+      aria-label={title}
       className={`w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] text-sm transition-colors cursor-pointer border-none
         ${active ? 'text-[var(--accent-gold)]' : 'text-[var(--ink-tertiary)]'}
         hover:bg-[var(--canvas-card)] hover:text-[var(--ink)]`}

@@ -59,6 +59,7 @@ function App() {
   const loadSettings = useSettingsStore((s) => s.loadFromServer)
   const rightPanelVisible = useUIStore((s) => s.rightPanelVisible)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
+  const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const autoCheckForUpdates = useUpdateStore((s) => s.autoCheck)
   const { toasts, show: showToast, dismiss: dismissToast } = useToast()
 
@@ -98,10 +99,14 @@ function App() {
           showToast(t('common.dataRefreshed'), 'success', 3000)
         })
       }
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's' && activePage === 'page-writing') {
+        e.preventDefault()
+        window.dispatchEvent(new Event('mythpen:save-chapter'))
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentProject])
+  }, [currentProject, activePage])
 
   // Reload chapters when project changes
   useEffect(() => {
@@ -115,10 +120,25 @@ function App() {
     track('screen_view', { screen: showProjectList ? 'project_list' : activePage.replace(/^page-/, '') })
   }, [activePage, showProjectList])
 
-  // Restore right panel width from localStorage
+  // Restore sidebar / AI panel widths. Restore the sidebar first so the panel
+  // clamp accounts for it.
   useEffect(() => {
-    const saved = localStorage.getItem('mythpen-right-panel-width')
-    if (saved) setRightPanelWidth(Number(saved))
+    const savedSidebar = localStorage.getItem('mythpen-sidebar-width')
+    if (savedSidebar) setSidebarWidth(Number(savedSidebar))
+    const savedPanel = localStorage.getItem('mythpen-right-panel-width')
+    if (savedPanel) setRightPanelWidth(Number(savedPanel))
+  }, [setSidebarWidth, setRightPanelWidth])
+
+  // Re-clamp both side panels when the window shrinks so the page area keeps
+  // its minimum width instead of being squeezed.
+  useEffect(() => {
+    const handleResize = () => {
+      const state = useUIStore.getState()
+      state.setRightPanelWidth(state.rightPanelWidth)
+      state.setSidebarWidth(state.sidebarWidth)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   return (
@@ -134,7 +154,7 @@ function App() {
               {/* App view with pages */}
               <div className="flex flex-1 min-w-0 min-h-0">
                 {/* Page content + AI panel */}
-                <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${showProjectList ? 'hidden' : 'flex'}`}>
+                <div className={`flex-1 flex flex-col min-w-[640px] min-h-0 ${showProjectList ? 'hidden' : 'flex'}`}>
                   {Object.entries(PAGES)
                     .filter(([id]) => id === activePage || mountedPages.has(id))
                     .map(([id, page]) => (

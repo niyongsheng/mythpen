@@ -82,6 +82,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       merged.editorFontSize = get().settings.editorFontSize
       merged.editorFontFamily = get().settings.editorFontFamily
       merged.accentColor = get().settings.accentColor
+      // Auto-save can be disabled (0); prefer the persisted server value.
+      const serverAutoSave = Number(serverSettings.auto_save_interval)
+      merged.autoSaveInterval = Number.isFinite(serverAutoSave)
+        ? serverAutoSave
+        : get().settings.autoSaveInterval
       // Preserve per-provider API keys from local state (server only has one api_key slot)
       merged.apiKeyDeepseek = get().settings.apiKeyDeepseek || DEFAULT_SETTINGS.apiKeyDeepseek
       merged.apiKeyAnthropic = get().settings.apiKeyAnthropic || DEFAULT_SETTINGS.apiKeyAnthropic

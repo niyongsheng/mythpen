@@ -15,7 +15,7 @@
         "title": "Mythpen",
         "width": 1280,
         "height": 860,
-        "minWidth": 900,
+        "minWidth": 1140,
         "minHeight": 600,
         "resizable": true,
         "fullscreen": false,

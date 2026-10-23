@@ -2,7 +2,9 @@ import { Pen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { formatChapterTitle, stripLeadingChapterHeading } from '@/lib/chapterTitle'
+import { performHistory } from '@/lib/editorHistory'
 import { useChapterStore } from '@/stores/useChapterStore'
+import { useEditorHistoryStore } from '@/stores/useEditorHistoryStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
@@ -154,6 +156,15 @@ export function EditorContent() {
     setIsDirty(false)
   }, [updateChapter, setSaveStatus]) // no longer depends on chapter/currentProject
 
+  // Manual save from the toolbar or Cmd/Ctrl+S.
+  useEffect(() => {
+    const handleSaveRequest = () => {
+      void doSave()
+    }
+    window.addEventListener('mythpen:save-chapter', handleSaveRequest)
+    return () => window.removeEventListener('mythpen:save-chapter', handleSaveRequest)
+  }, [doSave])
+
   // Debounced auto-save — reads autoSaveInterval from settings
   const doSaveRef = useRef(doSave)
   doSaveRef.current = doSave
@@ -168,31 +179,46 @@ export function EditorContent() {
   }, []) // stable — reads doSave and settings through refs
 
   // Sync editor content from store when chapter changes
-  const syncContent = useCallback(() => {
-    if (!editorRef.current) return
-    if (!chapter) {
-      editorRef.current.innerHTML = ''
-      return
-    }
-    editorRef.current.innerHTML = chapter.content ? renderContent(chapter.content, chapter.title) : ''
-    if (editorRef.current.innerHTML) {
-      editorRef.current.removeAttribute('data-placeholder')
-    } else {
-      editorRef.current.setAttribute('data-placeholder', t('editor.startWriting'))
-    }
-    lastSavedContentRef.current = chapter.content || ''
-  }, [chapter])
+  const syncContent = useCallback(
+    (forceReset = false) => {
+      if (!editorRef.current) return
+      if (!chapter) {
+        if (editorRef.current.innerHTML !== '') editorRef.current.innerHTML = ''
+        useEditorHistoryStore.getState().reset('')
+        return
+      }
 
-  // Watch chapter changes (switching chapters) and external content updates (AI generation)
+      const html = chapter.content ? renderContent(chapter.content, chapter.title) : ''
+      // Autosave/store updates often round-trip to identical HTML. Only reset
+      // the undo history when the content really changed.
+      if (forceReset || editorRef.current.innerHTML !== html) {
+        editorRef.current.innerHTML = html
+        useEditorHistoryStore.getState().reset(html)
+      }
+      if (html) {
+        editorRef.current.removeAttribute('data-placeholder')
+      } else {
+        editorRef.current.setAttribute('data-placeholder', t('editor.startWriting'))
+      }
+      lastSavedContentRef.current = chapter.content || ''
+    },
+    [chapter, t],
+  )
+
+  // Watch chapter changes (switching chapters/projects) and external content
+  // updates (AI generation).
   const lastSyncedChapterIdRef = useRef<number | null>(null)
+  const lastSyncedProjectRef = useRef<string | null>(null)
   useEffect(() => {
     const chapterId = chapter?.id ?? null
+    const projectChanged = lastSyncedProjectRef.current !== currentProject
     const chapterChanged = lastSyncedChapterIdRef.current !== chapterId
     // Always sync when the chapter identity changes (e.g. switching projects),
     // even if the editor is focused; otherwise keep the user's in-progress text.
-    if (chapterChanged || !isEditingRef.current) {
-      syncContent()
+    if (projectChanged || chapterChanged || !isEditingRef.current) {
+      syncContent(projectChanged || chapterChanged)
       lastSyncedChapterIdRef.current = chapterId
+      lastSyncedProjectRef.current = currentProject
     }
     setIsDirty(false)
     // Only show 'saved' if content exists and we've actually persisted it
@@ -208,7 +234,7 @@ export function EditorContent() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [chapter?.id, chapter?.num, syncContent])
+  }, [currentProject, chapter?.id, chapter?.num, syncContent])
 
   // Mark unsaved when user starts editing
   useEffect(() => {
@@ -219,6 +245,7 @@ export function EditorContent() {
   const handleBlur = useCallback(() => {
     isEditingRef.current = false
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    if (editorRef.current) useEditorHistoryStore.getState().record(editorRef.current.innerHTML)
     doSave()
   }, [doSave])
 
@@ -226,11 +253,33 @@ export function EditorContent() {
   const handleInput = useCallback(() => {
     isEditingRef.current = true
     setIsDirty(true)
-    if (editorRef.current?.hasAttribute('data-placeholder')) {
-      editorRef.current.removeAttribute('data-placeholder')
+    const editor = editorRef.current
+    if (editor) {
+      if (editor.textContent?.trim()) {
+        editor.removeAttribute('data-placeholder')
+      } else {
+        editor.setAttribute('data-placeholder', t('editor.startWriting'))
+      }
+
+      // Record every edit so a continuous typing burst still has many undo
+      // steps (the store caps the depth and total memory).
+      useEditorHistoryStore.getState().record(editor.innerHTML)
     }
     scheduleAutosave()
-  }, [scheduleAutosave])
+  }, [scheduleAutosave, t])
+
+  // Custom undo/redo (replaces the browser's shallower native stack).
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!e.metaKey && !e.ctrlKey) return
+    const key = e.key.toLowerCase()
+    if (key === 'z') {
+      e.preventDefault()
+      performHistory(e.currentTarget, e.shiftKey ? 'redo' : 'undo')
+    } else if (key === 'y') {
+      e.preventDefault()
+      performHistory(e.currentTarget, 'redo')
+    }
+  }, [])
 
   // Auto-focus editor when writing page becomes visible
   const activePage = useSidebarStore((s) => s.activePage)
@@ -307,6 +356,7 @@ export function EditorContent() {
               onBlur={handleBlur}
               onInput={handleInput}
               onFocus={handleFocus}
+              onKeyDown={handleEditorKeyDown}
             />
           </>
         ) : (
