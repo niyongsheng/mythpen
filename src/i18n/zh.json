@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "续写",
+    "undo": "撤销",
+    "redo": "重做",
     "lastSaved": "上次保存",
     "justNow": "刚刚",
     "words": "字",
@@ -143,7 +145,7 @@
       "writing": "写作中",
       "unknown": "未知"
     },
-    "subtitle": "选择创作类型，mythpen 会自动匹配写作工具",
+    "subtitle": "选择创作类型，Mythpen 会自动匹配写作工具",
     "creating": "创建中…",
     "genre": {
       "sci-fi": "科幻",
@@ -235,7 +237,7 @@
     "maxTokens": "最大输出 Token",
     "testConnection": "测试连接",
     "done": "完成",
-    "footer": "mythpen · 本地数据 · 安全高效",
+    "footer": "Mythpen · 本地数据 · 安全高效",
     "apiType": "接口类型",
     "apiTypeDesc": "OpenAI 格式或 Anthropic 格式",
     "showKey": "显示密钥",
@@ -245,7 +247,7 @@
     "connectionFailed": "连接失败",
     "getApiKey": "如何获取 API Key？",
     "autoSaveEnabled": "每 {seconds} 秒自动保存当前章节",
-    "autoSaveDisabled": "自动保存已关闭",
+    "autoSaveDisabled": "自动保存已关闭（用 ⌘S / Ctrl+S 或工具栏保存按钮手动保存）",
     "forceRefreshDesc": "刷新整个应用页面，重载所有数据",
     "checkUpdates": "检查更新",
     "checkForUpdates": "检查更新",
@@ -365,6 +367,10 @@
     "create": "创建",
     "select": "请选择...",
     "cancel": "取消",
+    "edit": "编辑",
+    "save": "保存",
+    "delete": "删除",
+    "deleteConfirm": "确定删除「{name}」吗？此操作不可撤销。",
     "dismiss": "关闭",
     "saving": "保存中...",
     "noData": "暂无数据",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "核心动机",
     "arcPlaceholder": "角色成长弧光",
     "ageUnit": "岁",
-    "chapterAppearances": "章出场"
+    "chapterAppearances": "章出场",
+    "roleLabel": "角色定位",
+    "roleUnset": "未设定",
+    "notesLabel": "备注",
+    "notesPlaceholder": "备注、别名或希望 AI 记住的设定",
+    "saveFailed": "保存失败",
+    "deleteFailed": "删除失败"
   },
   "export": {
     "formatEpubDesc": "电子书格式，支持封面",
@@ -457,7 +469,8 @@
     "priorityNormal": "普通",
     "priorityLow": "低",
     "statusField": "状态",
-    "expectedResolve": "预期回收: 第{n}章"
+    "expectedResolve": "预期回收: 第{n}章",
+    "expectedResolveField": "预期回收章节"
   },
   "payoff": {
     "aiPrompt": "你是一个网文爽点设计助手。根据项目中的角色、世界观、章节概览和已有爽点的排期，设计3-5个新的爽点，并保证爽点合理分布：\n- 小爽点保持高频（约每1-2章一次），大爽点放在卷末或剧情高潮\n- 不要把多个高强度爽点集中在相邻章节\n- 强度整体递进，类型交替（打脸/装逼/逆袭/身份揭晓/获得奇遇/复仇/突破/其他）\n- 每个爽点都要规划铺垫章节与释放章节，并与已有爽点的章节错开\n每个爽点包含：标题、类型(face-slap打脸/flex装逼/comeback逆袭/reveal身份揭晓/reward获得奇遇/revenge复仇/breakthrough突破/other其他)、描述、爽感强度(1-5)、铺垫章节(数字，可选)、释放章节(数字，可选)。直接返回JSON数组，格式：[{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}]，不要前缀说明。",
@@ -499,6 +512,9 @@
     "categoryPromise": "承诺",
     "categoryItem": "物品",
     "categoryOther": "其他",
+    "category": "分类",
+    "contentLabel": "内容",
+    "contentPlaceholder": "叙事记忆内容",
     "searchPlaceholder": "搜索记忆内容...",
     "noResults": "未找到匹配的记忆",
     "searchResultsCount": "找到 {n} 条匹配结果",
@@ -564,6 +580,9 @@
     "roleMinor": "配角",
     "roleExtra": "其他",
     "existingRelations": "暂无",
+    "relationList": "关系列表",
+    "descriptionField": "描述",
+    "intensityField": "关系强度",
     "userPrompt": "角色：{charList}\n\n已有关系：\n{existingRels}\n\n请推断可能存在的其他角色关系。"
   },
   "science": {

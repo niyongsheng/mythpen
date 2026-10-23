@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "Continuer",
+    "undo": "Annuler",
+    "redo": "Rétablir",
     "lastSaved": "Dernière sauvegarde",
     "justNow": "à l’instant",
     "words": "mots",
@@ -143,7 +145,7 @@
       "writing": "En écriture",
       "unknown": "Inconnu"
     },
-    "subtitle": "Choisissez un genre et mythpen adaptera les outils d’écriture",
+    "subtitle": "Choisissez un genre et Mythpen adaptera les outils d’écriture",
     "creating": "Création…",
     "genre": {
       "sci-fi": "Science-fiction",
@@ -235,7 +237,7 @@
     "maxTokens": "Tokens de sortie maximum",
     "testConnection": "Tester la connexion",
     "done": "Terminé",
-    "footer": "mythpen · Données locales · Sûr et efficace",
+    "footer": "Mythpen · Données locales · Sûr et efficace",
     "apiType": "Type d’API",
     "apiTypeDesc": "Format OpenAI ou format Anthropic",
     "showKey": "Afficher la clé",
@@ -245,7 +247,7 @@
     "connectionFailed": "Échec de la connexion",
     "getApiKey": "Comment obtenir une API Key ?",
     "autoSaveEnabled": "Enregistrement automatique toutes les {seconds} secondes",
-    "autoSaveDisabled": "Enregistrement automatique désactivé",
+    "autoSaveDisabled": "Enregistrement automatique désactivé (utilisez ⌘S / Ctrl+S ou le bouton Enregistrer de la barre d’outils)",
     "forceRefreshDesc": "Recharger toute l’application et récupérer à nouveau toutes les données",
     "checkUpdates": "Rechercher des mises à jour",
     "checkForUpdates": "Rechercher des mises à jour",
@@ -365,6 +367,10 @@
     "create": "Créer",
     "select": "Veuillez sélectionner…",
     "cancel": "Annuler",
+    "edit": "Modifier",
+    "save": "Enregistrer",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer « {name} » ? Cette action est irréversible.",
     "dismiss": "Fermer",
     "saving": "Enregistrement…",
     "noData": "Aucune donnée",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "Motivation",
     "arcPlaceholder": "Arc du personnage",
     "ageUnit": "ans",
-    "chapterAppearances": "chap."
+    "chapterAppearances": "chap.",
+    "roleLabel": "Rôle",
+    "roleUnset": "Non défini",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Notes, alias ou éléments que l’IA doit retenir",
+    "saveFailed": "Échec de l’enregistrement",
+    "deleteFailed": "Échec de la suppression"
   },
   "export": {
     "formatEpubDesc": "Format e-book, avec prise en charge de la couverture",
@@ -457,7 +469,8 @@
     "priorityNormal": "Normale",
     "priorityLow": "Basse",
     "statusField": "Statut",
-    "expectedResolve": "Résolution prévue : chap. {n}"
+    "expectedResolve": "Résolution prévue : chap. {n}",
+    "expectedResolveField": "Chapitre de résolution prévu"
   },
   "payoff": {
     "aiPrompt": "Vous êtes un assistant de conception de moments de satisfaction pour web-romans. À partir des personnages, de l'univers, de l'aperçu des chapitres et du calendrier des points existants, concevez 3 à 5 nouveaux moments en assurant une répartition équilibrée :\n- Gardez les petits moments fréquents (environ un tous les 1-2 chapitres) et placez les grands moments en fin de volume ou au climax\n- Ne concentrez pas plusieurs moments très intenses dans des chapitres adjacents\n- Faites monter l'intensité globalement et alternez les types (face-slap/humiliation retournée, flex/frime, comeback/retournement, reveal/révélation, reward/récompense, revenge/vengeance, breakthrough/perceé, other/autre)\n- Prévoyez pour chaque point un chapitre de préparation et un chapitre de libération, décalés des points existants\nChaque point inclut : titre, type, description, intensité (1-5), chapitre de préparation (nombre, facultatif), chapitre de libération (nombre, facultatif). Renvoyez directement un tableau JSON au format : [{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}], sans explication préalable.",
@@ -499,6 +512,9 @@
     "categoryPromise": "Promesse",
     "categoryItem": "Objet",
     "categoryOther": "Autre",
+    "category": "Catégorie",
+    "contentLabel": "Contenu",
+    "contentPlaceholder": "Contenu de la mémoire narrative",
     "searchPlaceholder": "Rechercher dans la mémoire…",
     "noResults": "Aucun souvenir correspondant",
     "searchResultsCount": "{n} résultats trouvés",
@@ -564,6 +580,9 @@
     "roleMinor": "Personnage secondaire",
     "roleExtra": "Autre",
     "existingRelations": "Aucune",
+    "relationList": "Relations",
+    "descriptionField": "Description",
+    "intensityField": "Intensité",
     "userPrompt": "Personnages : {charList}\n\nRelations existantes :\n{existingRels}\n\nVeuillez déduire les autres relations possibles entre les personnages."
   },
   "science": {
@@ -608,7 +627,7 @@
     "version": "Version",
     "sourceCode": "Code source",
     "support": "Soutenir l’auteur",
-    "supportDesc": "Si mythpen vous est utile, vous pouvez m’offrir un café via 爱发电",
+    "supportDesc": "Si Mythpen vous est utile, vous pouvez m’offrir un café via 爱发电",
     "contact": "Contacter l’auteur",
     "techStack": "Stack technique",
     "openLink": "Ouvrir"

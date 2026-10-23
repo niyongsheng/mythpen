@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "Continuar",
+    "undo": "Deshacer",
+    "redo": "Rehacer",
     "lastSaved": "Último guardado",
     "justNow": "ahora mismo",
     "words": "palabras",
@@ -143,7 +145,7 @@
       "writing": "En escritura",
       "unknown": "Desconocido"
     },
-    "subtitle": "Elige un género y mythpen adaptará las herramientas de escritura",
+    "subtitle": "Elige un género y Mythpen adaptará las herramientas de escritura",
     "creating": "Creando…",
     "genre": {
       "sci-fi": "Ciencia ficción",
@@ -235,7 +237,7 @@
     "maxTokens": "Máximo de tokens de salida",
     "testConnection": "Probar conexión",
     "done": "Listo",
-    "footer": "mythpen · datos locales · seguro y eficiente",
+    "footer": "Mythpen · datos locales · seguro y eficiente",
     "apiType": "Tipo de API",
     "apiTypeDesc": "Formato OpenAI o formato Anthropic",
     "showKey": "Mostrar clave",
@@ -245,7 +247,7 @@
     "connectionFailed": "Error de conexión",
     "getApiKey": "¿Cómo obtener una API Key?",
     "autoSaveEnabled": "Guardar el capítulo actual cada {seconds} segundos",
-    "autoSaveDisabled": "Guardado automático desactivado",
+    "autoSaveDisabled": "Guardado automático desactivado (usa ⌘S / Ctrl+S o el botón Guardar de la barra de herramientas)",
     "forceRefreshDesc": "Recarga toda la aplicación y vuelve a cargar los datos",
     "checkUpdates": "Buscar actualizaciones",
     "checkForUpdates": "Buscar actualizaciones",
@@ -365,6 +367,10 @@
     "create": "Crear",
     "select": "Selecciona...",
     "cancel": "Cancelar",
+    "edit": "Editar",
+    "save": "Guardar",
+    "delete": "Eliminar",
+    "deleteConfirm": "¿Eliminar \"{name}\"? Esta acción no se puede deshacer.",
     "dismiss": "Cerrar",
     "saving": "Guardando...",
     "noData": "Sin datos",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "Motivación principal",
     "arcPlaceholder": "Arco de crecimiento del personaje",
     "ageUnit": "años",
-    "chapterAppearances": "cap."
+    "chapterAppearances": "cap.",
+    "roleLabel": "Rol",
+    "roleUnset": "Sin definir",
+    "notesLabel": "Notas",
+    "notesPlaceholder": "Notas, alias o detalles que la IA debe recordar",
+    "saveFailed": "Error al guardar",
+    "deleteFailed": "Error al eliminar"
   },
   "export": {
     "formatEpubDesc": "Formato de libro electrónico, compatible con portada",
@@ -457,7 +469,8 @@
     "priorityNormal": "Normal",
     "priorityLow": "Baja",
     "statusField": "Estado",
-    "expectedResolve": "Resolución prevista: capítulo {n}"
+    "expectedResolve": "Resolución prevista: capítulo {n}",
+    "expectedResolveField": "Capítulo de resolución previsto"
   },
   "payoff": {
     "aiPrompt": "Eres un asistente de diseño de momentos de satisfacción para novelas web. A partir de los personajes, el mundo, el resumen de capítulos y el calendario de puntos existentes, diseña de 3 a 5 momentos nuevos con una distribución equilibrada:\n- Mantén frecuentes los momentos pequeños (aproximadamente uno cada 1-2 capítulos) y coloca los grandes al final de un volumen o en el clímax\n- No concentres varios momentos de alta intensidad en capítulos adyacentes\n- Aumenta la intensidad de forma progresiva y alterna los tipos (face-slap/bofetada, flex/fanfarronería, comeback/remontada, reveal/revelación, reward/recompensa, revenge/venganza, breakthrough/avance, other/otro)\n- Asigna a cada punto un capítulo de preparación y otro de liberación, separados de los puntos existentes\nCada punto incluye: título, tipo, descripción, intensidad (1-5), capítulo de preparación (número, opcional), capítulo de liberación (número, opcional). Devuelve directamente un array JSON con el formato: [{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}], sin explicación previa.",
@@ -499,6 +512,9 @@
     "categoryPromise": "Promesa",
     "categoryItem": "Objeto",
     "categoryOther": "Otro",
+    "category": "Categoría",
+    "contentLabel": "Contenido",
+    "contentPlaceholder": "Contenido de la memoria narrativa",
     "searchPlaceholder": "Buscar en las memorias...",
     "noResults": "No se encontraron memorias coincidentes",
     "searchResultsCount": "Se encontraron {n} resultados",
@@ -564,6 +580,9 @@
     "roleMinor": "Secundario",
     "roleExtra": "Otro",
     "existingRelations": "Ninguna",
+    "relationList": "Relaciones",
+    "descriptionField": "Descripción",
+    "intensityField": "Intensidad",
     "userPrompt": "Personajes: {charList}\n\nRelaciones existentes:\n{existingRels}\n\nInfiere otras relaciones posibles entre los personajes."
   },
   "science": {
@@ -608,7 +627,7 @@
     "version": "Versión",
     "sourceCode": "Código fuente",
     "support": "Apoyar al autor",
-    "supportDesc": "Si mythpen te resulta útil, invítame a un café en 爱发电",
+    "supportDesc": "Si Mythpen te resulta útil, invítame a un café en 爱发电",
     "contact": "Contactar con el autor",
     "techStack": "Tecnologías",
     "openLink": "Abrir"

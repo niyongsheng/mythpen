@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "이어 쓰기",
+    "undo": "실행 취소",
+    "redo": "다시 실행",
     "lastSaved": "마지막 저장",
     "justNow": "방금 전",
     "words": "자",
@@ -143,7 +145,7 @@
       "writing": "집필 중",
       "unknown": "알 수 없음"
     },
-    "subtitle": "장르를 선택하면 mythpen이 집필 도구를 자동으로 맞춰 드립니다",
+    "subtitle": "장르를 선택하면 Mythpen이 집필 도구를 자동으로 맞춰 드립니다",
     "creating": "생성 중…",
     "genre": {
       "sci-fi": "SF",
@@ -235,7 +237,7 @@
     "maxTokens": "최대 출력 Token",
     "testConnection": "연결 테스트",
     "done": "완료",
-    "footer": "mythpen · 로컬 데이터 · 안전하고 효율적",
+    "footer": "Mythpen · 로컬 데이터 · 안전하고 효율적",
     "apiType": "API 유형",
     "apiTypeDesc": "OpenAI 형식 또는 Anthropic 형식",
     "showKey": "키 표시",
@@ -245,7 +247,7 @@
     "connectionFailed": "연결 실패",
     "getApiKey": "API Key를 발급받는 방법",
     "autoSaveEnabled": "{seconds}초마다 현재 장 자동 저장",
-    "autoSaveDisabled": "자동 저장 꺼짐",
+    "autoSaveDisabled": "자동 저장이 꺼져 있습니다 (⌘S / Ctrl+S 또는 도구 모음 저장 버튼으로 수동 저장)",
     "forceRefreshDesc": "앱 페이지 전체를 새로 고쳐 모든 데이터를 다시 불러옵니다",
     "checkUpdates": "업데이트 확인",
     "checkForUpdates": "업데이트 확인",
@@ -365,6 +367,10 @@
     "create": "생성",
     "select": "선택하세요...",
     "cancel": "취소",
+    "edit": "편집",
+    "save": "저장",
+    "delete": "삭제",
+    "deleteConfirm": "\"{name}\"을(를) 삭제할까요? 이 작업은 되돌릴 수 없습니다.",
     "dismiss": "닫기",
     "saving": "저장 중...",
     "noData": "데이터 없음",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "핵심 동기",
     "arcPlaceholder": "캐릭터 성장 아크",
     "ageUnit": "세",
-    "chapterAppearances": "장 출연"
+    "chapterAppearances": "장 출연",
+    "roleLabel": "역할",
+    "roleUnset": "미설정",
+    "notesLabel": "메모",
+    "notesPlaceholder": "메모, 별칭 또는 AI가 기억해야 할 설정",
+    "saveFailed": "저장 실패",
+    "deleteFailed": "삭제 실패"
   },
   "export": {
     "formatEpubDesc": "전자책 형식, 표지 지원",
@@ -457,7 +469,8 @@
     "priorityNormal": "보통",
     "priorityLow": "낮음",
     "statusField": "상태",
-    "expectedResolve": "회수 예정: {n}장"
+    "expectedResolve": "회수 예정: {n}장",
+    "expectedResolveField": "회수 예정 장"
   },
   "payoff": {
     "aiPrompt": "당신은 웹소설 사이다 포인트 설계 도우미입니다. 프로젝트의 캐릭터, 세계관, 장 개요, 기존 사이다 포인트 일정을 바탕으로 새로운 사이다 포인트 3-5개를 설계하고 배치를 균형 있게 하세요:\n- 작은 사이다 포인트는 자주(1-2장에 한 번 정도), 큰 사이다 포인트는 권말이나 이야기 절정에 배치\n- 강도 높은 사이다 포인트를 인접한 장에 몰아넣지 말 것\n- 강도는 전체적으로 점진적으로 높이고, 유형은 번갈아 사용(face-slap 통쾌한 응징/flex 과시/comeback 역전/reveal 정체 공개/reward 기연/revenge 복수/breakthrough 각성/other 기타)\n- 각 포인트에 복선 장과 회수 장을 정하고 기존 사이다 포인트와 장이 겹치지 않게 할 것\n각 포인트에는 제목, 유형, 설명, 강도(1-5), 복선 장(숫자, 선택), 회수 장(숫자, 선택)이 포함됩니다. JSON 배열을 바로 반환하세요. 형식: [{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}], 앞말 없이.",
@@ -499,6 +512,9 @@
     "categoryPromise": "약속",
     "categoryItem": "물품",
     "categoryOther": "기타",
+    "category": "분류",
+    "contentLabel": "내용",
+    "contentPlaceholder": "서사 메모 내용",
     "searchPlaceholder": "기억 내용 검색...",
     "noResults": "일치하는 기억이 없습니다",
     "searchResultsCount": "{n}개의 일치 결과를 찾았습니다",
@@ -564,6 +580,9 @@
     "roleMinor": "조연",
     "roleExtra": "기타",
     "existingRelations": "없음",
+    "relationList": "관계 목록",
+    "descriptionField": "설명",
+    "intensityField": "관계 강도",
     "userPrompt": "캐릭터: {charList}\n\n기존 관계:\n{existingRels}\n\n가능한 다른 캐릭터 관계를 추론해 주세요."
   },
   "science": {
@@ -608,7 +627,7 @@
     "version": "버전",
     "sourceCode": "소스 코드",
     "support": "후원하기",
-    "supportDesc": "mythpen이 도움이 되었다면 爱发电에서 커피 한 잔을 후원해 주세요",
+    "supportDesc": "Mythpen이 도움이 되었다면 爱发电에서 커피 한 잔을 후원해 주세요",
     "contact": "작성자에게 연락",
     "techStack": "기술 스택",
     "openLink": "열기"

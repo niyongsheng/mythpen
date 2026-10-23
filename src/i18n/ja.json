@@ -31,7 +31,7 @@
     "timeline": "タイムライン",
     "consistency": "整合性チェック",
     "export": "エクスポート",
-    "about": "mythpenについて",
+    "about": "Mythpenについて",
     "refreshTooltip": "すべてのデータを手動更新（ショートカット ⌘⇧R）",
     "currentChapter": "現在の章",
     "switchToStatus": "{status}に切り替え",
@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "続きを書く",
+    "undo": "元に戻す",
+    "redo": "やり直す",
     "lastSaved": "最終保存",
     "justNow": "たった今",
     "words": "文字",
@@ -143,7 +145,7 @@
       "writing": "執筆中",
       "unknown": "不明"
     },
-    "subtitle": "創作ジャンルを選ぶと、mythpenが最適な執筆ツールを自動で選択します",
+    "subtitle": "創作ジャンルを選ぶと、Mythpenが最適な執筆ツールを自動で選択します",
     "creating": "作成中…",
     "genre": {
       "sci-fi": "SF",
@@ -235,7 +237,7 @@
     "maxTokens": "最大出力Token",
     "testConnection": "接続テスト",
     "done": "完了",
-    "footer": "mythpen · ローカルデータ · 安全・高速",
+    "footer": "Mythpen · ローカルデータ · 安全・高速",
     "apiType": "APIタイプ",
     "apiTypeDesc": "OpenAI形式またはAnthropic形式",
     "showKey": "キーを表示",
@@ -245,7 +247,7 @@
     "connectionFailed": "接続に失敗しました",
     "getApiKey": "API Keyの取得方法は？",
     "autoSaveEnabled": "{seconds}秒ごとに現在の章を自動保存",
-    "autoSaveDisabled": "自動保存はオフです",
+    "autoSaveDisabled": "自動保存はオフです（⌘S / Ctrl+S またはツールバーの保存ボタンで手動保存）",
     "forceRefreshDesc": "アプリ全体を再読み込みし、すべてのデータを再取得します",
     "checkUpdates": "アップデートを確認",
     "checkForUpdates": "アップデートを確認",
@@ -285,7 +287,7 @@
     "timeline": "タイムライン",
     "newEvent": "新しいイベント",
     "consistencyCheck": "整合性チェック",
-    "about": "mythpenについて",
+    "about": "Mythpenについて",
     "quickScan": "クイックスキャン",
     "deepCheck": "詳細なセマンティックチェック",
     "phaseIdea": "企画",
@@ -365,6 +367,10 @@
     "create": "作成",
     "select": "選択してください...",
     "cancel": "キャンセル",
+    "edit": "編集",
+    "save": "保存",
+    "delete": "削除",
+    "deleteConfirm": "「{name}」を削除しますか？この操作は元に戻せません。",
     "dismiss": "閉じる",
     "saving": "保存中...",
     "noData": "データがありません",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "中心となる動機",
     "arcPlaceholder": "キャラクターの成長アーク",
     "ageUnit": "歳",
-    "chapterAppearances": "章登場"
+    "chapterAppearances": "章登場",
+    "roleLabel": "役割",
+    "roleUnset": "未設定",
+    "notesLabel": "メモ",
+    "notesPlaceholder": "メモ、別名、AI に覚えてほしい設定",
+    "saveFailed": "保存に失敗しました",
+    "deleteFailed": "削除に失敗しました"
   },
   "export": {
     "formatEpubDesc": "電子書籍形式、表紙に対応",
@@ -457,7 +469,8 @@
     "priorityNormal": "普通",
     "priorityLow": "低",
     "statusField": "ステータス",
-    "expectedResolve": "回収予定: 第{n}章"
+    "expectedResolve": "回収予定: 第{n}章",
+    "expectedResolveField": "回収予定章"
   },
   "payoff": {
     "aiPrompt": "あなたはウェブ小説の爽快ポイント設計アシスタントです。プロジェクト内のキャラクター、世界観、章の概要、既存の爽快ポイントの予定をふまえ、新しい爽快ポイントを3〜5個設計し、配置のバランスを取ってください：\n- 小さな爽快ポイントは高頻度（1〜2章に1回程度）、大きな爽快ポイントは巻末や物語のクライマックスに置く\n- 高強度の爽快ポイントを隣接する章に集中させない\n- 強度は全体として漸進させ、タイプを交互にする（face-slapざまぁ/flex無双/comeback逆転/reveal正体判明/reward幸運/revenge復讐/breakthrough覚醒/otherその他）\n- 各ポイントに布石章と回収章を設定し、既存の爽快ポイントと章が重ならないようにする\n各ポイントにはタイトル、タイプ、説明、爽快度(1-5)、布石章(数字、任意)、回収章(数字、任意)を含めます。JSON配列を直接返してください。形式：[{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}]。前置きは不要です。",
@@ -499,6 +512,9 @@
     "categoryPromise": "約束",
     "categoryItem": "アイテム",
     "categoryOther": "その他",
+    "category": "カテゴリ",
+    "contentLabel": "内容",
+    "contentPlaceholder": "叙事メモの内容",
     "searchPlaceholder": "メモリーの内容を検索...",
     "noResults": "一致するメモリーが見つかりません",
     "searchResultsCount": "{n}件の一致が見つかりました",
@@ -564,6 +580,9 @@
     "roleMinor": "脇役",
     "roleExtra": "その他",
     "existingRelations": "なし",
+    "relationList": "関係一覧",
+    "descriptionField": "説明",
+    "intensityField": "関係の強さ",
     "userPrompt": "キャラクター：{charList}\n\n既存の関係：\n{existingRels}\n\n存在し得るその他のキャラクター関係を推測してください。"
   },
   "science": {
@@ -608,7 +627,7 @@
     "version": "バージョン",
     "sourceCode": "ソースコード",
     "support": "支援する",
-    "supportDesc": "mythpenがお役に立てたら、Afdian（愛発電）でコーヒーをごちそういただけると嬉しいです",
+    "supportDesc": "Mythpenがお役に立てたら、Afdian（愛発電）でコーヒーをごちそういただけると嬉しいです",
     "contact": "作者に連絡",
     "techStack": "技術スタック",
     "openLink": "開く"

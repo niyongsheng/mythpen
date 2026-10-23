@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "續寫",
+    "undo": "復原",
+    "redo": "重做",
     "lastSaved": "上次儲存",
     "justNow": "剛剛",
     "words": "字",
@@ -143,7 +145,7 @@
       "writing": "寫作中",
       "unknown": "未知"
     },
-    "subtitle": "選擇創作類型，mythpen 會自動搭配寫作工具",
+    "subtitle": "選擇創作類型，Mythpen 會自動搭配寫作工具",
     "creating": "建立中…",
     "genre": {
       "sci-fi": "科幻",
@@ -235,7 +237,7 @@
     "maxTokens": "最大輸出 Token",
     "testConnection": "測試連線",
     "done": "完成",
-    "footer": "mythpen · 本機資料 · 安全高效",
+    "footer": "Mythpen · 本機資料 · 安全高效",
     "apiType": "API 類型",
     "apiTypeDesc": "OpenAI 格式或 Anthropic 格式",
     "showKey": "顯示金鑰",
@@ -245,7 +247,7 @@
     "connectionFailed": "連線失敗",
     "getApiKey": "如何取得 API Key？",
     "autoSaveEnabled": "每 {seconds} 秒自動儲存目前章節",
-    "autoSaveDisabled": "自動儲存已關閉",
+    "autoSaveDisabled": "自動儲存已關閉（用 ⌘S / Ctrl+S 或工具列儲存按鈕手動儲存）",
     "forceRefreshDesc": "重新整理整個應用程式頁面，重新載入所有資料",
     "checkUpdates": "檢查更新",
     "checkForUpdates": "檢查更新",
@@ -365,6 +367,10 @@
     "create": "建立",
     "select": "請選擇...",
     "cancel": "取消",
+    "edit": "編輯",
+    "save": "儲存",
+    "delete": "刪除",
+    "deleteConfirm": "確定刪除「{name}」嗎？此操作無法復原。",
     "dismiss": "關閉",
     "saving": "儲存中...",
     "noData": "暫無資料",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "核心動機",
     "arcPlaceholder": "角色成長弧光",
     "ageUnit": "歲",
-    "chapterAppearances": "章出場"
+    "chapterAppearances": "章出場",
+    "roleLabel": "角色定位",
+    "roleUnset": "未設定",
+    "notesLabel": "備註",
+    "notesPlaceholder": "備註、別名或希望 AI 記住的設定",
+    "saveFailed": "儲存失敗",
+    "deleteFailed": "刪除失敗"
   },
   "export": {
     "formatEpubDesc": "電子書格式，支援封面",
@@ -457,7 +469,8 @@
     "priorityNormal": "一般",
     "priorityLow": "低",
     "statusField": "狀態",
-    "expectedResolve": "預期回收：第{n}章"
+    "expectedResolve": "預期回收：第{n}章",
+    "expectedResolveField": "預期回收章節"
   },
   "payoff": {
     "aiPrompt": "你是一個網文爽點設計助手。根據專案中的角色、世界觀、章節概覽和已有爽點的排期，設計3-5個新的爽點，並保證爽點合理分布：\n- 小爽點保持高頻（約每1-2章一次），大爽點放在卷末或劇情高潮\n- 不要把多個高強度爽點集中在相鄰章節\n- 強度整體遞進，類型交替（打臉/裝逼/逆襲/身份揭曉/獲得奇遇/復仇/突破/其他）\n- 每個爽點都要規劃鋪墊章節與釋放章節，並與已有爽點的章節錯開\n每個爽點包含：標題、類型(face-slap打臉/flex裝逼/comeback逆襲/reveal身份揭曉/reward獲得奇遇/revenge復仇/breakthrough突破/other其他)、描述、爽感強度(1-5)、鋪墊章節(數字，可選)、釋放章節(數字，可選)。直接返回JSON陣列，格式：[{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}]，不要前綴說明。",
@@ -499,6 +512,9 @@
     "categoryPromise": "承諾",
     "categoryItem": "物品",
     "categoryOther": "其他",
+    "category": "分類",
+    "contentLabel": "內容",
+    "contentPlaceholder": "敘事記憶內容",
     "searchPlaceholder": "搜尋記憶內容...",
     "noResults": "找不到相符的記憶",
     "searchResultsCount": "找到 {n} 筆相符結果",
@@ -564,6 +580,9 @@
     "roleMinor": "配角",
     "roleExtra": "其他",
     "existingRelations": "暫無",
+    "relationList": "關係列表",
+    "descriptionField": "描述",
+    "intensityField": "關係強度",
     "userPrompt": "角色：{charList}\n\n既有關係：\n{existingRels}\n\n請推斷可能存在的其他角色關係。"
   },
   "science": {
@@ -608,7 +627,7 @@
     "version": "版本號",
     "sourceCode": "原始碼",
     "support": "贊助作者",
-    "supportDesc": "如果 mythpen 對你有幫助，歡迎透過愛發電請我喝杯咖啡",
+    "supportDesc": "如果 Mythpen 對你有幫助，歡迎透過愛發電請我喝杯咖啡",
     "contact": "聯絡作者",
     "techStack": "技術堆疊",
     "openLink": "開啟"

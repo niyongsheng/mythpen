@@ -40,6 +40,8 @@
   },
   "editor": {
     "continue": "Continue",
+    "undo": "Undo",
+    "redo": "Redo",
     "lastSaved": "Last saved",
     "justNow": "just now",
     "words": "words",
@@ -143,7 +145,7 @@
       "writing": "Writing",
       "unknown": "Unknown"
     },
-    "subtitle": "Choose a genre and mythpen will match the writing tools for you",
+    "subtitle": "Choose a genre and Mythpen will match the writing tools for you",
     "creating": "Creating…",
     "genre": {
       "sci-fi": "Sci-Fi",
@@ -235,7 +237,7 @@
     "maxTokens": "Max Output Tokens",
     "testConnection": "Test Connection",
     "done": "Done",
-    "footer": "mythpen · Local-first · Safe & efficient",
+    "footer": "Mythpen · Local-first · Safe & efficient",
     "apiType": "API Type",
     "apiTypeDesc": "OpenAI compatible or Anthropic format",
     "showKey": "Show Key",
@@ -245,7 +247,7 @@
     "connectionFailed": "Connection Failed",
     "getApiKey": "How to get an API Key?",
     "autoSaveEnabled": "Auto-save every {seconds} seconds",
-    "autoSaveDisabled": "Auto-save disabled",
+    "autoSaveDisabled": "Auto-save is off (use ⌘S / Ctrl+S or the toolbar save button)",
     "forceRefreshDesc": "Reload the entire app and re-fetch all data",
     "checkUpdates": "Check for Updates",
     "checkForUpdates": "Check for Updates",
@@ -365,6 +367,10 @@
     "create": "Create",
     "select": "Please select...",
     "cancel": "Cancel",
+    "edit": "Edit",
+    "save": "Save",
+    "delete": "Delete",
+    "deleteConfirm": "Delete \"{name}\"? This cannot be undone.",
     "dismiss": "Dismiss",
     "saving": "Saving...",
     "noData": "No Data",
@@ -421,7 +427,13 @@
     "motivationPlaceholder": "Motivation",
     "arcPlaceholder": "Character arc",
     "ageUnit": "yrs",
-    "chapterAppearances": "ch."
+    "chapterAppearances": "ch.",
+    "roleLabel": "Role",
+    "roleUnset": "Not set",
+    "notesLabel": "Notes",
+    "notesPlaceholder": "Notes, aliases, or details the AI should remember",
+    "saveFailed": "Failed to save",
+    "deleteFailed": "Failed to delete"
   },
   "export": {
     "formatEpubDesc": "E-book format, supports cover",
@@ -457,7 +469,8 @@
     "priorityNormal": "Normal",
     "priorityLow": "Low",
     "statusField": "Status",
-    "expectedResolve": "Expected resolve: Ch. {n}"
+    "expectedResolve": "Expected resolve: Ch. {n}",
+    "expectedResolveField": "Expected Resolve Chapter"
   },
   "payoff": {
     "aiPrompt": "You are a web-novel payoff design assistant. Based on the project's characters, worldbuilding, chapter overview and the existing payoff schedule, design 3-5 new payoff moments with a sensible distribution:\n- Keep small payoffs frequent (roughly one every 1-2 chapters); place big payoffs at volume endings or story climaxes\n- Never cluster several high-intensity payoffs in adjacent chapters\n- Escalate intensity overall and alternate types (face-slap/flex/comeback/reveal/reward/revenge/breakthrough/other)\n- Give every payoff a setup chapter and a payoff chapter, offset from the existing payoffs\nEach payoff includes: title, type, description, intensity (1-5), setup chapter (number, optional), payoff chapter (number, optional). Return a JSON array directly in the format: [{\"title\":\"...\",\"type\":\"face-slap\",\"description\":\"...\",\"intensity\":4,\"setup_chapter\":10,\"payoff_chapter\":12}], with no prefix explanation.",
@@ -499,6 +512,9 @@
     "categoryPromise": "Promise",
     "categoryItem": "Item",
     "categoryOther": "Other",
+    "category": "Category",
+    "contentLabel": "Content",
+    "contentPlaceholder": "Narrative memory content",
     "searchPlaceholder": "Search memory content...",
     "noResults": "No matching memories found",
     "searchResultsCount": "Found {n} results",
@@ -564,6 +580,9 @@
     "roleMinor": "Supporting",
     "roleExtra": "Extra",
     "existingRelations": "None",
+    "relationList": "Relations",
+    "descriptionField": "Description",
+    "intensityField": "Intensity",
     "userPrompt": "Characters: {charList}\n\nExisting relationships:\n{existingRels}\n\nPlease infer other possible character relationships."
   },
   "science": {
