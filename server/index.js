@@ -52,6 +52,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ─── Graceful shutdown endpoint (must be registered before the 404 handler) ───
+app.post('/api/shutdown', (req, res) => {
+  res.json({ status: 'shutting_down' });
+  setImmediate(() => gracefulShutdown());
+});
+
 // ─── Not found & error handling ───
 app.use((req, res) => {
   res.status(404).json({
@@ -80,25 +86,32 @@ let serverInstance = null;
 
 function gracefulShutdown() {
   console.log('\n  🛑 Shutting down Mythpen API Server gracefully...');
+  // Flush pending SQLite writes before the process exits.
+  try {
+    db.closeAllDatabases();
+  } catch (e) {
+    console.warn('[Server] Failed to close databases:', e.message);
+  }
   if (serverInstance) {
     serverInstance.close(() => {
       console.log('  ✓ Server closed.');
       process.exit(0);
     });
-    // Force exit after 5s if close hangs
+    // Keep-alive / SSE sockets would otherwise keep close() waiting.
+    try {
+      serverInstance.closeAllConnections?.();
+    } catch (e) {
+      console.warn('[Server] Failed to close connections:', e.message);
+    }
+    // Safety net: never keep the desktop app waiting for long.
     setTimeout(() => {
       console.error('  ⚠️  Server close timed out, forcing exit.');
       process.exit(0);
-    }, 5000);
+    }, 1000);
   } else {
     process.exit(0);
   }
 }
-
-app.post('/api/shutdown', (req, res) => {
-  res.json({ status: 'shutting_down' });
-  setImmediate(() => gracefulShutdown());
-});
 
 // Handle SIGTERM from Tauri (sent before SIGKILL on some platforms)
 process.on('SIGTERM', gracefulShutdown);

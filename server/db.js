@@ -451,6 +451,25 @@ function closeProjectDb(filePath) {
   }
 }
 
+/** Flush and close every open database; used on graceful shutdown. */
+function closeAllDatabases() {
+  if (configDb) {
+    try {
+      configDb.flush();
+    } catch (e) {
+      console.warn('[DB] Failed to flush config database:', e.message);
+    }
+  }
+  for (const [filePath, projectDb] of projectConnections) {
+    try {
+      projectDb.close();
+    } catch (e) {
+      console.warn(`[DB] Failed to close project "${filePath}":`, e.message);
+    }
+    projectConnections.delete(filePath);
+  }
+}
+
 function getProjectDb(name) {
   const filePath = getProjectDbPath(name);
   // Reads must not create projects. Only explicit create/import paths call
@@ -899,6 +918,7 @@ module.exports = {
   isProjectOpen,
   openProjectDb,
   closeProjectDb,
+  closeAllDatabases,
   dbQuery,
   dbGet,
   dbExecute,

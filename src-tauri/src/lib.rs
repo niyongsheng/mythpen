@@ -104,18 +104,21 @@ pub fn run() {
             // This three-step strategy avoids triggering antivirus software that flags
             // SIGKILL/TerminateProcess as suspicious behavior.
             tauri::RunEvent::Exit => {
-                // Aptabase: session end, then flush queued events before the process dies
+                // Aptabase: queue the session end event. Do not block the exit
+                // path on analytics — a slow/unreachable network used to freeze
+                // the window (spinning cursor) while the app closed.
                 let _ = app_handle.track_event("app_exited", None);
-                app_handle.flush_events_blocking();
 
                 if let Some(state) = app_handle.try_state::<SidecarProcess>() {
                     if let Ok(mut guard) = state.0.lock() {
                         if let Some(child) = guard.take() {
-                            // Step 1: Request graceful shutdown via HTTP
+                            // Step 1: Request graceful shutdown via HTTP. The
+                            // server flushes SQLite and closes its sockets.
                             request_graceful_shutdown(3001);
 
-                            // Step 2: Give the server time to close gracefully
-                            std::thread::sleep(Duration::from_millis(2000));
+                            // Step 2: Short grace period only. The previous 2s
+                            // wait made the red close button hang.
+                            std::thread::sleep(Duration::from_millis(250));
 
                             // Step 3: Force kill as safety net
                             let _ = child.kill();
