@@ -15,6 +15,8 @@ interface DropdownProps<T extends string> {
   ariaLabel: string
   /** Badge or icon shown before the label in the trigger. */
   renderLeading?: (selected: DropdownOption<T> | undefined) => React.ReactNode
+  /** Secondary content shown between the trigger label and the chevron. */
+  renderTriggerMeta?: (selected: DropdownOption<T> | undefined) => React.ReactNode
   placeholder?: string
   /** `sm` for toolbars/panels, `md` for settings forms. */
   size?: 'sm' | 'md'
@@ -44,6 +46,7 @@ export function Dropdown<T extends string>({
   onChange,
   ariaLabel,
   renderLeading,
+  renderTriggerMeta,
   placeholder = '—',
   size = 'md',
   disabled = false,
@@ -153,6 +156,7 @@ export function Dropdown<T extends string>({
         <span className={`flex-1 truncate ${selected ? 'text-[var(--ink)]' : 'text-[var(--ink-mute)]'}`}>
           {selected ? selected.label : placeholder}
         </span>
+        {renderTriggerMeta?.(selected)}
         <ChevronDown
           className={`shrink-0 text-[var(--ink-mute)] transition-transform duration-150 ${
             size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5'

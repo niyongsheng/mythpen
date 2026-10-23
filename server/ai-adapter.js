@@ -78,9 +78,14 @@ function makeResponse(content, toolCalls, inputTokens, outputTokens, finishReaso
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
 function apiError(status, text) {
-  return Object.assign(new Error(`API Error: ${status}`), {
+  const detail = String(text || '').slice(0, 500);
+  // Surface the provider's own error message (e.g. "Model Not Exist",
+  // "invalid api key") instead of a bare status code — these reports can't be
+  // diagnosed otherwise.
+  const summary = detail.replace(/\s+/g, ' ').trim().slice(0, 220);
+  return Object.assign(new Error(`API Error: ${status}${summary ? ` — ${summary}` : ''}`), {
     status,
-    detail: String(text || '').slice(0, 500),
+    detail,
   });
 }
 
