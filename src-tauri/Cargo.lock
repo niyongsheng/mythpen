@@ -1986,7 +1986,7 @@ dependencies = [
 
 [[package]]
 name = "mythpen"
-version = "0.0.3"
+version = "0.0.15"
 dependencies = [
  "serde_json",
  "tauri",

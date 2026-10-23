@@ -33,23 +33,22 @@ export async function downloadAndInstall(
     })
   }
 
-  await update.downloadAndInstall(
-    (event) => {
-      if (event.event === 'Started') {
-        total = event.data.contentLength ?? 0
-        report()
-      } else if (event.event === 'Progress') {
-        downloaded += event.data.chunkLength
-        report()
-      } else {
-        if (total > 0) downloaded = total
-        report()
-      }
-    },
-    // Restart explicitly from the UI so every platform shows the same
-    // "installed, restart to apply" state instead of exiting on Windows.
-    { restartAfterInstall: false },
-  )
+  // Windows: the updater exits the app as soon as the installer is launched,
+  // so the installer must relaunch it (restartAfterInstall defaults to true).
+  // macOS/Linux: the option is ignored; downloadAndInstall resolves and the
+  // UI shows the "restart to apply" state.
+  await update.downloadAndInstall((event) => {
+    if (event.event === 'Started') {
+      total = event.data.contentLength ?? 0
+      report()
+    } else if (event.event === 'Progress') {
+      downloaded += event.data.chunkLength
+      report()
+    } else {
+      if (total > 0) downloaded = total
+      report()
+    }
+  })
 }
 
 /** Relaunch the app so the installed update takes effect. */

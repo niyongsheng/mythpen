@@ -11,8 +11,24 @@ env:
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
 jobs:
+  version-check:
+    name: Verify version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify manifests match the tag
+        run: node scripts/check-release-version.mjs "${{ github.ref_name }}"
+
   build-mac-arm:
     name: Build (macOS ARM)
+    needs: version-check
     runs-on: macos-latest
     timeout-minutes: 30
 
@@ -63,6 +79,7 @@ jobs:
 
   build-win-x86:
     name: Build (Windows x86_64)
+    needs: version-check
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -113,6 +130,7 @@ jobs:
 
   build-linux-x86:
     name: Build (Linux x86_64)
+    needs: version-check
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

@@ -26,10 +26,13 @@ CI 会在构建时自动生成 `latest.json` 与各平台更新包，客户端�
 
 ## 步骤
 
-1. **更新版本号（三处保持一致）**
+1. **更新版本号（四处保持一致）**
    - `package.json` → `"version"`
    - `src-tauri/tauri.conf.json` → `"version"`
+   - `src-tauri/Cargo.toml` → `[package] version`（同步 `Cargo.lock` 中 mythpen 的 version）
    - `docs/index.html` → `const APP_VERSION = 'X.Y.Z'`
+
+   CI 的 `version-check` job 会用 tag 校验这四处，不一致会直接失败。
 
 2. **提交并打 tag**
    ```bash
