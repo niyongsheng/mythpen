@@ -5,6 +5,7 @@ import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { worldApi } from '@/lib/api'
 import { useProjectName, useWorldEntries } from '@/lib/useProjectData'
+import type { WorldEntry } from '@/types'
 
 const TABS = ['all', 'location', 'organization', 'concept', 'event']
 const TAB_ICONS: Record<string, React.ReactNode> = {
@@ -27,6 +28,7 @@ export function World() {
   useDataRefresh('world', reload)
   const [activeTab, setActiveTab] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<WorldEntry | null>(null)
   const { t } = useT()
   const project = useProjectName()
   const tabLabels: Record<string, string> = {
@@ -56,7 +58,12 @@ export function World() {
           <Globe className="w-5 h-5" /> {t('pages.world')}
         </h2>
         <div className="page-header-actions">
-          <button className="btn-primary" style={{ height: 30, padding: '0 14px' }} onClick={() => setShowCreate(true)}>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ height: 30, padding: '0 14px' }}
+            onClick={() => setShowCreate(true)}
+          >
             + {t('pages.newEntry')}
           </button>
         </div>
@@ -94,6 +101,49 @@ export function World() {
         />
       )}
 
+      {editing && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${editing.name}」`}
+          fields={[
+            {
+              key: 'category',
+              label: t('world.category'),
+              type: 'select',
+              required: true,
+              options: [
+                { value: 'location', label: t('world.categoryLocation') },
+                { value: 'organization', label: t('world.categoryOrganization') },
+                { value: 'concept', label: t('world.categoryConcept') },
+                { value: 'event', label: t('world.categoryEvent') },
+              ],
+            },
+            { key: 'name', label: t('world.name'), required: true, placeholder: t('world.namePlaceholder') },
+            {
+              key: 'description',
+              label: t('world.description'),
+              type: 'textarea',
+              placeholder: t('world.descriptionPlaceholder'),
+            },
+          ]}
+          initialValues={{
+            category: editing.category || '',
+            name: editing.name || '',
+            description: editing.description || '',
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await worldApi.remove(project, editing.id)
+            reload()
+          }}
+          deleteName={editing.name}
+          onSubmit={async (vals) => {
+            await worldApi.update(project, editing.id, vals)
+            reload()
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <div className="flex gap-0 border-b border-[var(--hairline)] px-6 shrink-0 bg-[var(--canvas-soft)]">
         {TABS.map((t) => (
           <span
@@ -111,9 +161,11 @@ export function World() {
       <div className="page-body" style={{ padding: 0 }}>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-6">
           {filtered.map((entry) => (
-            <div
+            <button
               key={entry.id}
-              className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+              type="button"
+              className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 text-left cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+              onClick={() => setEditing(entry)}
             >
               <span className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] inline-block mb-1.5">
                 <span className="inline-flex items-center gap-0.5">
@@ -122,7 +174,7 @@ export function World() {
               </span>
               <div className="text-[15px] text-[var(--ink)] mb-1">{entry.name}</div>
               <div className="text-[13px] text-[var(--ink-tertiary)] line-clamp-2">{entry.description}</div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

@@ -273,6 +273,8 @@ router.delete('/:project/volumes/:id', (req, res) => {
 // CHARACTERS
 // ═══════════════════════════════════════════
 
+const CHARACTER_ROLES = ['', 'major', 'minor', 'extra'];
+
 router.get('/:project/characters', (req, res) => {
   const chars = db.projectQuery(
     project(req.params.project),
@@ -292,20 +294,38 @@ router.get('/:project/characters/:id', (req, res) => {
 });
 
 router.post('/:project/characters', (req, res) => {
-  const { name, age = '', gender = '', appearance = '', personality = '', background = '', motivation = '', arc = '', ext_markers = '' } = req.body || {};
+  const {
+    name,
+    age = '',
+    gender = '',
+    appearance = '',
+    personality = '',
+    background = '',
+    motivation = '',
+    arc = '',
+    notes = '',
+    role = '',
+    ext_markers = '',
+  } = req.body || {};
   if (!name) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '角色名不能为空', recoverable: true } });
+  if (!CHARACTER_ROLES.includes(role)) {
+    return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '无效的角色定位', recoverable: true } });
+  }
   const id = randomUUID();
   db.projectExecute(project(req.params.project),
-    'INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, ext_markers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, age, gender, appearance, personality, background, motivation, arc, ext_markers]
+    'INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, notes, role, ext_markers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, age, gender, appearance, personality, background, motivation, arc, notes, role, ext_markers]
   );
   res.status(201).json({ id, name });
 });
 
 router.put('/:project/characters/:id', (req, res) => {
   const { id } = req.params;
+  if (req.body.role !== undefined && !CHARACTER_ROLES.includes(req.body.role)) {
+    return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '无效的角色定位', recoverable: true } });
+  }
   const fields = []; const params = [];
-  for (const key of ['name', 'age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'ext_markers', 'notes']) {
+  for (const key of ['name', 'age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'ext_markers', 'notes', 'role']) {
     if (req.body[key] !== undefined) { fields.push(`${key} = ?`); params.push(req.body[key]); }
   }
   if (fields.length === 0) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '没有要更新的字段', recoverable: true } });
@@ -372,6 +392,13 @@ router.post('/:project/science', (req, res) => {
   res.status(201).json({ id, name });
 });
 
+router.put('/:project/science/:id', (req, res) => {
+  const changes = updateRecord(project(req.params.project), 'science_entries', req.params.id, req.body, ['label', 'name', 'description'], true);
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '条目不存在' } });
+  res.json({ success: true });
+});
+
 router.delete('/:project/science/:id', (req, res) => {
   const changes = db.projectExecute(project(req.params.project), 'DELETE FROM science_entries WHERE id = ?', [req.params.id]);
   if (changes === 0) return res.status(404).json({ error: { message: '条目不存在' } });
@@ -400,6 +427,26 @@ router.post('/:project/foreshadows', (req, res) => {
     [id, title, description, status, priority, expected_resolve_chapter]
   );
   res.status(201).json({ id, title });
+});
+
+router.put('/:project/foreshadows/:id', (req, res) => {
+  const changes = updateRecord(
+    project(req.params.project),
+    'foreshadows',
+    req.params.id,
+    req.body,
+    ['title', 'description', 'status', 'priority', 'expected_resolve_chapter'],
+    true,
+  );
+  if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  if (changes === 0) return res.status(404).json({ error: { message: '伏笔不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/foreshadows/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM foreshadows WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '伏笔不存在' } });
+  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════

@@ -134,6 +134,10 @@ export const charactersApi = {
     ((await request(`/${encodeURIComponent(project)}/characters`)) as any[]).map(toCharacter),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/characters`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/characters/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/characters/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── World ───
@@ -142,6 +146,10 @@ export const worldApi = {
   list: (project: string) => request(`/${encodeURIComponent(project)}/world`),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/world`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/world/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/world/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Science ───
@@ -150,6 +158,10 @@ export const scienceApi = {
   list: (project: string) => request(`/${encodeURIComponent(project)}/science`),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/science`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/science/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/science/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Foreshadows ───
@@ -161,6 +173,10 @@ export const foreshadowsApi = {
   },
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/foreshadows`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/foreshadows/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/foreshadows/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Payoffs (爽点) ───
@@ -185,6 +201,10 @@ export const relationsApi = {
     ((await request(`/${encodeURIComponent(project)}/relations`)) as any[]).map(toRelation),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/relations`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/relations/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/relations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Memories ───
@@ -193,6 +213,10 @@ export const memoriesApi = {
   list: async (project: string) => ((await request(`/${encodeURIComponent(project)}/memories`)) as any[]).map(toMemory),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/memories`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/memories/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/memories/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   search: async (project: string, query: string) =>
     (
       (await request(`/${encodeURIComponent(project)}/memories/search`, { method: 'POST', body: { query } })) as any[]
@@ -205,6 +229,10 @@ export const timelineApi = {
   list: (project: string) => request(`/${encodeURIComponent(project)}/timeline`),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/timeline`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/timeline/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/timeline/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Stats ───

@@ -127,7 +127,8 @@ const TOOLS = [
           background: { type: 'string', description: '背景故事（可选）' },
           motivation: { type: 'string', description: '动机（可选）' },
           arc: { type: 'string', description: '角色弧线（可选）' },
-          notes: { type: 'string', description: '备注（可选）' },
+          role: { type: 'string', enum: ['major', 'minor', 'extra'], description: '角色定位：major(主角)、minor(配角)、extra(客串)，由作者指定（可选）' },
+          notes: { type: 'string', description: '备注、别名或作者要求 AI 记住的设定（可选）' },
         },
         required: ['name'],
       },
@@ -149,7 +150,8 @@ const TOOLS = [
           background: { type: 'string', description: '背景' },
           motivation: { type: 'string', description: '动机' },
           arc: { type: 'string', description: '角色弧线' },
-          notes: { type: 'string', description: '备注' },
+          role: { type: 'string', enum: ['major', 'minor', 'extra'], description: '角色定位：major(主角)、minor(配角)、extra(客串)' },
+          notes: { type: 'string', description: '备注、别名或作者要求 AI 记住的设定' },
         },
         required: ['name'],
       },
@@ -864,7 +866,7 @@ const HANDLERS = {
     category: '设定构建',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT id, name, age, gender, personality, background, motivation, arc, notes FROM characters ORDER BY name').all();
+      return pdb.prepare('SELECT id, name, age, gender, role, personality, background, motivation, arc, notes FROM characters ORDER BY name').all();
     },
   },
   get_character: {
@@ -890,10 +892,10 @@ const HANDLERS = {
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
-      pdb.prepare(`INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      pdb.prepare(`INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, role, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, args.name, args.age || '', args.gender || '', args.appearance || '', args.personality || '',
-          args.background || '', args.motivation || '', args.arc || '', args.notes || '');
+          args.background || '', args.motivation || '', args.arc || '', args.role || '', args.notes || '');
       return { created: true, id, name: args.name };
     },
   },
@@ -905,7 +907,7 @@ const HANDLERS = {
       const { name, ...fields } = args;
       const existing = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(name);
       if (!existing) return { error: `角色 "${name}" 不存在` };
-      const allowed = ['age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'notes'];
+      const allowed = ['age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'role', 'notes'];
       const updates = [];
       const params = [];
       for (const key of allowed) {

@@ -1,9 +1,11 @@
-import { HeartHandshake, Link2, Loader, Plus, RefreshCcw, Sparkles, Users } from 'lucide-react'
+import { HeartHandshake, Link2, Loader, RefreshCcw, Sparkles, Users } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
+import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { aiApi, extractAIJsonArray, getAIResponseText, relationsApi } from '@/lib/api'
 import { useCharacters, useProjectName, useRelations } from '@/lib/useProjectData'
+import type { CharacterRelation } from '@/types'
 
 interface PositionedNode {
   id: string
@@ -72,8 +74,7 @@ function computeCircleLayout(
   const nodes: PositionedNode[] = characters.map((c, i) => {
     const angle = (i / count) * 2 * Math.PI - Math.PI / 2 + hash(seed, i) * 0.15
     const r = 24 + ((c.chapterCount || 0) / maxCh) * 20
-    const ch = c.chapterCount || 0
-    const role = ch >= 3 ? 'major' : ch >= 1 ? 'minor' : 'extra'
+    const role = c.role || 'extra'
     return {
       id: c.id,
       name: c.name,
@@ -113,6 +114,7 @@ export function Relations() {
   const [layoutSeed, setLayoutSeed] = useState(0)
   const [organizing, setOrganizing] = useState(false)
   const [orgMsg, setOrgMsg] = useState('')
+  const [editingRelation, setEditingRelation] = useState<CharacterRelation | null>(null)
 
   const loading = charsLoading || relsLoading
   const chars = characters || []
@@ -132,9 +134,14 @@ export function Relations() {
     try {
       const charList = chars
         .map((c: any) => {
-          const ch = c.chapterCount || 0
           const role =
-            ch >= 3 ? t('relations.roleMajor') : ch >= 1 ? t('relations.roleMinor') : t('relations.roleExtra')
+            c.role === 'major'
+              ? t('pages.roleMajor')
+              : c.role === 'minor'
+                ? t('pages.roleMinor')
+                : c.role === 'extra'
+                  ? t('pages.roleExtra')
+                  : t('characters.roleUnset')
           return `${c.name}（${role}）`
         })
         .join('、')
@@ -221,6 +228,7 @@ export function Relations() {
     )
   }
 
+  const relationName = (id: string) => chars.find((c) => c.id === id)?.name || id
   const sortedByChapter = [...chars].sort((a, b) => (b.chapterCount || 0) - (a.chapterCount || 0))
   const relTypeCount = new Map<string, number>()
   rels.forEach((r: any) => relTypeCount.set(r.relationType, (relTypeCount.get(r.relationType) || 0) + 1))
@@ -234,6 +242,7 @@ export function Relations() {
         </h2>
         <div className="page-header-actions">
           <button
+            type="button"
             className="btn-secondary flex items-center gap-1.5"
             style={{ height: 30, padding: '0 14px' }}
             onClick={handleRelayout}
@@ -242,6 +251,51 @@ export function Relations() {
           </button>
         </div>
       </div>
+
+      {editingRelation && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${relationName(editingRelation.characterAId)} ↔ ${relationName(editingRelation.characterBId)}」`}
+          fields={[
+            {
+              key: 'relation_type',
+              label: t('relations.relationType'),
+              required: true,
+              placeholder: t('relations.relationType'),
+            },
+            {
+              key: 'description',
+              label: t('relations.descriptionField'),
+              type: 'textarea',
+            },
+            {
+              key: 'intensity',
+              label: t('relations.intensityField'),
+              type: 'number',
+            },
+          ]}
+          initialValues={{
+            relation_type: editingRelation.relationType || '',
+            description: editingRelation.description || '',
+            intensity: String(editingRelation.intensity || 3),
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await relationsApi.remove(project, editingRelation.id)
+            await reloadRels()
+          }}
+          deleteName={`${relationName(editingRelation.characterAId)} ↔ ${relationName(editingRelation.characterBId)}`}
+          onSubmit={async (vals) => {
+            await relationsApi.update(project, editingRelation.id, {
+              relation_type: vals.relation_type,
+              description: vals.description,
+              intensity: parseInt(vals.intensity, 10) || 3,
+            })
+            await reloadRels()
+          }}
+          onClose={() => setEditingRelation(null)}
+        />
+      )}
+
       <div className="flex flex-1 min-h-0">
         {/* Graph */}
         <div className="flex-1 flex items-center justify-center relative overflow-hidden bg-[var(--canvas)]">
@@ -406,6 +460,7 @@ export function Relations() {
           {/* AI Organize */}
           <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3">
             <button
+              type="button"
               className="w-full h-[32px] rounded-lg bg-[var(--accent-gold)] text-[var(--canvas)] text-[12px] font-medium cursor-pointer border-none flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={handleOrganize}
               disabled={organizing}
@@ -421,6 +476,36 @@ export function Relations() {
               )}
             </button>
             {orgMsg && <div className="text-[11px] text-[var(--ink-tertiary)] mt-2 text-center">{orgMsg}</div>}
+          </div>
+
+          {/* Relation list — click to edit or delete */}
+          <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3">
+            <div className="text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2 flex items-center gap-1.5">
+              <Link2 className="w-3 h-3" /> {t('relations.relationList')}
+            </div>
+            <div className="max-h-[220px] overflow-y-auto custom-scrollbar">
+              {rels.map((r: any) => (
+                <button
+                  type="button"
+                  key={r.id}
+                  className="w-full text-left px-1 py-1.5 rounded cursor-pointer border-none bg-transparent hover:bg-[var(--canvas-mid)]"
+                  onClick={() => setEditingRelation(r)}
+                >
+                  <div className="text-[12px] text-[var(--ink-secondary)] truncate">
+                    {relationName(r.characterAId)} ↔ {relationName(r.characterBId)}
+                  </div>
+                  <div className="text-[10px] text-[var(--ink-mute)] flex justify-between gap-2">
+                    <span className="truncate">{r.relationType}</span>
+                    <span className="font-mono shrink-0">{r.intensity}/5</span>
+                  </div>
+                </button>
+              ))}
+              {rels.length === 0 && (
+                <div className="text-[12px] text-[var(--ink-tertiary)] py-2 text-center">
+                  {t('relations.listEmpty')}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Character stats */}

@@ -5,14 +5,14 @@ import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { scienceApi } from '@/lib/api'
 import { useProjectName, useScienceEntries } from '@/lib/useProjectData'
-
-const FILTERS = ['all', 'known', 'extrapolation', 'hypothesis']
+import type { ScienceEntry } from '@/types'
 
 export function Science() {
   const { data: entries, loading, reload } = useScienceEntries()
   useDataRefresh('science', reload)
   const [filter, setFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<ScienceEntry | null>(null)
   const { t } = useT()
   const project = useProjectName()
   const labelMap: Record<string, { text: string; color: string; bg: string }> = {
@@ -33,7 +33,12 @@ export function Science() {
           <FlaskConical className="w-5 h-5" /> {t('pages.scienceSettings')}
         </h2>
         <div className="page-header-actions">
-          <button className="btn-primary" style={{ height: 30, padding: '0 14px' }} onClick={() => setShowCreate(true)}>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ height: 30, padding: '0 14px' }}
+            onClick={() => setShowCreate(true)}
+          >
             + {t('pages.newSetting')}
           </button>
           <select
@@ -82,14 +87,58 @@ export function Science() {
         />
       )}
 
+      {editing && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${editing.name}」`}
+          fields={[
+            {
+              key: 'label',
+              label: t('science.category'),
+              type: 'select',
+              required: true,
+              options: [
+                { value: 'known', label: t('science.knownLabel') },
+                { value: 'extrapolation', label: t('science.extrapolationLabel') },
+                { value: 'hypothesis', label: t('science.hypothesisLabel') },
+              ],
+            },
+            { key: 'name', label: t('science.name'), required: true, placeholder: t('science.namePlaceholder') },
+            {
+              key: 'description',
+              label: t('science.description'),
+              type: 'textarea',
+              placeholder: t('science.descriptionPlaceholder'),
+            },
+          ]}
+          initialValues={{
+            label: editing.label || '',
+            name: editing.name || '',
+            description: editing.description || '',
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await scienceApi.remove(project, editing.id)
+            reload()
+          }}
+          deleteName={editing.name}
+          onSubmit={async (vals) => {
+            await scienceApi.update(project, editing.id, vals)
+            reload()
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <div className="page-body" style={{ padding: 0 }}>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-6">
           {filtered.map((entry: any) => {
             const lm = labelMap[entry.label] || labelMap.hypothesis
             return (
-              <div
+              <button
                 key={entry.id}
-                className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                type="button"
+                className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 text-left cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                onClick={() => setEditing(entry)}
               >
                 <span className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] inline-block mb-1.5">
                   {entry.label === 'known'
@@ -106,7 +155,7 @@ export function Science() {
                   {lm.text}
                 </span>
                 <div className="text-[13px] text-[var(--ink-tertiary)] mt-1">{entry.description}</div>
-              </div>
+              </button>
             )
           })}
         </div>

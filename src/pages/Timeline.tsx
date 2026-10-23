@@ -5,6 +5,7 @@ import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { timelineApi } from '@/lib/api'
 import { useProjectName, useTimelineEvents } from '@/lib/useProjectData'
+import type { TimelineEvent } from '@/types'
 
 export function Timeline() {
   const { data: events, loading, reload } = useTimelineEvents()
@@ -12,6 +13,7 @@ export function Timeline() {
   const { t } = useT()
   const project = useProjectName()
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<TimelineEvent | null>(null)
 
   if (loading)
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
@@ -24,6 +26,7 @@ export function Timeline() {
         </h2>
         <div className="page-header-actions">
           <button
+            type="button"
             className="btn-primary flex items-center gap-1"
             style={{ height: 30, padding: '0 14px' }}
             onClick={() => setShowCreate(true)}
@@ -62,7 +65,7 @@ export function Timeline() {
               year: vals.year,
               title: vals.title,
               description: vals.description,
-              importance: parseInt(vals.importance) || 3,
+              importance: parseInt(vals.importance, 10) || 3,
             })
             reload()
           }}
@@ -70,11 +73,70 @@ export function Timeline() {
         />
       )}
 
+      {editing && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${editing.title}」`}
+          fields={[
+            {
+              key: 'year',
+              label: t('timeline.yearLabel'),
+              required: true,
+              placeholder: t('timeline.yearPlaceholder'),
+            },
+            {
+              key: 'title',
+              label: t('timeline.titleLabel'),
+              required: true,
+              placeholder: t('timeline.titlePlaceholder'),
+            },
+            {
+              key: 'description',
+              label: t('timeline.descriptionLabel'),
+              type: 'textarea',
+              placeholder: t('timeline.descriptionPlaceholder'),
+            },
+            {
+              key: 'importance',
+              label: t('timeline.importanceLabel'),
+              type: 'number',
+              placeholder: t('timeline.importancePlaceholder'),
+            },
+          ]}
+          initialValues={{
+            year: editing.year || '',
+            title: editing.title || '',
+            description: editing.description || '',
+            importance: String(editing.importance || 3),
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await timelineApi.remove(project, editing.id)
+            reload()
+          }}
+          deleteName={editing.title}
+          onSubmit={async (vals) => {
+            await timelineApi.update(project, editing.id, {
+              year: vals.year,
+              title: vals.title,
+              description: vals.description,
+              importance: parseInt(vals.importance, 10) || 3,
+            })
+            reload()
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <div className="page-body" style={{ padding: 0 }}>
         <div className="relative px-8 pb-8 pt-6">
           <div className="absolute left-12 top-6 bottom-0 w-[2px] bg-[var(--hairline-light)]" />
-          {(events || []).map((ev, i) => (
-            <div key={ev.id} className="flex gap-[18px] pb-[18px] relative">
+          {(events || []).map((ev) => (
+            <button
+              key={ev.id}
+              type="button"
+              className="flex w-full text-left gap-[18px] pb-[18px] relative cursor-pointer"
+              onClick={() => setEditing(ev)}
+            >
               <div
                 className={`w-3 h-3 rounded-full shrink-0 z-[1] mt-1 ml-[30px]
                 ${ev.importance < 3 ? 'bg-[var(--canvas-pop)] shadow-none' : 'bg-[var(--accent-gold)] border-2 border-[var(--canvas)] shadow-[0_0_0_2px_var(--accent-gold-soft-bg)]'}`}
@@ -97,7 +159,7 @@ export function Timeline() {
                 </div>
                 <div className="text-[13px] text-[var(--ink-tertiary)] leading-[1.6]">{ev.description}</div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

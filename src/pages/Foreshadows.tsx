@@ -7,6 +7,7 @@ import { useT } from '@/hooks/useT'
 import { aiApi, extractAIJsonArray, foreshadowsApi, getAIResponseText } from '@/lib/api'
 import { useForeshadows, useProjectName } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
+import type { Foreshadow } from '@/types'
 
 interface Column {
   key: string
@@ -27,6 +28,7 @@ export function Foreshadows() {
   const { t } = useT()
   const project = useProjectName()
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<Foreshadow | null>(null)
   const [generating, setGenerating] = useState(false)
 
   const handleAIDesign = async () => {
@@ -94,6 +96,7 @@ export function Foreshadows() {
         </h2>
         <div className="page-header-actions">
           <button
+            type="button"
             className="btn-primary flex items-center gap-1.5"
             style={{ height: 30, padding: '0 14px' }}
             onClick={handleAIDesign}
@@ -103,6 +106,7 @@ export function Foreshadows() {
             {generating ? t('common.generating') : t('pages.aiDesign')}
           </button>
           <button
+            type="button"
             className="btn-secondary flex items-center gap-1"
             style={{ height: 30, padding: '0 14px' }}
             onClick={() => setShowCreate(true)}
@@ -156,6 +160,76 @@ export function Foreshadows() {
         />
       )}
 
+      {editing && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${editing.title}」`}
+          fields={[
+            {
+              key: 'title',
+              label: t('foreshadow.titleField'),
+              required: true,
+              placeholder: t('foreshadow.titlePlaceholder'),
+            },
+            {
+              key: 'description',
+              label: t('foreshadow.descriptionField'),
+              type: 'textarea',
+              placeholder: t('foreshadow.descriptionPlaceholder'),
+            },
+            {
+              key: 'priority',
+              label: t('foreshadow.priorityField'),
+              type: 'select',
+              options: [
+                { value: 'high', label: t('foreshadow.priorityHigh') },
+                { value: 'normal', label: t('foreshadow.priorityNormal') },
+                { value: 'low', label: t('foreshadow.priorityLow') },
+              ],
+            },
+            {
+              key: 'status',
+              label: t('foreshadow.statusField'),
+              type: 'select',
+              options: [
+                { value: 'planted', label: t('foreshadow.planted') },
+                { value: 'progressing', label: t('foreshadow.progressing') },
+                { value: 'resolved', label: t('foreshadow.resolved') },
+              ],
+            },
+            {
+              key: 'expected_resolve_chapter',
+              label: t('foreshadow.expectedResolveField'),
+              type: 'number',
+              placeholder: t('foreshadow.expectedResolve', { n: 0 }),
+            },
+          ]}
+          initialValues={{
+            title: editing.title || '',
+            description: editing.description || '',
+            priority: editing.priority || 'normal',
+            status: editing.status || 'planted',
+            expected_resolve_chapter: String(editing.expectedResolveChapter || 0),
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await foreshadowsApi.remove(project, editing.id)
+            reload()
+          }}
+          deleteName={editing.title}
+          onSubmit={async (vals) => {
+            await foreshadowsApi.update(project, editing.id, {
+              title: vals.title,
+              description: vals.description,
+              priority: vals.priority || 'normal',
+              status: vals.status || 'planted',
+              expected_resolve_chapter: parseInt(vals.expected_resolve_chapter, 10) || 0,
+            })
+            reload()
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <div className="flex gap-3 px-6 py-4 shrink-0 bg-[var(--canvas-soft)] border-b border-[var(--hairline)]">
         {stats.map((s) => (
           <div
@@ -185,9 +259,11 @@ export function Foreshadows() {
                 {list
                   .filter((f: any) => f.status === col.key)
                   .map((f: any) => (
-                    <div
+                    <button
                       key={f.id}
-                      className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-2.5 mb-1.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)]"
+                      type="button"
+                      className="w-full text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-2.5 mb-1.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)]"
+                      onClick={() => setEditing(f)}
                     >
                       <div className="text-[13px] text-[var(--ink)] flex items-center gap-1.5">
                         <span
@@ -204,7 +280,7 @@ export function Foreshadows() {
                           {t('foreshadow.expectedResolve', { n: f.expectedResolveChapter })}
                         </div>
                       )}
-                    </div>
+                    </button>
                   ))}
               </div>
             </div>

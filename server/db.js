@@ -22,7 +22,7 @@ let configDb;    // wrapped config database
 // ═══════════════════════════════════════════════════════════════
 
 const CONFIG_SCHEMA_VERSION = 2;
-const PROJECT_SCHEMA_VERSION = 4;
+const PROJECT_SCHEMA_VERSION = 5;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -507,6 +507,7 @@ const projectMigrations = [
         background  TEXT DEFAULT '',
         motivation  TEXT DEFAULT '',
         arc         TEXT DEFAULT '',
+        role        TEXT NOT NULL DEFAULT '',
         ext_markers TEXT DEFAULT '',
         avatar      TEXT DEFAULT '',
         notes       TEXT DEFAULT '',
@@ -707,6 +708,15 @@ const projectMigrations = [
       );
       CREATE INDEX IF NOT EXISTS idx_payoff_points_status ON payoff_points(status);
     `);
+  },
+  // v4 → v5: explicit character role, chosen by the author instead of being
+  // inferred from list order / chapter count.
+  (db) => {
+    try {
+      db.exec("ALTER TABLE characters ADD COLUMN role TEXT NOT NULL DEFAULT ''");
+    } catch (e) {
+      // column already exists — ignore
+    }
   },
 ];
 

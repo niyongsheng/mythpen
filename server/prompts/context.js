@@ -23,6 +23,8 @@ const PHASE_LABELS = {
   writing: '写作', review: '审阅', consistency: '一致性', export: '导出',
 };
 
+const CHARACTER_ROLE_LABELS = { major: '主角', minor: '配角', extra: '客串' };
+
 // `toolHints: false` keeps tool names out of the prompt entirely — required for
 // tool-less requests such as /api/ai/continue, where mentioning them makes the
 // model emit tool-call markup as literal text.
@@ -47,7 +49,7 @@ function buildProjectContext(projectName, { toolHints = true } = {}) {
     const chapters = [...chapterMap.values()].sort((a, b) => a.num - b.num);
 
     const chars = pdb.prepare(
-      'SELECT name, age, gender, personality, background FROM characters ORDER BY name LIMIT 50'
+      'SELECT name, age, gender, role, personality, background, notes FROM characters ORDER BY name LIMIT 50'
     ).all();
     const totalChars = pdb.prepare('SELECT COUNT(*) as c FROM characters').get().c;
     const worldEntries = pdb.prepare(
@@ -97,7 +99,7 @@ ${payoffs.length ? payoffs.map(p => `[${p.status}/${p.type}/强度${p.intensity}
 当前总字数: ${meta.word_count || '0'}${descriptionLine}${importNote}
 
 角色列表${charNote}:
-${chars.length ? chars.map(c => `- ${c.name}（${c.age || '?'}岁，${c.gender || '?'}）：${c.personality || ''} ${c.background || ''}`).join('\n') : '（暂无）'}
+${chars.length ? chars.map(c => `- ${c.name}（${CHARACTER_ROLE_LABELS[c.role] || '未定位'}，${c.age || '?'}岁，${c.gender || '?'}）：${c.personality || ''} ${c.background || ''}${c.notes ? `｜备注：${String(c.notes).slice(0, 300)}` : ''}`).join('\n') : '（暂无）'}
 
 世界观设定（最多 30 条）:
 ${worldEntries.length ? worldEntries.map(w => `- [${w.category}] ${w.name}：${w.description || ''}`).join('\n') : '（暂无）'}

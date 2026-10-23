@@ -1,9 +1,11 @@
 import { Brain, Loader, Search, Sparkles, X } from 'lucide-react'
 import { useState } from 'react'
+import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { aiApi, extractAIJsonArray, getAIResponseText, memoriesApi } from '@/lib/api'
 import { useMemories, useProjectName } from '@/lib/useProjectData'
+import type { Memory as MemoryItem } from '@/types'
 
 const CAT_LABELS: Record<string, string> = {
   character: 'memory.categoryCharacter',
@@ -31,6 +33,7 @@ export function Memory() {
   const [searchResults, setSearchResults] = useState<any[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [extracting, setExtracting] = useState(false)
+  const [editing, setEditing] = useState<MemoryItem | null>(null)
 
   const handleSearch = async () => {
     if (!project || !searchQuery.trim()) return
@@ -96,6 +99,7 @@ export function Memory() {
         </h2>
         <div className="page-header-actions">
           <button
+            type="button"
             className="btn-secondary flex items-center gap-1.5"
             style={{ height: 30, padding: '0 14px' }}
             onClick={() => setSearchMode(!searchMode)}
@@ -103,6 +107,7 @@ export function Memory() {
             <Search className="w-3.5 h-3.5" /> {t('pages.semanticSearch')}
           </button>
           <button
+            type="button"
             className="btn-primary flex items-center gap-1.5"
             style={{ height: 30, padding: '0 14px' }}
             onClick={handleExtract}
@@ -128,6 +133,7 @@ export function Memory() {
               autoFocus
             />
             <button
+              type="button"
               className="h-8 px-4 min-w-[72px] rounded-lg bg-[var(--accent-gold)] text-[var(--canvas)] text-[12px] cursor-pointer border-none font-medium whitespace-nowrap"
               onClick={handleSearch}
               disabled={searching || !searchQuery.trim()}
@@ -135,6 +141,7 @@ export function Memory() {
               {searching ? t('common.searching') : t('common.search')}
             </button>
             <button
+              type="button"
               className="h-8 w-8 rounded-lg flex items-center justify-center border border-[var(--hairline)] bg-[var(--canvas-elevated)] text-[var(--ink-tertiary)] cursor-pointer hover:text-[var(--ink)]"
               onClick={handleClearSearch}
             >
@@ -147,6 +154,7 @@ export function Memory() {
                 ? t('memory.noResults')
                 : t('memory.searchResultsCount', { n: searchResults.length })}
               <button
+                type="button"
                 className="ml-2 text-[var(--accent-gold)] underline cursor-pointer bg-transparent border-none"
                 onClick={() => {
                   setSearchResults(null)
@@ -160,14 +168,65 @@ export function Memory() {
         </div>
       )}
 
+      {editing && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${editing.content.slice(0, 20)}」`}
+          fields={[
+            {
+              key: 'category',
+              label: t('memory.category'),
+              type: 'select',
+              required: true,
+              options: [
+                { value: 'character', label: t('memory.categoryCharacter') },
+                { value: 'location', label: t('memory.categoryLocation') },
+                { value: 'item', label: t('memory.categoryItem') },
+                { value: 'event', label: t('memory.categoryEvent') },
+                { value: 'promise', label: t('memory.categoryPromise') },
+                { value: 'other', label: t('memory.categoryOther') },
+              ],
+            },
+            {
+              key: 'content',
+              label: t('memory.contentLabel'),
+              type: 'textarea',
+              required: true,
+              placeholder: t('memory.contentPlaceholder'),
+            },
+          ]}
+          initialValues={{
+            category: editing.category || 'other',
+            content: editing.content || '',
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await memoriesApi.remove(project, editing.id)
+            setSearchResults(null)
+            reload()
+          }}
+          deleteName={editing.content.slice(0, 20)}
+          onSubmit={async (vals) => {
+            await memoriesApi.update(project, editing.id, {
+              category: vals.category || 'other',
+              content: vals.content,
+            })
+            setSearchResults(null)
+            reload()
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <div className="page-body" style={{ padding: 0 }}>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3 p-6">
           {displayList.map((m: any) => {
             const color = CAT_COLORS[m.category] || { bg: 'var(--canvas-mid)', text: 'var(--ink-tertiary)' }
             return (
-              <div
+              <button
                 key={m.id}
-                className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3.5 transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                type="button"
+                className="text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                onClick={() => setEditing(m)}
               >
                 <span
                   className="text-[10px] px-[7px] py-[1px] rounded-full inline-block mb-2"
@@ -179,7 +238,7 @@ export function Memory() {
                 <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
                   {m.sourceChapterId ? t('memory.sourceChapter', { n: m.sourceChapterId }) : ''}
                 </div>
-              </div>
+              </button>
             )
           })}
         </div>

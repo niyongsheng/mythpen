@@ -15,15 +15,47 @@ interface Props {
   fields: Field[]
   onSubmit: (values: Record<string, string>) => Promise<void>
   onClose: () => void
+  /** Pre-fill the form when editing an existing record. */
+  initialValues?: Record<string, string>
+  /** Submit button label; defaults to the localized "create". */
+  submitLabel?: string
+  /** Show a delete action with an inline confirmation. */
+  onDelete?: () => Promise<void>
+  /** Name used in the delete confirmation, when the dialog title differs. */
+  deleteName?: string
 }
 
-export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) {
-  const [values, setValues] = useState<Record<string, string>>({})
+export function SimpleCreateDialog({
+  title,
+  fields,
+  onSubmit,
+  onClose,
+  initialValues,
+  submitLabel,
+  onDelete,
+  deleteName,
+}: Props) {
+  const [values, setValues] = useState<Record<string, string>>(() => ({ ...initialValues }))
   const [submitting, setSubmitting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const { t } = useT()
   const [error, setError] = useState('')
 
   const update = (key: string, val: string) => setValues((v) => ({ ...v, [key]: val }))
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    setDeleting(true)
+    setError('')
+    try {
+      await onDelete()
+      onClose()
+    } catch (e: any) {
+      setError(e.message || t('project.deleteFailed'))
+      setDeleting(false)
+    }
+  }
 
   const handleSubmit = async () => {
     // Check required
@@ -61,9 +93,9 @@ export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) 
         <div className="space-y-3 mb-5">
           {fields.map((f) => (
             <div key={f.key}>
-              <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1">
+              <div className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1">
                 {f.label}
-              </label>
+              </div>
               {f.type === 'textarea' ? (
                 <textarea
                   className="w-full bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-2.5 font-sans text-[13px] text-[var(--ink)] outline-none resize-vertical min-h-[60px] focus:border-[var(--accent-gold)]"
@@ -97,20 +129,60 @@ export function SimpleCreateDialog({ title, fields, onSubmit, onClose }: Props) 
           ))}
         </div>
 
-        <div className="flex gap-2 justify-end border-t border-[var(--hairline)] pt-4">
-          <button
-            className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer hover:bg-[var(--canvas-mid)]"
-            onClick={onClose}
-          >
-            {t('project.cancel')}
-          </button>
-          <button
-            className="h-[32px] px-4 rounded-lg border-none bg-[var(--accent-gold)] text-[var(--canvas)] font-medium text-[13px] cursor-pointer hover:bg-[var(--accent-gold-soft)] disabled:opacity-40"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? t('common.creating') : t('common.create')}
-          </button>
+        <div className="flex gap-2 items-center border-t border-[var(--hairline)] pt-4">
+          {onDelete && !confirmingDelete && (
+            <button
+              type="button"
+              className="mr-auto h-[32px] px-3 rounded-lg border border-transparent bg-transparent text-[var(--error)] text-[13px] cursor-pointer hover:bg-[var(--error-soft)]"
+              onClick={() => setConfirmingDelete(true)}
+            >
+              {t('common.delete')}
+            </button>
+          )}
+          {confirmingDelete ? (
+            <>
+              <span className="mr-auto text-[12px] text-[var(--error)]">
+                {t('common.deleteConfirm', { name: deleteName || title })}
+              </span>
+              <button
+                type="button"
+                className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer hover:bg-[var(--canvas-mid)]"
+                onClick={() => setConfirmingDelete(false)}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="h-[32px] px-4 rounded-lg border-none bg-[var(--error)] text-white font-medium text-[13px] cursor-pointer hover:opacity-90 disabled:opacity-40"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? t('common.saving') : t('common.delete')}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="h-[32px] px-4 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[13px] cursor-pointer hover:bg-[var(--canvas-mid)]"
+                onClick={onClose}
+              >
+                {t('project.cancel')}
+              </button>
+              <button
+                type="button"
+                className="h-[32px] px-4 rounded-lg border-none bg-[var(--accent-gold)] text-[var(--canvas)] font-medium text-[13px] cursor-pointer hover:bg-[var(--accent-gold-soft)] disabled:opacity-40"
+                onClick={handleSubmit}
+                disabled={submitting}
+              >
+                {submitting
+                  ? submitLabel
+                    ? t('common.saving')
+                    : t('common.creating')
+                  : submitLabel || t('common.create')}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

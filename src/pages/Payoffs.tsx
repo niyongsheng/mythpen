@@ -56,6 +56,7 @@ export function Payoffs() {
   const { t } = useT()
   const project = useProjectName()
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState<PayoffPoint | null>(null)
   const [generating, setGenerating] = useState(false)
 
   const handleAIDesign = async () => {
@@ -117,6 +118,7 @@ export function Payoffs() {
         </h2>
         <div className="page-header-actions">
           <button
+            type="button"
             className="btn-primary flex items-center gap-1.5"
             style={{ height: 30, padding: '0 14px' }}
             onClick={handleAIDesign}
@@ -126,6 +128,7 @@ export function Payoffs() {
             {generating ? t('common.generating') : t('pages.aiDesignPayoff')}
           </button>
           <button
+            type="button"
             className="btn-secondary flex items-center gap-1"
             style={{ height: 30, padding: '0 14px' }}
             onClick={() => setShowCreate(true)}
@@ -204,6 +207,91 @@ export function Payoffs() {
         />
       )}
 
+      {editing && (
+        <SimpleCreateDialog
+          title={`${t('common.edit')}「${editing.title}」`}
+          fields={[
+            {
+              key: 'title',
+              label: t('payoff.titleField'),
+              required: true,
+              placeholder: t('payoff.titlePlaceholder'),
+            },
+            {
+              key: 'type',
+              label: t('payoff.typeField'),
+              type: 'select',
+              options: TYPES.map((type) => ({ value: type, label: t(TYPE_KEYS[type]) })),
+            },
+            {
+              key: 'description',
+              label: t('payoff.descriptionField'),
+              type: 'textarea',
+              placeholder: t('payoff.descriptionPlaceholder'),
+            },
+            {
+              key: 'intensity',
+              label: t('payoff.intensityField'),
+              type: 'select',
+              options: [1, 2, 3, 4, 5].map((n) => ({
+                value: String(n),
+                label: t('payoff.intensityValue', { n }),
+              })),
+            },
+            {
+              key: 'setup_chapter',
+              label: t('payoff.setupChapterField'),
+              type: 'number',
+              placeholder: t('payoff.setupChapterPlaceholder'),
+            },
+            {
+              key: 'payoff_chapter',
+              label: t('payoff.payoffChapterField'),
+              type: 'number',
+              placeholder: t('payoff.payoffChapterPlaceholder'),
+            },
+            {
+              key: 'status',
+              label: t('payoff.statusField'),
+              type: 'select',
+              options: [
+                { value: 'planned', label: t('payoff.planned') },
+                { value: 'building', label: t('payoff.building') },
+                { value: 'released', label: t('payoff.released') },
+              ],
+            },
+          ]}
+          initialValues={{
+            title: editing.title || '',
+            type: editing.type || 'other',
+            description: editing.description || '',
+            intensity: String(editing.intensity || 3),
+            setup_chapter: String(editing.setupChapter || 0),
+            payoff_chapter: String(editing.payoffChapter || 0),
+            status: editing.status || 'planned',
+          }}
+          submitLabel={t('common.save')}
+          onDelete={async () => {
+            await payoffsApi.remove(project, editing.id)
+            reload()
+          }}
+          deleteName={editing.title}
+          onSubmit={async (vals) => {
+            await payoffsApi.update(project, editing.id, {
+              title: vals.title,
+              type: vals.type || 'other',
+              description: vals.description,
+              status: vals.status || 'planned',
+              intensity: parseInt(vals.intensity, 10) || 3,
+              setup_chapter: parseInt(vals.setup_chapter, 10) || 0,
+              payoff_chapter: parseInt(vals.payoff_chapter, 10) || 0,
+            })
+            reload()
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       <div className="flex gap-3 px-6 py-4 shrink-0 bg-[var(--canvas-soft)] border-b border-[var(--hairline)]">
         {stats.map((s) => (
           <div
@@ -233,9 +321,11 @@ export function Payoffs() {
                 {list
                   .filter((p) => p.status === col.key)
                   .map((p) => (
-                    <div
+                    <button
                       key={p.id}
-                      className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-2.5 mb-1.5 transition-colors hover:border-[var(--hairline-light)]"
+                      type="button"
+                      className="w-full text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-[var(--radius-sm)] p-2.5 mb-1.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)]"
+                      onClick={() => setEditing(p)}
                     >
                       <div className="flex items-center gap-1.5">
                         <div className="text-[13px] text-[var(--ink)] flex-1 min-w-0 truncate">{p.title}</div>
@@ -254,7 +344,7 @@ export function Payoffs() {
                         {p.payoffChapter > 0 && <span>{t('payoff.payoffAt', { n: p.payoffChapter })}</span>}
                         {isBehind(p) && <span className="text-[var(--error)]">{t('payoff.behind')}</span>}
                       </div>
-                    </div>
+                    </button>
                   ))}
               </div>
             </div>

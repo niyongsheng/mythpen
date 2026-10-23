@@ -42,6 +42,7 @@ export function toCharacter(row: any): Character {
     avatar: row.avatar ?? '',
     notes: row.notes ?? '',
     chapterCount: row.chapterCount ?? 0,
+    role: row.role || undefined,
   }
 }
 
