@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface DropdownOption<T extends string> {
   value: T
@@ -7,6 +8,9 @@ export interface DropdownOption<T extends string> {
   /** Right-aligned secondary text in the menu (e.g. a locale code). */
   meta?: string
 }
+
+/** `xs`/`form` cover plain form controls; `sm`/`md` are for rich triggers. */
+export type SelectSize = 'sm' | 'xs' | 'md' | 'form'
 
 interface DropdownProps<T extends string> {
   value: T | null
@@ -18,27 +22,41 @@ interface DropdownProps<T extends string> {
   /** Secondary content shown between the trigger label and the chevron. */
   renderTriggerMeta?: (selected: DropdownOption<T> | undefined) => React.ReactNode
   placeholder?: string
-  /** `sm` for toolbars/panels, `md` for settings forms. */
-  size?: 'sm' | 'md'
+  size?: SelectSize
   disabled?: boolean
   className?: string
   menuClassName?: string
+  /** Keep the menu at least this wide (px) when labels are longer than the trigger. */
+  menuMinWidth?: number
 }
 
-const TRIGGER_SIZE: Record<'sm' | 'md', string> = {
+const TRIGGER_SIZE: Record<SelectSize, string> = {
   sm: 'h-[28px] gap-2 px-2 text-[12px] rounded-[var(--radius-sm)]',
+  xs: 'h-[30px] gap-2 px-2.5 text-[13px] rounded-[var(--radius-sm)]',
   md: 'h-[38px] gap-2.5 pl-2 pr-3 text-[13px] rounded-[var(--radius-md)]',
+  form: 'h-9 gap-2 px-3 text-[15px] rounded-lg',
 }
 
-const ITEM_SIZE: Record<'sm' | 'md', string> = {
+const ITEM_SIZE: Record<SelectSize, string> = {
   sm: 'px-2 py-[5px] text-[12px]',
+  xs: 'px-2 py-[6px] text-[13px]',
   md: 'px-2 py-[7px] text-[13px]',
+  form: 'px-2 py-[7px] text-[15px]',
 }
+
+const MENU_GAP = 6
+const VIEWPORT_MARGIN = 8
+const MENU_MAX_HEIGHT = 320
+/** Below this, a menu opens upwards when there is more room above. */
+const MENU_MIN_HEIGHT_BELOW = 180
 
 /**
  * Custom listbox-style dropdown (no native <select>) that matches the app's
  * paper-and-ink styling. Supports mouse, keyboard (arrows / Home / End /
  * Enter / Escape) and screen readers.
+ *
+ * The menu renders in a portal so it is not clipped by scrollable panels
+ * (settings drawer, dialogs) or stacked behind them.
  */
 export function Dropdown<T extends string>({
   value,
@@ -52,9 +70,11 @@ export function Dropdown<T extends string>({
   disabled = false,
   className = '',
   menuClassName = '',
+  menuMinWidth = 0,
 }: DropdownProps<T>) {
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const menuId = useId()
@@ -77,6 +97,44 @@ export function Dropdown<T extends string>({
     if (optionValue !== value) onChange(optionValue)
     closeMenu(true)
   }
+
+  // Anchor the portaled menu to the trigger, flipping up when the viewport
+  // bottom is close. Re-measure on resize and on scrolls of any container.
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom - MENU_GAP - VIEWPORT_MARGIN
+    const spaceAbove = rect.top - MENU_GAP - VIEWPORT_MARGIN
+    const openUp = spaceBelow < MENU_MIN_HEIGHT_BELOW && spaceAbove > spaceBelow
+    const width = Math.min(Math.max(rect.width, menuMinWidth), window.innerWidth - VIEWPORT_MARGIN * 2)
+    const left = Math.min(Math.max(rect.left, VIEWPORT_MARGIN), window.innerWidth - width - VIEWPORT_MARGIN)
+
+    setMenuStyle({
+      position: 'fixed',
+      left,
+      width,
+      maxHeight: Math.min(MENU_MAX_HEIGHT, Math.max(0, openUp ? spaceAbove : spaceBelow)),
+      ...(openUp ? { bottom: window.innerHeight - rect.top + MENU_GAP } : { top: rect.bottom + MENU_GAP }),
+    })
+  }, [menuMinWidth])
+
+  useLayoutEffect(() => {
+    if (!open) return
+    updateMenuPosition()
+    const handleResize = () => updateMenuPosition()
+    const handleScroll = (event: Event) => {
+      // Scrolling inside the menu itself doesn't move its anchor.
+      if (menuRef.current?.contains(event.target as Node)) return
+      updateMenuPosition()
+    }
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('scroll', handleScroll, true)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('scroll', handleScroll, true)
+    }
+  }, [open, updateMenuPosition])
 
   // Move focus into the list so arrow keys / Enter / Escape are handled there.
   useEffect(() => {
@@ -129,48 +187,14 @@ export function Dropdown<T extends string>({
     }
   }
 
-  return (
-    <div className={`relative ${className}`}>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-controls={menuId}
-        aria-label={ariaLabel}
-        disabled={disabled}
-        className={`flex w-full items-center border bg-[var(--canvas-elevated)] text-left transition-colors ${TRIGGER_SIZE[size]} ${
-          open
-            ? 'border-[var(--accent-gold)] bg-[var(--canvas-mid)]'
-            : 'border-[var(--hairline)] enabled:hover:border-[var(--hairline-light)] enabled:hover:bg-[var(--canvas-mid)]'
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-        onClick={() => (open ? closeMenu() : openMenu())}
-        onKeyDown={(event) => {
-          if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-            event.preventDefault()
-            openMenu()
-          }
-        }}
-      >
-        {renderLeading?.(selected)}
-        <span className={`flex-1 truncate ${selected ? 'text-[var(--ink)]' : 'text-[var(--ink-mute)]'}`}>
-          {selected ? selected.label : placeholder}
-        </span>
-        {renderTriggerMeta?.(selected)}
-        <ChevronDown
-          className={`shrink-0 text-[var(--ink-mute)] transition-transform duration-150 ${
-            size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5'
-          } ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-
-      {open && (
+  const menu = open
+    ? createPortal(
         <>
           <button
             type="button"
             tabIndex={-1}
             aria-hidden="true"
-            className="fixed inset-0 z-40 cursor-default border-none bg-transparent p-0"
+            className="fixed inset-0 z-[400] cursor-default border-none bg-transparent p-0"
             onClick={() => closeMenu(true)}
           />
           <div
@@ -180,7 +204,8 @@ export function Dropdown<T extends string>({
             aria-label={ariaLabel}
             aria-activedescendant={activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
             tabIndex={-1}
-            className={`dropdown-menu custom-scrollbar absolute top-full right-0 left-0 z-50 mt-1.5 max-h-[320px] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] p-1.5 shadow-[var(--shadow-pop)] outline-none ${menuClassName}`}
+            style={menuStyle}
+            className={`custom-scrollbar z-[401] overflow-y-auto rounded-[var(--radius-md)] border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] p-1.5 shadow-[var(--shadow-pop)] outline-none ${menuClassName}`}
             onKeyDown={handleMenuKeyDown}
           >
             {options.map((option, index) => {
@@ -224,8 +249,47 @@ export function Dropdown<T extends string>({
               )
             })}
           </div>
-        </>
-      )}
+        </>,
+        document.body,
+      )
+    : null
+
+  return (
+    <div className={`relative ${className}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-label={ariaLabel}
+        disabled={disabled}
+        className={`flex w-full items-center border bg-[var(--canvas-elevated)] text-left transition-colors ${TRIGGER_SIZE[size]} ${
+          open
+            ? 'border-[var(--accent-gold)] bg-[var(--canvas-mid)]'
+            : 'border-[var(--hairline)] enabled:hover:border-[var(--hairline-light)] enabled:hover:bg-[var(--canvas-mid)]'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        onClick={() => (open ? closeMenu() : openMenu())}
+        onKeyDown={(event) => {
+          if (!open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault()
+            openMenu()
+          }
+        }}
+      >
+        {renderLeading?.(selected)}
+        <span className={`flex-1 truncate ${selected ? 'text-[var(--ink)]' : 'text-[var(--ink-mute)]'}`}>
+          {selected ? selected.label : placeholder}
+        </span>
+        {renderTriggerMeta?.(selected)}
+        <ChevronDown
+          className={`shrink-0 text-[var(--ink-mute)] transition-transform duration-150 ${
+            size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5'
+          } ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {menu}
     </div>
   )
 }

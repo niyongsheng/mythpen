@@ -1,6 +1,7 @@
 import { Bot, Download, Eye, EyeOff, Globe, Palette, Pen, RotateCw, SwatchBook, X, Zap } from 'lucide-react'
 import { useState } from 'react'
 import { LanguageSelect } from '@/components/LanguageSelect'
+import { Select } from '@/components/Select'
 import { useT } from '@/hooks/useT'
 import { apiUrl } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
@@ -187,15 +188,17 @@ export function SettingsDrawer() {
               />
             </SettingRow>
             <SettingRow label={t('settings.fontFamily')}>
-              <select
-                className="h-[30px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)]"
+              <Select
+                ariaLabel={t('settings.fontFamily')}
+                className="w-[150px]"
                 value={settings.editorFontFamily}
-                onChange={(e) => handleFontFamilyChange(e.target.value)}
-              >
-                <option value="'Noto Serif SC', 'Source Han Serif SC', serif">{t('settings.fontSong')}</option>
-                <option value="'Noto Sans SC', 'Source Han Sans SC', sans-serif">{t('settings.fontHei')}</option>
-                <option value="Georgia, 'Noto Serif SC', serif">Georgia</option>
-              </select>
+                options={[
+                  { value: "'Noto Serif SC', 'Source Han Serif SC', serif", label: t('settings.fontSong') },
+                  { value: "'Noto Sans SC', 'Source Han Sans SC', sans-serif", label: t('settings.fontHei') },
+                  { value: "Georgia, 'Noto Serif SC', serif", label: 'Georgia' },
+                ]}
+                onChange={handleFontFamilyChange}
+              />
             </SettingRow>
           </div>
 
@@ -232,14 +235,16 @@ export function SettingsDrawer() {
               <Bot className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.aiService')}
             </div>
             <SettingRow label={t('settings.apiType')} desc={t('settings.apiTypeDesc')}>
-              <select
-                className="h-[30px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)] w-[120px]"
+              <Select<'openai' | 'claude'>
+                ariaLabel={t('settings.apiType')}
+                className="w-[120px]"
                 value={settings.apiType}
-                onChange={(e) => updateSetting('apiType', e.target.value as 'openai' | 'claude')}
-              >
-                <option value="openai">OpenAI</option>
-                <option value="claude">Anthropic</option>
-              </select>
+                options={[
+                  { value: 'openai', label: 'OpenAI' },
+                  { value: 'claude', label: 'Anthropic' },
+                ]}
+                onChange={(value) => updateSetting('apiType', value)}
+              />
             </SettingRow>
             <SettingRow label={t('settings.apiBaseUrl')}>
               <input

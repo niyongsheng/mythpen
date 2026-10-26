@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Select } from '@/components/Select'
 import { useT } from '@/hooks/useT'
 
 interface Field {
@@ -104,18 +105,14 @@ export function SimpleCreateDialog({
                   onChange={(e) => update(f.key, e.target.value)}
                 />
               ) : f.type === 'select' && f.options ? (
-                <select
-                  className="w-full h-[34px] px-2.5 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[13px] outline-none cursor-pointer focus:border-[var(--accent-gold)]"
+                <Select
+                  ariaLabel={f.label}
+                  className="w-full"
+                  size="form"
                   value={values[f.key] || ''}
-                  onChange={(e) => update(f.key, e.target.value)}
-                >
-                  <option value="">{t('common.select')}</option>
-                  {f.options.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  options={[{ value: '', label: t('common.select') }, ...f.options]}
+                  onChange={(value) => update(f.key, value)}
+                />
               ) : (
                 <input
                   type={f.type === 'number' ? 'number' : 'text'}

@@ -1,5 +1,6 @@
 import { Pencil, Save, Trash2, Users, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Select } from '@/components/Select'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
@@ -319,16 +320,19 @@ export function Characters() {
               </FormField>
               <FormField label={t('characters.roleLabel')} full>
                 {editing ? (
-                  <select
-                    className="form-input"
+                  <Select
+                    ariaLabel={t('characters.roleLabel')}
+                    className="w-full"
+                    size="form"
                     value={view.role || ''}
-                    onChange={(e) => updateDraft('role', e.target.value)}
-                  >
-                    <option value="">{t('characters.roleUnset')}</option>
-                    <option value="major">{t('pages.roleMajor')}</option>
-                    <option value="minor">{t('pages.roleMinor')}</option>
-                    <option value="extra">{t('pages.roleExtra')}</option>
-                  </select>
+                    options={[
+                      { value: '', label: t('characters.roleUnset') },
+                      { value: 'major', label: t('pages.roleMajor') },
+                      { value: 'minor', label: t('pages.roleMinor') },
+                      { value: 'extra', label: t('pages.roleExtra') },
+                    ]}
+                    onChange={(value) => updateDraft('role', value)}
+                  />
                 ) : (
                   <input type="text" value={roleLabel(view.role)} className="form-input" readOnly />
                 )}

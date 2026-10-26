@@ -1,5 +1,6 @@
 import { FlaskConical } from 'lucide-react'
 import { useState } from 'react'
+import { Select } from '@/components/Select'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
@@ -41,18 +42,18 @@ export function Science() {
           >
             + {t('pages.newSetting')}
           </button>
-          <select
-            id="science-filter"
-            name="science-filter"
-            className="setting-select"
+          <Select
+            ariaLabel={t('science.category')}
+            className="w-[150px]"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="all">{t('science.filterAll')}</option>
-            <option value="known">{t('science.knownLabel')}</option>
-            <option value="extrapolation">{t('science.extrapolationLabel')}</option>
-            <option value="hypothesis">{t('science.hypothesisLabel')}</option>
-          </select>
+            options={[
+              { value: 'all', label: t('science.filterAll') },
+              { value: 'known', label: t('science.knownLabel') },
+              { value: 'extrapolation', label: t('science.extrapolationLabel') },
+              { value: 'hypothesis', label: t('science.hypothesisLabel') },
+            ]}
+            onChange={setFilter}
+          />
         </div>
       </div>
 

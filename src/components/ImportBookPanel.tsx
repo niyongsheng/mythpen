@@ -1,5 +1,6 @@
 import { AlertTriangle, FileText, Loader, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { Select } from '@/components/Select'
 import { useT } from '@/hooks/useT'
 import type { ImportProgress, ImportSource, ImportWarning, TextEncoding } from '@/lib/import/types'
 
@@ -120,19 +121,21 @@ export function ImportBookPanel({
       {isTxtFile(file) && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[12px] text-[var(--ink-secondary)] shrink-0">{t('project.import.encodingLabel')}</span>
-          <select
-            className="form-input h-8 text-[12px] px-2 py-0 w-full min-w-0 sm:w-auto sm:flex-1"
+          <Select<TextEncoding>
+            ariaLabel={t('project.import.encodingLabel')}
+            className="w-full min-w-0 sm:w-auto sm:flex-1"
             value={encoding}
             disabled={disabled || extracting}
-            onChange={(event) => onEncodingChange(event.target.value as TextEncoding)}
-          >
-            <option value="auto">{t('project.import.encodingAuto')}</option>
-            <option value="utf-8">UTF-8</option>
-            <option value="gb18030">GB18030 / GBK</option>
-            <option value="big5">Big5</option>
-            <option value="utf-16le">UTF-16 LE</option>
-            <option value="utf-16be">UTF-16 BE</option>
-          </select>
+            options={[
+              { value: 'auto', label: t('project.import.encodingAuto') },
+              { value: 'utf-8', label: 'UTF-8' },
+              { value: 'gb18030', label: 'GB18030 / GBK' },
+              { value: 'big5', label: 'Big5' },
+              { value: 'utf-16le', label: 'UTF-16 LE' },
+              { value: 'utf-16be', label: 'UTF-16 BE' },
+            ]}
+            onChange={onEncodingChange}
+          />
         </div>
       )}
 
