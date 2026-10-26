@@ -402,23 +402,29 @@ export function AIPanel() {
               {isRunning ? t('ai.generating') : project || t('ai.idle')}
             </span>
           </div>
-          {/* Mode toggle */}
-          <div className="flex mt-2 bg-[var(--canvas-card)] rounded-[var(--radius-sm)] p-[2px] border border-[var(--hairline)]">
+          {/* Mode toggle — sliding highlight instead of swapping backgrounds */}
+          <div className="relative flex mt-2 bg-[var(--canvas-card)] rounded-[var(--radius-sm)] p-[2px] border border-[var(--hairline)]">
+            <span
+              aria-hidden="true"
+              className={`absolute top-[2px] bottom-[2px] left-[2px] w-[calc(50%-2px)] rounded-[4px] bg-[var(--accent-gold)] transition-transform duration-200 ease-out motion-reduce:transition-none ${
+                mode === 'writing' ? 'translate-x-full' : 'translate-x-0'
+              }`}
+            />
             <button
-              className={`flex-1 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none ${
-                mode === 'collab'
-                  ? 'bg-[var(--accent-gold)] text-[var(--canvas)]'
-                  : 'bg-transparent text-[var(--ink-tertiary)] hover:text-[var(--ink)]'
+              type="button"
+              aria-pressed={mode === 'collab'}
+              className={`relative z-10 flex-1 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
+                mode === 'collab' ? 'text-[var(--canvas)]' : 'text-[var(--ink-tertiary)] hover:text-[var(--ink)]'
               }`}
               onClick={() => setMode('collab')}
             >
               {t('ai.modeCollab')}
             </button>
             <button
-              className={`flex-1 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none ${
-                mode === 'writing'
-                  ? 'bg-[var(--accent-gold)] text-[var(--canvas)]'
-                  : 'bg-transparent text-[var(--ink-tertiary)] hover:text-[var(--ink)]'
+              type="button"
+              aria-pressed={mode === 'writing'}
+              className={`relative z-10 flex-1 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
+                mode === 'writing' ? 'text-[var(--canvas)]' : 'text-[var(--ink-tertiary)] hover:text-[var(--ink)]'
               }`}
               onClick={() => setMode('writing')}
             >
