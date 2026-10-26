@@ -8,6 +8,11 @@
   <em>AI-assisted novel writing desktop app — characters, world-building, chapters, foreshadowing, timelines, with integrated AI writing assistant.</em>
 </p>
 
+<p>
+  <a href="https://mythpen.looplooptech.com">Website</a> ·
+  <a href="https://mythpen.looplooptech.com/#download">Download</a>
+</p>
+
 <p align="center">
   <a href="https://github.com/niyongsheng/mythpen/releases"><img src="https://img.shields.io/github/v/release/niyongsheng/mythpen?style=flat-square&label=Release" alt="Release"></a>
   <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React"></a>
@@ -15,6 +20,8 @@
   <a href="https://expressjs.com"><img src="https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white" alt="Express"></a>
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=white" alt="Tauri"></a>
 </p>
+
+**English** &nbsp;|&nbsp; [简体中文](README.zh.md)
 
 <p align="center">
   <img alt="demo" src="https://github.com/user-attachments/assets/87ba980c-492b-4bd2-af75-e14faa3cec68" width="80%" style="border-radius: 8px;" />
@@ -25,7 +32,7 @@
 - **AI Writing** — Two modes: *Writing* (guided 6-step workflow) and *Collab* (AI co-writer). Supports OpenAI and Claude.
 - **AI Book Import** — Import an existing TXT/EPUB; the model detects volumes and chapters, then builds characters, world-building, timeline, foreshadows and narrative memories.
 - **Payoff Board** — Plan face-slap, reveal and comeback beats on a kanban board for power-fantasy projects, with AI-designed payoff schedules.
-- **Internationalization (i18n)** — Full UI localization for 8 languages: Simplified/Traditional Chinese, English, Japanese, Korean, French, Spanish and Russian. Switch languages instantly from Settings; the preference persists, updates `<html lang>` and the document title, and localizes built-in AI design prompts. Each project also keeps its own writing language (Chinese/English) for generation.
+- **Internationalization (i18n)** — Full UI localization for 8 languages: Simplified/Traditional Chinese, English, Japanese, Korean, French, Spanish and Russian. 
 - **Novel Management** — Characters, world-building, chapters, foreshadowing, timeline, and relations — all in one place.
 - **Local-First** — Data stored in SQLite under `~/.mythpen/`. No cloud required, full privacy.
 - **Rich Editor** — Bold, italic, underline via keyboard shortcuts. Chapters auto-save locally.
