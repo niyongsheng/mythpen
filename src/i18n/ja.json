@@ -625,6 +625,7 @@
   },
   "about": {
     "version": "バージョン",
+    "website": "公式サイト",
     "sourceCode": "ソースコード",
     "support": "支援する",
     "supportDesc": "Mythpenがお役に立てたら、Afdian（愛発電）でコーヒーをごちそういただけると嬉しいです",

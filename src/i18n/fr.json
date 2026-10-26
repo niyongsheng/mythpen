@@ -625,6 +625,7 @@
   },
   "about": {
     "version": "Version",
+    "website": "Site officiel",
     "sourceCode": "Code source",
     "support": "Soutenir l’auteur",
     "supportDesc": "Si Mythpen vous est utile, vous pouvez m’offrir un café via 爱发电",

@@ -625,6 +625,7 @@
   },
   "about": {
     "version": "버전",
+    "website": "공식 웹사이트",
     "sourceCode": "소스 코드",
     "support": "후원하기",
     "supportDesc": "Mythpen이 도움이 되었다면 爱发电에서 커피 한 잔을 후원해 주세요",

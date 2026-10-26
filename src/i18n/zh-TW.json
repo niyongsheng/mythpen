@@ -625,6 +625,7 @@
   },
   "about": {
     "version": "版本號",
+    "website": "官方網站",
     "sourceCode": "原始碼",
     "support": "贊助作者",
     "supportDesc": "如果 Mythpen 對你有幫助，歡迎透過愛發電請我喝杯咖啡",
