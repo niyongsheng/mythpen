@@ -8,7 +8,7 @@
   <em>AI-assisted novel writing desktop app — characters, world-building, chapters, foreshadowing, timelines, with integrated AI writing assistant.</em>
 </p>
 
-<p>
+<p align="center">
   <a href="https://mythpen.looplooptech.com">Website</a> ·
   <a href="https://mythpen.looplooptech.com/#download">Download</a>
 </p>
@@ -21,7 +21,9 @@
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=white" alt="Tauri"></a>
 </p>
 
-**English** &nbsp;|&nbsp; [简体中文](README.zh.md)
+<p align="center">
+  <strong>English</strong> &nbsp;|&nbsp; <a href="README.zh.md">简体中文</a>
+</p>
 
 <p align="center">
   <img alt="demo" src="https://github.com/user-attachments/assets/87ba980c-492b-4bd2-af75-e14faa3cec68" width="80%" style="border-radius: 8px;" />

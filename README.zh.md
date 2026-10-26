@@ -8,7 +8,7 @@
   <em>AI 辅助小说创作桌面软件 —— 角色管理、世界观构建、章节写作、伏笔追踪、时间线，内置 AI 写作助手。</em>
 </p>
 
-<p>
+<p align="center">
   <a href="https://mythpen.looplooptech.com">官网</a> ·
   <a href="https://mythpen.looplooptech.com/#download">下载</a>
 </p>
@@ -21,7 +21,9 @@
   <a href="https://tauri.app"><img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=white" alt="Tauri"></a>
 </p>
 
-[English](README.md) &nbsp;|&nbsp; **简体中文**
+<p align="center">
+  <a href="README.md">English</a> &nbsp;|&nbsp; <strong>简体中文</strong>
+</p>
 
 <p align="center">
   <img alt="demo" src="https://github.com/user-attachments/assets/87ba980c-492b-4bd2-af75-e14faa3cec68" width="80%" style="border-radius: 8px;" />
@@ -36,7 +38,7 @@
 - **小说管理** — 角色、世界观、章节、伏笔、时间线与人物关系，一站式管理。
 - **本地优先** — 数据存储在 `~/.mythpen/` 下的 SQLite 中，无需云端，隐私安全。
 - **富文本编辑器** — 支持快捷键加粗、斜体、下划线，章节自动保存到本地。
-- **跨平台** — 基于 Tauri v2 的原生桌面体验，同时支持浏览器开发模式。
+- **跨平台** — 基于 Tauri v2 的原生桌面体验，同时支持 Mac Windows Linux。
 
 ## 环境要求
 
