@@ -21,6 +21,11 @@ if (!repo || !tag) {
 
 const version = tag.replace(/^v/, '')
 
+// The updater looks up `{os}-{arch}-{bundle-type}` first and only falls back to
+// `{os}-{arch}`. Linux ships three install formats that cannot be swapped for
+// one another (a deb install rejects an AppImage and vice versa), so each gets
+// its own manifest entry. The generic `linux-x86_64` entry stays for clients
+// built before the bundle-type aware lookup and points at the AppImage.
 const PLATFORMS = [
   {
     key: 'darwin-aarch64',
@@ -31,6 +36,21 @@ const PLATFORMS = [
     key: 'windows-x86_64',
     artifact: 'Mythpen-Windows-x86_64',
     isUpdaterArtifact: (name) => name.endsWith('-setup.exe'),
+  },
+  {
+    key: 'linux-x86_64-appimage',
+    artifact: 'Mythpen-Linux-x86_64',
+    isUpdaterArtifact: (name) => name.endsWith('.AppImage'),
+  },
+  {
+    key: 'linux-x86_64-deb',
+    artifact: 'Mythpen-Linux-x86_64',
+    isUpdaterArtifact: (name) => name.endsWith('.deb'),
+  },
+  {
+    key: 'linux-x86_64-rpm',
+    artifact: 'Mythpen-Linux-x86_64',
+    isUpdaterArtifact: (name) => name.endsWith('.rpm'),
   },
   {
     key: 'linux-x86_64',
@@ -49,6 +69,12 @@ function walk(dir) {
   return files
 }
 
+const filesByDir = new Map()
+function filesIn(dir) {
+  if (!filesByDir.has(dir)) filesByDir.set(dir, walk(dir))
+  return filesByDir.get(dir)
+}
+
 const platforms = {}
 for (const platform of PLATFORMS) {
   const dir = join(root, platform.artifact)
@@ -57,8 +83,7 @@ for (const platform of PLATFORMS) {
     process.exit(1)
   }
 
-  const files = walk(dir)
-  const artifact = files.find((file) => platform.isUpdaterArtifact(basename(file)))
+  const artifact = filesIn(dir).find((file) => platform.isUpdaterArtifact(basename(file)))
   if (!artifact) {
     console.error(`No updater artifact (${platform.key}) found in ${dir}`)
     process.exit(1)
