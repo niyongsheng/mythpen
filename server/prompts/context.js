@@ -3,13 +3,14 @@
  * from the database and formats it for injection into system prompts.
  */
 const db = require('../db');
+const { STYLE_LABELS } = require('../styles');
 const { languageName } = require('../languages');
 const { chapterHeading } = require('../titles');
 
 const GENRE_LABELS = {
-  'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情',
-  'history': '历史', 'urban': '都市', 'power-fantasy': '爽文',
-  'biography': '传记', 'other': '其他',
+  'sci-fi': '科幻', 'fantasy': '玄幻', 'xianxia': '仙侠', 'wuxia': '武侠',
+  'romance': '言情', 'history': '历史', 'urban': '都市', 'mystery': '悬疑',
+  'game': '游戏', 'biography': '传记', 'other': '其他',
 };
 
 const MODE_LABELS = {
@@ -25,6 +26,16 @@ const PHASE_LABELS = {
 
 const CHARACTER_ROLE_LABELS = { major: '主角', minor: '配角', extra: '客串' };
 
+// Concise style directives injected into the shared project context.
+const STYLE_GUIDANCE = {
+  dark: '暗黑：基调压抑，保留道德灰度，避免廉价圆满。',
+  realistic: '写实：细节可信、人物动机落地，避免悬浮设定与过度巧合。',
+  healing: '治愈：冲突克制，情绪温暖，重视日常细节与关系修复。',
+  poetic: '诗意：重视意象、节奏与留白，允许适度的抒情性描写。',
+  'power-fantasy': '爽文：小爽点密集、大爽点集中在卷末高潮，避免连续章节堆叠高强度爽点。',
+  light: '轻快：节奏明快，语言轻松，善用反差与幽默，少做沉重铺陈。',
+};
+
 // `toolHints: false` keeps tool names out of the prompt entirely — required for
 // tool-less requests such as /api/ai/continue, where mentioning them makes the
 // model emit tool-call markup as literal text.
@@ -34,6 +45,10 @@ function buildProjectContext(projectName, { toolHints = true } = {}) {
     const meta = {};
     pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
     const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
+    const styles = pdb.prepare('SELECT style FROM project_styles').all().map(s => s.style);
+    // 爽文 is a writing style; the payoff board and tools are bound to it.
+    // Fall back to the legacy meta flag for projects opened before migration.
+    const powerFantasy = styles.includes('power-fantasy') || meta.power_fantasy === '1';
 
     // Keep prompts bounded even for very large imported works. The AI can
     // page through the full list with list_chapters / get_chapter.
@@ -60,13 +75,19 @@ function buildProjectContext(projectName, { toolHints = true } = {}) {
     ).all();
     // Include released payoffs too: both writing and payoff design need the
     // existing rhythm to avoid clustering new payoffs on the same chapters.
-    const payoffs = genres.includes('power-fantasy')
+    const payoffs = powerFantasy
       ? pdb.prepare(
           "SELECT * FROM payoff_points WHERE status != 'abandoned' ORDER BY COALESCE(NULLIF(payoff_chapter, 0), 999999), created_at LIMIT 40"
         ).all()
       : [];
 
     const genreStr = genres.map(g => GENRE_LABELS[g] || g).join('、') || '未设定';
+    const styleStr = styles.map(s => STYLE_LABELS[s] || s).join('、') || '未设定';
+    const styleGuide = styles
+      .map(s => STYLE_GUIDANCE[s])
+      .filter(Boolean)
+      .map(line => `- ${line}`)
+      .join('\n');
     const modeStr = MODE_LABELS[meta.mode] || meta.mode || '中篇';
     const langStr = languageName(meta.language);
     const phaseStr = PHASE_LABELS[meta.workflow_phase] || meta.workflow_phase || '选题';
@@ -83,7 +104,7 @@ function buildProjectContext(projectName, { toolHints = true } = {}) {
 
     const charNote = totalChars > chars.length ? `（共 ${totalChars} 个，仅列出前 ${chars.length} 个）` : '';
 
-    const payoffSection = genres.includes('power-fantasy')
+    const payoffSection = powerFantasy
       ? `
 
 爽点排期（按释放章节排序，含已释放）:
@@ -93,6 +114,7 @@ ${payoffs.length ? payoffs.map(p => `[${p.status}/${p.type}/强度${p.intensity}
     return `
 项目: ${meta.name || projectName}
 创作类型: ${genreStr}
+写作风格: ${styleStr}${styleGuide ? `\n风格要求:\n${styleGuide}` : ''}
 篇幅模式: ${modeStr}
 写作语言: ${langStr}
 当前阶段: ${phaseStr}

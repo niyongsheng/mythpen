@@ -4,6 +4,8 @@ const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
+const { ALLOWED_STYLES } = require('../styles');
+const { ALLOWED_SETTING_CATEGORIES } = require('../settings');
 const { normalizeLanguageCode } = require('../languages');
 const { chapterHeading, volumeHeading, stripLeadingChapterHeading } = require('../titles');
 
@@ -44,19 +46,22 @@ router.get('/projects', (req, res) => {
         db2.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
         const chCount = db2.prepare('SELECT COUNT(*) as c FROM chapters').get().c;
         const genres = db2.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
+        const styles = db2.prepare('SELECT style FROM project_styles').all().map(s => s.style);
         const wordCount = parseInt(meta.word_count || '0');
-        const iconMap = { 'sci-fi': 'Rocket', 'fantasy': 'Wand', 'romance': 'Heart', 'history': 'Landmark', 'urban': 'Building', 'power-fantasy': 'Zap', 'biography': 'BookOpen', 'other': 'Scroll' };
-        const iconName = genres.map(g => iconMap[g] || 'BookOpen').join(' ');
-        const genreLabels = { 'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情', 'history': '历史', 'urban': '都市', 'power-fantasy': '爽文', 'biography': '传记', 'other': '其他' };
+        const iconMap = { 'sci-fi': 'Rocket', 'fantasy': 'Wand', 'xianxia': 'Mountain', 'wuxia': 'Swords', 'romance': 'Heart', 'history': 'Landmark', 'urban': 'Building', 'mystery': 'Fingerprint', 'game': 'Gamepad2', 'biography': 'BookOpen', 'other': 'Scroll' };
+        // A project can carry several genres; the icon shows the first one.
+        const iconName = iconMap[genres[0]] || 'BookOpen';
         return {
-          id: r.id, name: r.name, iconName: iconName || 'BookOpen',
-          genres: genres.map(g => genreLabels[g] || g),
+          id: r.id, name: r.name, iconName,
+          genres,
+          styles,
+          powerFantasy: styles.includes('power-fantasy'),
           wordCount, chapterCount: chCount, lastOpened: r.last_opened,
           mode: meta.mode || 'medium-novel',
           status: wordCount > 30000 ? 'writing' : wordCount > 5000 ? 'inProgress' : 'new',
         };
       } catch (e) {
-        return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: 'unknown' };
+        return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], styles: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: 'unknown' };
       }
     })
     .filter(Boolean);
@@ -64,7 +69,21 @@ router.get('/projects', (req, res) => {
 });
 
 router.post('/projects', (req, res) => {
-  const { name, mode = 'medium-novel', language = 'zh', genres = ['other'] } = req.body || {};
+  const {
+    name,
+    mode = 'medium-novel',
+    language = 'zh',
+    genres: rawGenres = ['other'],
+    styles: rawStyles = [],
+    powerFantasy,
+  } = req.body || {};
+  const genreList = Array.isArray(rawGenres) ? rawGenres : ['other'];
+  // 爽文 is a writing style now; accept the legacy genre/flag values.
+  const genres = genreList.filter((genre) => genre !== 'power-fantasy');
+  const styles = [...new Set((Array.isArray(rawStyles) ? rawStyles : []).filter((style) => ALLOWED_STYLES.has(style)))];
+  if ((powerFantasy === true || genreList.includes('power-fantasy')) && !styles.includes('power-fantasy')) {
+    styles.push('power-fantasy');
+  }
   const writingLanguage = normalizeLanguageCode(language);
   const nameError = db.validateProjectName(name);
   if (nameError) {
@@ -81,8 +100,13 @@ router.post('/projects', (req, res) => {
   const pdb = db.openProjectDb(filePath);
   db.registerRecentProject(name, filePath);
   try {
-    db.initProjectMeta(name, { mode, language: writingLanguage });
+    db.initProjectMeta(name, {
+      mode,
+      language: writingLanguage,
+      power_fantasy: styles.includes('power-fantasy') ? '1' : '0',
+    });
     db.initProjectGenres(name, genres);
+    db.initProjectStyles(name, styles);
 
     // Default volume
     pdb.prepare("INSERT INTO volumes (id, sort_order, title, summary) VALUES (1, 1, '第一卷', '')").run();
@@ -93,7 +117,7 @@ router.post('/projects', (req, res) => {
     throw err;
   }
 
-  res.json({ name, filePath, mode, language: writingLanguage, genres });
+  res.json({ name, filePath, mode, language: writingLanguage, genres, styles });
 });
 
 router.get('/projects/:name', (req, res) => {
@@ -109,7 +133,8 @@ router.get('/projects/:name', (req, res) => {
   const meta = {};
   pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
   const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
-  res.json({ ...meta, genres, filePath });
+  const styles = pdb.prepare('SELECT style FROM project_styles').all().map(s => s.style);
+  res.json({ ...meta, genres, styles, filePath });
 });
 
 router.delete('/projects/:name', (req, res) => {
@@ -378,22 +403,44 @@ router.delete('/:project/world/:id', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.get('/:project/science', (req, res) => {
-  const rows = db.projectQuery(project(req.params.project), 'SELECT * FROM science_entries ORDER BY label, name');
+  const rows = db.projectQuery(
+    project(req.params.project),
+    'SELECT * FROM science_entries ORDER BY sort_order, category, label, name',
+  );
   res.json(rows);
 });
 
 router.post('/:project/science', (req, res) => {
-  const { label, name, description = '', references = '' } = req.body || {};
+  const { label = 'known', name, description = '', references = '', category = '', sort_order = 0 } = req.body || {};
   const id = randomUUID();
   db.projectExecute(project(req.params.project),
-    'INSERT INTO science_entries (id, label, name, description, "references") VALUES (?, ?, ?, ?, ?)',
-    [id, label, name, description, references]
+    `INSERT INTO science_entries (id, label, name, description, "references", category, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      label,
+      name,
+      description,
+      references,
+      ALLOWED_SETTING_CATEGORIES.has(category) ? category : '',
+      Number(sort_order) || 0,
+    ]
   );
   res.status(201).json({ id, name });
 });
 
 router.put('/:project/science/:id', (req, res) => {
-  const changes = updateRecord(project(req.params.project), 'science_entries', req.params.id, req.body, ['label', 'name', 'description'], true);
+  const body = { ...(req.body || {}) };
+  if (body.category !== undefined && !ALLOWED_SETTING_CATEGORIES.has(body.category)) body.category = '';
+  if (body.sort_order !== undefined) body.sort_order = Number(body.sort_order) || 0;
+  const changes = updateRecord(
+    project(req.params.project),
+    'science_entries',
+    req.params.id,
+    body,
+    ['label', 'name', 'description', 'references', 'category', 'sort_order'],
+    true,
+  );
   if (changes === null) return res.status(400).json({ error: { message: '没有要更新的字段' } });
   if (changes === 0) return res.status(404).json({ error: { message: '条目不存在' } });
   res.json({ success: true });
@@ -504,6 +551,78 @@ router.put('/:project/payoffs/:id', (req, res) => {
 router.delete('/:project/payoffs/:id', (req, res) => {
   const changes = db.projectExecute(project(req.params.project), 'DELETE FROM payoff_points WHERE id = ?', [req.params.id]);
   if (changes === 0) return res.status(404).json({ error: { message: '爽点不存在' } });
+  res.json({ success: true });
+});
+
+// ═══════════════════════════════════════════
+// CLUE BOARD (线索板)
+// ═══════════════════════════════════════════
+
+const CLUE_KINDS = ['clue', 'red-herring', 'deduction', 'question'];
+
+function chapterIdByNum(projectName, num) {
+  const value = Number(num);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return db.projectGet(projectName, 'SELECT id FROM chapters WHERE num = ?', [value])?.id ?? null;
+}
+
+router.get('/:project/clues', (req, res) => {
+  const { status } = req.query;
+  let sql = `SELECT c.*, ch.num AS related_chapter_num
+             FROM clue_board c
+             LEFT JOIN chapters ch ON ch.id = c.related_chapter_id`;
+  if (status === 'unresolved') sql += ' WHERE c.resolved = 0';
+  else if (status === 'resolved') sql += ' WHERE c.resolved = 1';
+  sql += ' ORDER BY c.resolved, c.created_at DESC';
+  res.json(db.projectQuery(project(req.params.project), sql));
+});
+
+router.post('/:project/clues', (req, res) => {
+  const { title, description = '', kind = 'clue', related_chapter_num, resolved = false } = req.body || {};
+  if (!title) return res.status(400).json({ error: { message: '线索标题不能为空' } });
+  const id = randomUUID();
+  const resolvedFlag = resolved ? 1 : 0;
+  db.projectExecute(project(req.params.project),
+    `INSERT INTO clue_board (id, title, description, kind, related_chapter_id, resolved, resolved_at)
+     VALUES (?, ?, ?, ?, ?, ?, ${resolvedFlag ? "datetime('now')" : 'NULL'})`,
+    [
+      id,
+      title,
+      description,
+      CLUE_KINDS.includes(kind) ? kind : 'clue',
+      chapterIdByNum(project(req.params.project), related_chapter_num),
+      resolvedFlag,
+    ]
+  );
+  res.status(201).json({ id, title });
+});
+
+router.put('/:project/clues/:id', (req, res) => {
+  const pn = project(req.params.project);
+  const { title, description, kind, related_chapter_num, resolved } = req.body || {};
+  const fields = [];
+  const params = [];
+  if (title !== undefined) { fields.push('title = ?'); params.push(title); }
+  if (description !== undefined) { fields.push('description = ?'); params.push(description); }
+  if (kind !== undefined) { fields.push('kind = ?'); params.push(CLUE_KINDS.includes(kind) ? kind : 'clue'); }
+  if (related_chapter_num !== undefined) {
+    fields.push('related_chapter_id = ?');
+    params.push(chapterIdByNum(pn, related_chapter_num));
+  }
+  if (resolved !== undefined) {
+    fields.push('resolved = ?', resolved ? "resolved_at = datetime('now')" : 'resolved_at = NULL');
+    params.push(resolved ? 1 : 0);
+  }
+  if (fields.length === 0) return res.status(400).json({ error: { message: '没有要更新的字段' } });
+  params.push(req.params.id);
+  const changes = db.projectExecute(pn, `UPDATE clue_board SET ${fields.join(', ')} WHERE id = ?`, params);
+  if (changes === 0) return res.status(404).json({ error: { message: '线索不存在' } });
+  res.json({ success: true });
+});
+
+router.delete('/:project/clues/:id', (req, res) => {
+  const changes = db.projectExecute(project(req.params.project), 'DELETE FROM clue_board WHERE id = ?', [req.params.id]);
+  if (changes === 0) return res.status(404).json({ error: { message: '线索不存在' } });
   res.json({ success: true });
 });
 
@@ -707,6 +826,7 @@ router.get('/:project/stats', (req, res) => {
       (SELECT COALESCE(SUM(output_tokens), 0) FROM token_usage) AS tokenOutput
   `) || {};
   const genres = db.projectQuery(pn, 'SELECT genre FROM project_genres').map(g => g.genre);
+  const styles = db.projectQuery(pn, 'SELECT style FROM project_styles').map(s => s.style);
 
   // Target words: custom override or fallback to project mode default
   const metaRows = db.projectQuery(pn, "SELECT key, value FROM project_meta WHERE key IN ('mode', 'target_words')");
@@ -737,6 +857,8 @@ router.get('/:project/stats', (req, res) => {
     ...stats,
     volumes,
     genres,
+    styles,
+    powerFantasy: styles.includes('power-fantasy'),
     targetWords,
     chapters: db.projectQuery(pn, 'SELECT id, num, title, word_count, status FROM chapters ORDER BY num'),
     dailyWords,

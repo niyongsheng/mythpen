@@ -47,7 +47,7 @@ ${context}
 
 ### 第一步 · 了解项目
 
-用 list_characters / list_foreshadows / list_world / get_chapter(前一章) 了解已有设定和前文。爽文项目还要用 list_payoffs 查看待铺垫/待释放的爽点。
+用 list_characters / list_foreshadows / list_world / get_chapter(前一章) 了解已有设定和前文。开启爽文模式的项目还要用 list_payoffs 查看待铺垫/待释放的爽点。
 
 ---
 
@@ -71,7 +71,7 @@ ${context}
 注意事项：
 - 与上一章结尾无缝衔接
 - 推动主线或支线情节
-- 爽文项目要按爽点规划推进：该铺垫的爽点用 update_payoff 标记 building，本章释放的爽点标记 released；保持小爽点密集、大爽点集中在卷末高潮，避免连续章节堆叠高强度爽点
+- 开启爽文模式的项目要按爽点规划推进：该铺垫的爽点用 update_payoff 标记 building，本章释放的爽点标记 released；保持小爽点密集、大爽点集中在卷末高潮，避免连续章节堆叠高强度爽点
 - 角色行为符合设定
 - **正文开头不要重复章节标题**（不要写「# 第X章 …」「第三章 …」之类的标题行），标题由系统界面单独显示
 

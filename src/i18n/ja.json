@@ -22,7 +22,8 @@
     "dashboard": "プロジェクト概要",
     "characters": "キャラクター",
     "world": "世界観",
-    "science": "科学設定",
+    "science": "設定体系",
+    "clue": "手がかりボード",
     "outline_page": "アウトライン",
     "foreshadow": "伏線管理",
     "payoff": "爽快ポイント",
@@ -123,6 +124,16 @@
     "defaultName": "未踏の道",
     "namePlaceholder": "小説のタイトルを入力...",
     "genresLabel": "創作ジャンル（複数選択可）",
+    "styleLabel": "作風",
+    "style": {
+      "dark": "ダーク",
+      "realistic": "リアリズム",
+      "healing": "癒し",
+      "poetic": "詩的",
+      "power-fantasy": "パワーファンタジー",
+      "light": "軽快"
+    },
+    "styleHint": "作風は AI の書き方に影響し、一部は専用ボードを有効にします",
     "modeLabel": "執筆モード",
     "shortStory": "短編（3万字以下）",
     "mediumNovel": "中編（5〜10万字）",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "SF",
       "fantasy": "ファンタジー",
+      "xianxia": "仙侠",
+      "wuxia": "武侠",
       "romance": "恋愛",
       "history": "歴史",
       "urban": "都市",
-      "power-fantasy": "パワーファンタジー",
+      "mystery": "ミステリー",
+      "game": "ゲーム",
       "biography": "伝記",
       "other": "その他"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "執筆を続ける",
     "export": "エクスポート",
     "exportAll": "すべてエクスポート",
-    "scienceSettings": "科学設定",
+    "scienceSettings": "設定体系",
     "newSetting": "新しい設定",
     "narrativeMemory": "ナラティブメモリー",
     "semanticSearch": "セマンティック検索",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "伏線管理",
     "cardVolumes": "巻構成",
     "cardClueBoard": "手がかりボード",
+    "clueBoard": "手がかりボード",
     "cardNarrative": "ナラティブ記録",
     "cardAiUsage": "AI使用量",
     "appearance": "外見",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "SF",
       "fantasy": "ファンタジー",
+      "xianxia": "仙侠",
+      "wuxia": "武侠",
       "romance": "恋愛",
       "history": "歴史",
       "urban": "都市",
-      "power-fantasy": "パワーファンタジー",
+      "mystery": "ミステリー",
+      "game": "ゲーム",
       "biography": "伝記",
       "other": "その他"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "文字",
     "switchPhaseTitle": "プロジェクトフェーズの切り替え",
     "confirmSwitch": "切り替えを確定",
-    "switchPhaseBody": "フェーズを「{phase}」に切り替えますか？"
+    "switchPhaseBody": "フェーズを「{phase}」に切り替えますか？",
+    "writingStyles": "作風"
   },
   "characters": {
     "namePlaceholder": "キャラクター名を入力",
@@ -599,6 +618,51 @@
     "description": "説明",
     "namePlaceholder": "設定名",
     "descriptionPlaceholder": "科学設定の詳細な説明..."
+  },
+  "clue": {
+    "titleField": "手がかりタイトル",
+    "titlePlaceholder": "例：被害者の手にあった切符",
+    "descriptionField": "説明",
+    "descriptionPlaceholder": "この手がかりが示すもの",
+    "kindField": "種類",
+    "kind": {
+      "clue": "手がかり",
+      "red-herring": "ミスリード",
+      "deduction": "推理結論",
+      "question": "未解決の疑問"
+    },
+    "relatedChapterField": "関連章",
+    "relatedChapterPlaceholder": "章番号（任意）",
+    "chapterRef": "第 {n} 章",
+    "statusField": "状態",
+    "unresolved": "未解決",
+    "resolved": "解決済み",
+    "statTotal": "総件数",
+    "statUnresolved": "未解決",
+    "statResolved": "解決済み",
+    "statRedHerring": "ミスリード",
+    "empty": "まだ項目がありません"
+  },
+  "setting": {
+    "categoryLabel": "カテゴリ",
+    "sortOrder": "並び順",
+    "sortOrderHint": "数値が小さいほど上に表示",
+    "uncategorized": "未分類",
+    "empty": "項目がありません",
+    "category": {
+      "realm": "境界",
+      "technique": "功法",
+      "artifact": "法宝",
+      "sect": "宗門",
+      "martial-art": "武芸",
+      "school": "門派",
+      "weapon": "兵器",
+      "system": "システム",
+      "skill": "スキル",
+      "equipment": "装備",
+      "dungeon": "ダンジョン",
+      "other": "その他"
+    }
   },
   "timeline": {
     "yearLabel": "年",

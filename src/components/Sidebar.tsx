@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCw,
   ScrollText,
+  Search,
   ShieldCheck,
   Sparkles,
   Users,
@@ -43,16 +44,31 @@ interface NavItem {
   route: string
   /** Only show for projects with one of these genres. */
   genres?: string[]
+  /** Only show for projects with one of these writing styles. */
+  styles?: string[]
+}
+
+function isItemVisible(item: NavItem, genres: string[], styles: string[]): boolean {
+  const genreOk = !item.genres || item.genres.some((genre) => genres.includes(genre))
+  const styleOk = !item.styles || item.styles.some((style) => styles.includes(style))
+  return genreOk && styleOk
 }
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: 'LayoutDashboard', route: 'page-dashboard' },
   { id: 'characters', labelKey: 'sidebar.characters', icon: 'Users', route: 'page-characters' },
   { id: 'world', labelKey: 'sidebar.world', icon: 'Globe', route: 'page-world' },
-  { id: 'science', labelKey: 'sidebar.science', icon: 'FlaskConical', route: 'page-science', genres: ['sci-fi'] },
+  {
+    id: 'science',
+    labelKey: 'sidebar.science',
+    icon: 'FlaskConical',
+    route: 'page-science',
+    genres: ['sci-fi', 'fantasy', 'xianxia', 'wuxia', 'game'],
+  },
   { id: 'outline_page', labelKey: 'sidebar.outline_page', icon: 'ScrollText', route: 'page-outline' },
   { id: 'foreshadow', labelKey: 'sidebar.foreshadow', icon: 'Link2', route: 'page-foreshadow' },
-  { id: 'payoff', labelKey: 'sidebar.payoff', icon: 'Sparkles', route: 'page-payoff', genres: ['power-fantasy'] },
+  { id: 'clue', labelKey: 'sidebar.clue', icon: 'Search', route: 'page-clue', genres: ['mystery'] },
+  { id: 'payoff', labelKey: 'sidebar.payoff', icon: 'Sparkles', route: 'page-payoff', styles: ['power-fantasy'] },
   { id: 'memory', labelKey: 'sidebar.memory', icon: 'Brain', route: 'page-memory' },
   { id: 'relations', labelKey: 'sidebar.relations', icon: 'HeartHandshake', route: 'page-relations' },
   { id: 'timeline', labelKey: 'sidebar.timeline', icon: 'CalendarDays', route: 'page-timeline' },
@@ -68,6 +84,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   FlaskConical,
   ScrollText,
   Link2,
+  Search,
   Sparkles,
   Brain,
   HeartHandshake,
@@ -132,19 +149,18 @@ export function Sidebar() {
     })
   }
 
-  // Load sidebar items filtered by project genre
+  // Load sidebar items filtered by project genre and writing style
   const projectGenres = stats?.genres ?? []
-  const sidebarItems = NAV_ITEMS.filter(
-    (item) => !item.genres || item.genres.some((genre) => projectGenres.includes(genre)),
-  )
+  const projectStyles = stats?.styles ?? []
+  const sidebarItems = NAV_ITEMS.filter((item) => isItemVisible(item, projectGenres, projectStyles))
 
-  // Switching to a project without the required genre must not leave the user
-  // on a page whose nav entry is now hidden (e.g. 爽点/科学设定).
+  // Switching to a project without the required genre/style must not leave the
+  // user on a page whose nav entry is now hidden (e.g. 爽点/线索板/设定体系).
   useEffect(() => {
-    const genres = stats?.genres
-    if (!genres) return
+    if (!stats) return
     const hidden = NAV_ITEMS.some(
-      (item) => item.route === activePage && item.genres && !item.genres.some((genre) => genres.includes(genre)),
+      (item) =>
+        item.route === activePage && !isItemVisible(item, stats.genres ?? [], stats.styles ?? []),
     )
     if (hidden) setActivePage('page-dashboard')
   }, [stats, activePage, setActivePage])

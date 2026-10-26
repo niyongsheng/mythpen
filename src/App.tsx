@@ -13,6 +13,7 @@ import { track } from '@/lib/analytics'
 import { refreshAllData } from '@/lib/dataEvents'
 import { About } from '@/pages/About'
 import { Characters } from '@/pages/Characters'
+import { ClueBoard } from '@/pages/ClueBoard'
 import { Consistency } from '@/pages/Consistency'
 import { Dashboard } from '@/pages/Dashboard'
 import { ExportPage } from '@/pages/ExportPage'
@@ -40,6 +41,7 @@ const PAGES: Record<string, React.ReactNode> = {
   'page-world': <World />,
   'page-outline': <Outline />,
   'page-foreshadow': <Foreshadows />,
+  'page-clue': <ClueBoard />,
   'page-payoff': <Payoffs />,
   'page-relations': <Relations />,
   'page-export': <ExportPage />,

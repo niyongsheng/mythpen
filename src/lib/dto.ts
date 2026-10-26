@@ -4,7 +4,17 @@
  * The server speaks snake_case; the UI types are camelCase. Keep the
  * translation at this boundary so pages and stores never read raw rows.
  */
-import type { Chapter, Character, CharacterRelation, Foreshadow, Memory, PayoffPoint, ProjectStats } from '@/types'
+import type {
+  Chapter,
+  Character,
+  CharacterRelation,
+  Clue,
+  Foreshadow,
+  Memory,
+  PayoffPoint,
+  ProjectStats,
+  ScienceEntry,
+} from '@/types'
 
 export function toChapter(row: any): Chapter {
   return {
@@ -69,6 +79,32 @@ export function toPayoffPoint(row: any): PayoffPoint {
     intensity: row.intensity ?? 3,
     setupChapter: row.setup_chapter ?? 0,
     payoffChapter: row.payoff_chapter ?? 0,
+  }
+}
+
+export function toClue(row: any): Clue {
+  return {
+    id: row.id,
+    title: row.title ?? '',
+    description: row.description ?? '',
+    kind: row.kind ?? 'clue',
+    relatedChapterId: row.related_chapter_id ?? undefined,
+    relatedChapterNum: row.related_chapter_num ?? undefined,
+    resolved: row.resolved === 1 || row.resolved === true,
+    resolvedAt: row.resolved_at ?? undefined,
+    createdAt: row.created_at ?? undefined,
+  }
+}
+
+export function toScienceEntry(row: any): ScienceEntry {
+  return {
+    id: row.id,
+    label: row.label ?? 'known',
+    category: row.category ?? '',
+    sortOrder: row.sort_order ?? 0,
+    name: row.name ?? '',
+    description: row.description ?? '',
+    references: row.references ?? '',
   }
 }
 

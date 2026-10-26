@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Select } from '@/components/Select'
 import { useT } from '@/hooks/useT'
 
-interface Field {
+export interface Field {
   key: string
   label: string
   type?: 'text' | 'textarea' | 'select' | 'number'

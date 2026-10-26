@@ -53,13 +53,15 @@ const METADATA_SYSTEM_PROMPT = `你是一位资深出版编辑。请根据作品
   "description": "300 字以内的作品简介",
   "language": "zh",
   "genres": ["sci-fi"],
+  "powerFantasy": false,
   "mode": "medium-novel",
   "synopsis": "800 字以内的故事梗概，覆盖主线与当前进展"
 }
 
 ## 规则
 
-- genres 只能从以下值中选 1–3 个：sci-fi, fantasy, romance, history, urban, power-fantasy, biography, other。
+- genres 只能从以下值中选 1–3 个：sci-fi, fantasy, xianxia, wuxia, romance, history, urban, mystery, game, biography, other。
+- powerFantasy 只能是 true / false：判断作品是否为爽文（以打脸、逆袭、装逼、升级突破等爽点释放为核心驱动力）。
 - mode 只能是 short-story / medium-novel / long-novel 之一。
 - language 只能是 zh（简体中文）、zh-TW（繁体中文）、en（英语）、ja（日语）、ko（韩语）、fr（法语）、es（西班牙语）、ru（俄语）之一，必须与正文语言一致。
 - author 不确定时填「佚名」，不要编造。

@@ -12,6 +12,7 @@ interface ProjectSummary {
   name: string
   iconName: string
   genres: string[]
+  styles?: string[]
   wordCount: number
   chapterCount: number
   lastOpened: string
@@ -35,11 +36,11 @@ interface ProjectState {
   setPhase: (project: string, phase: WorkflowPhase) => Promise<void>
   createProject: (
     name: string,
-    opts?: { mode?: string; language?: WritingLanguage; genres?: string[] },
+    opts?: { mode?: string; language?: WritingLanguage; genres?: string[]; styles?: string[] },
   ) => Promise<void>
   importProject: (
     name: string,
-    opts: { mode?: string; language?: WritingLanguage; genres?: string[] },
+    opts: { mode?: string; language?: WritingLanguage; genres?: string[]; styles?: string[] },
     source: ImportSource,
     handlers?: ImportSseHandlers,
     signal?: AbortSignal,
@@ -113,11 +114,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
   },
 
   createProject: async (name, opts = {}) => {
-    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'] } = opts
+    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [] } = opts
     set({ loading: true, error: null })
     try {
       // 1. Create the project
-      await projectsApi.create({ name, mode, language, genres })
+      await projectsApi.create({ name, mode, language, genres, styles })
 
       // 2. Auto-create Chapter 1 so user can start writing immediately
       await chaptersApi.create(name, { title: t('chapter.firstChapterTitle') })
@@ -125,7 +126,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // 3. Reload project list, select it, load chapters & navigate to Writing
       await activateProject(name, 'idea')
 
-      track('project_created', { mode, language, genres: genres.join(',') })
+      track('project_created', { mode, language, genres: genres.join(','), styles: styles.join(',') })
     } catch (err) {
       set({ error: (err as any).message || t('project.createFailed'), loading: false })
       throw err
@@ -133,7 +134,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   },
 
   importProject: async (name, opts, source, handlers, signal) => {
-    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'] } = opts
+    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [] } = opts
     set({ loading: true, error: null })
     try {
       // The server analyzes the whole book and creates the project atomically.
@@ -143,6 +144,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
           mode,
           language,
           genres,
+          styles,
           source: {
             fileName: source.fileName,
             format: source.format,

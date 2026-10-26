@@ -57,9 +57,26 @@ export interface WorldEntry {
 export interface ScienceEntry {
   id: string
   label: 'known' | 'extrapolation' | 'hypothesis'
+  category?: string
+  sortOrder?: number
   name: string
   description: string
   references: string
+}
+
+// ─── Clue Board (线索板) ───
+export type ClueKind = 'clue' | 'red-herring' | 'deduction' | 'question'
+
+export interface Clue {
+  id: string
+  title: string
+  description: string
+  kind: ClueKind
+  relatedChapterId?: number
+  relatedChapterNum?: number
+  resolved: boolean
+  resolvedAt?: string
+  createdAt?: string
 }
 
 // ─── Foreshadow ───
@@ -188,6 +205,7 @@ export interface ProjectStats {
   clueUnresolved?: number
   clueResolved?: number
   genres?: string[]
+  styles?: string[]
   tokenInput: number
   tokenOutput: number
   chapters: { id: number; num: number; title: string; wordCount: number; status: string }[]

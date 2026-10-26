@@ -3,7 +3,17 @@
 // Tauri production: sidecar server runs on 127.0.0.1:3001
 
 import { t } from '@/i18n'
-import { toChapter, toCharacter, toForeshadow, toMemory, toPayoffPoint, toRelation, toStats } from './dto'
+import {
+  toChapter,
+  toCharacter,
+  toClue,
+  toForeshadow,
+  toMemory,
+  toPayoffPoint,
+  toRelation,
+  toScienceEntry,
+  toStats,
+} from './dto'
 import { isTauri } from './runtime'
 
 const API_BASE = isTauri ? 'http://127.0.0.1:3001/api' : '/api'
@@ -155,13 +165,29 @@ export const worldApi = {
 // ─── Science ───
 
 export const scienceApi = {
-  list: (project: string) => request(`/${encodeURIComponent(project)}/science`),
+  list: async (project: string) =>
+    ((await request(`/${encodeURIComponent(project)}/science`)) as any[]).map(toScienceEntry),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/science`, { method: 'POST', body: data }),
   update: (project: string, id: string, data: any) =>
     request(`/${encodeURIComponent(project)}/science/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
   remove: (project: string, id: string) =>
     request(`/${encodeURIComponent(project)}/science/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+}
+
+// ─── Clue Board (线索板) ───
+
+export const cluesApi = {
+  list: async (project: string, status?: string) => {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+    return ((await request(`/${encodeURIComponent(project)}/clues${qs}`)) as any[]).map(toClue)
+  },
+  create: (project: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/clues`, { method: 'POST', body: data }),
+  update: (project: string, id: string, data: any) =>
+    request(`/${encodeURIComponent(project)}/clues/${encodeURIComponent(id)}`, { method: 'PUT', body: data }),
+  remove: (project: string, id: string) =>
+    request(`/${encodeURIComponent(project)}/clues/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 // ─── Foreshadows ───

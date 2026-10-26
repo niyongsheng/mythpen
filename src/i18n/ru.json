@@ -22,7 +22,8 @@
     "dashboard": "Обзор проекта",
     "characters": "Персонажи",
     "world": "Мир",
-    "science": "Наука",
+    "science": "Система мира",
+    "clue": "Доска улик",
     "outline_page": "План",
     "foreshadow": "Сюжетные зацепки",
     "payoff": "Точки удовольствия",
@@ -123,6 +124,16 @@
     "defaultName": "Неизведанный путь",
     "namePlaceholder": "Придумайте название романа...",
     "genresLabel": "Жанр (можно несколько)",
+    "styleLabel": "Стили письма",
+    "style": {
+      "dark": "Тёмное",
+      "realistic": "Реализм",
+      "healing": "Исцеление",
+      "poetic": "Поэтичное",
+      "power-fantasy": "Пауэр-фэнтези",
+      "light": "Лёгкое и динамичное"
+    },
+    "styleHint": "Стили влияют на манеру письма ИИ; некоторые включают отдельные панели",
     "modeLabel": "Режим написания",
     "shortStory": "Рассказ (до 30 000 слов)",
     "mediumNovel": "Повесть (50 000–100 000 слов)",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "Научная фантастика",
       "fantasy": "Фэнтези",
+      "xianxia": "Сянься",
+      "wuxia": "Уся",
       "romance": "Романтика",
       "history": "Историческое",
       "urban": "Городское",
-      "power-fantasy": "Пауэр-фэнтези",
+      "mystery": "Детектив",
+      "game": "Игра",
       "biography": "Биография",
       "other": "Другое"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "Продолжить написание",
     "export": "Экспорт",
     "exportAll": "Экспортировать всё",
-    "scienceSettings": "Научные допущения",
+    "scienceSettings": "Система мира",
     "newSetting": "Новое допущение",
     "narrativeMemory": "Сюжетная память",
     "semanticSearch": "Семантический поиск",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "Сюжетные зацепки",
     "cardVolumes": "Структура томов",
     "cardClueBoard": "Доска улик",
+    "clueBoard": "Доска улик",
     "cardNarrative": "Записи повествования",
     "cardAiUsage": "Использование AI",
     "appearance": "Внешность",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "Научная фантастика",
       "fantasy": "Фэнтези",
+      "xianxia": "Сянься",
+      "wuxia": "Уся",
       "romance": "Романтика",
       "history": "Историческое",
       "urban": "Городское",
-      "power-fantasy": "Пауэр-фэнтези",
+      "mystery": "Детектив",
+      "game": "Игра",
       "biography": "Биография",
       "other": "Другое"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "слов",
     "switchPhaseTitle": "Сменить этап проекта",
     "confirmSwitch": "Подтвердить",
-    "switchPhaseBody": "Переключить этап на «{phase}»?"
+    "switchPhaseBody": "Переключить этап на «{phase}»?",
+    "writingStyles": "Стили письма"
   },
   "characters": {
     "namePlaceholder": "Введите имя персонажа",
@@ -599,6 +618,51 @@
     "description": "Описание",
     "namePlaceholder": "Название допущения",
     "descriptionPlaceholder": "Подробное описание научного допущения..."
+  },
+  "clue": {
+    "titleField": "Заголовок улики",
+    "titlePlaceholder": "напр. билет в руке жертвы",
+    "descriptionField": "Описание",
+    "descriptionPlaceholder": "На что указывает улика",
+    "kindField": "Тип",
+    "kind": {
+      "clue": "Улика",
+      "red-herring": "Ложный след",
+      "deduction": "Вывод",
+      "question": "Открытый вопрос"
+    },
+    "relatedChapterField": "Связанная глава",
+    "relatedChapterPlaceholder": "Номер главы (необязательно)",
+    "chapterRef": "Глава {n}",
+    "statusField": "Статус",
+    "unresolved": "Не раскрыто",
+    "resolved": "Раскрыто",
+    "statTotal": "Всего",
+    "statUnresolved": "Не раскрыто",
+    "statResolved": "Раскрыто",
+    "statRedHerring": "Ложные следы",
+    "empty": "Записей пока нет"
+  },
+  "setting": {
+    "categoryLabel": "Категория",
+    "sortOrder": "Порядок",
+    "sortOrderHint": "Меньшие числа показываются первыми",
+    "uncategorized": "Без категории",
+    "empty": "Записей нет",
+    "category": {
+      "realm": "Царство",
+      "technique": "Техника",
+      "artifact": "Артефакт",
+      "sect": "Секта",
+      "martial-art": "Боевое искусство",
+      "school": "Школа",
+      "weapon": "Оружие",
+      "system": "Система",
+      "skill": "Навык",
+      "equipment": "Снаряжение",
+      "dungeon": "Подземелье",
+      "other": "Другое"
+    }
   },
   "timeline": {
     "yearLabel": "Год",

@@ -22,7 +22,7 @@ let configDb;    // wrapped config database
 // ═══════════════════════════════════════════════════════════════
 
 const CONFIG_SCHEMA_VERSION = 2;
-const PROJECT_SCHEMA_VERSION = 5;
+const PROJECT_SCHEMA_VERSION = 9;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -737,6 +737,46 @@ const projectMigrations = [
       // column already exists — ignore
     }
   },
+  // v5 → v6: 爽文 is a writing style, not a genre. The payoff board stays bound
+  // to it through the power_fantasy flag, so existing projects keep their 爽点.
+  (db) => {
+    const hasPowerFantasy = db.prepare("SELECT 1 AS x FROM project_genres WHERE genre = 'power-fantasy'").get();
+    if (!hasPowerFantasy) return;
+    db.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('power_fantasy', '1')").run();
+    db.prepare("DELETE FROM project_genres WHERE genre = 'power-fantasy'").run();
+  },
+  // v6 → v7: writing styles are a multi-select dimension. Carry the legacy
+  // single power_fantasy flag over as the power-fantasy style.
+  (db) => {
+    db.exec('CREATE TABLE IF NOT EXISTS project_styles (style TEXT PRIMARY KEY)');
+    const legacy = db.prepare("SELECT value FROM project_meta WHERE key = 'power_fantasy'").get();
+    if (legacy?.value === '1') {
+      db.prepare("INSERT OR IGNORE INTO project_styles (style) VALUES ('power-fantasy')").run();
+    }
+  },
+  // v7 → v8: settings become a genre-aware system with ordered categories
+  // (境界/功法/门派/技能…) instead of sci-fi-only hardness labels.
+  (db) => {
+    try {
+      db.exec("ALTER TABLE science_entries ADD COLUMN category TEXT NOT NULL DEFAULT ''");
+    } catch (e) {
+      // column already exists — ignore
+    }
+    try {
+      db.exec('ALTER TABLE science_entries ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+    } catch (e) {
+      // column already exists — ignore
+    }
+  },
+  // v8 → v9: 轻松搞笑 + 快节奏 merged into 轻快; 悬疑推理 retired (suspense is
+  // a genre, not a writing style). Clean up any rows created while testing.
+  (db) => {
+    const merged = db.prepare("SELECT 1 AS x FROM project_styles WHERE style IN ('comedy','fast-paced')").get();
+    if (merged) {
+      db.prepare("INSERT OR IGNORE INTO project_styles (style) VALUES ('light')").run();
+    }
+    db.prepare("DELETE FROM project_styles WHERE style IN ('comedy','fast-paced','mystery-suspense')").run();
+  },
 ];
 
 const getProjectVersion = makeVersionGetter('project_meta');
@@ -851,6 +891,11 @@ function initProjectGenres(projectName, genres) {
   for (const genre of genres) insert.run(genre);
 }
 
+function initProjectStyles(projectName, styles) {
+  const insert = getProjectDb(projectName).prepare('INSERT OR IGNORE INTO project_styles (style) VALUES (?)');
+  for (const style of styles) insert.run(style);
+}
+
 /** Record AI token usage; never let accounting failures break a request. */
 function recordTokenUsage(projectName, taskName, usage, model) {
   try {
@@ -931,6 +976,7 @@ module.exports = {
   recordTokenUsage,
   initProjectMeta,
   initProjectGenres,
+  initProjectStyles,
   validateProjectName,
   registerRecentProject,
   lastVolumeId,

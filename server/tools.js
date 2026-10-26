@@ -1,5 +1,7 @@
 // ─── Tool schema definitions (OpenAI function-calling format) ───
 const { stripLeadingChapterHeading } = require('./titles');
+const { ALLOWED_SETTING_CATEGORIES } = require('./settings');
+const { STYLE_LABELS } = require('./styles');
 
 const TOOLS = [
   // ═══ Chapters ═══
@@ -239,7 +241,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'list_payoffs',
-      description: '列出小说的所有爽点（打脸、逆袭、装逼等爽感设计），可按状态筛选。写爽文章节前用它确认哪些爽点待铺垫或待释放。',
+      description: '列出小说的所有爽点（打脸、逆袭、装逼等爽感设计），可按状态筛选。写爽文模式章节前用它确认哪些爽点待铺垫或待释放。',
       parameters: {
         type: 'object',
         properties: {
@@ -253,7 +255,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_payoff',
-      description: '设计一个新的爽点，用于规划爽文中的情绪释放：何时铺垫、何时爆发。',
+      description: '设计一个新的爽点，用于规划爽文模式项目中的情绪释放：何时铺垫、何时爆发。',
       parameters: {
         type: 'object',
         properties: {
@@ -439,7 +441,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'list_science',
-      description: '列出小说的所有科幻设定条目，按标签（已知/外推/假设）分组。',
+      description: '列出小说的所有设定体系条目。科幻按标签（已知/外推/假设）分组，玄幻/仙侠/武侠/游戏按分类（境界/功法/门派/技能等）分组。',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -447,16 +449,18 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_science_entry',
-      description: '创建一条科幻设定条目。',
+      description: '创建一条设定体系条目（科幻设定、修炼境界、武功体系、游戏系统等）。',
       parameters: {
         type: 'object',
         properties: {
-          label: { type: 'string', enum: ['known', 'extrapolation', 'hypothesis'], description: '分类：已知/外推/假设' },
+          label: { type: 'string', enum: ['known', 'extrapolation', 'hypothesis'], description: '科幻条目的标签：已知/外推/假设（非科幻项目可省略）' },
+          category: { type: 'string', enum: ['realm', 'technique', 'artifact', 'sect', 'martial-art', 'school', 'weapon', 'system', 'skill', 'equipment', 'dungeon', 'other'], description: '玄幻/仙侠/武侠/游戏项目的分类：realm(境界)、technique(功法)、artifact(法宝)、sect(宗门)、martial-art(武功)、school(门派)、weapon(兵器)、system(系统)、skill(技能)、equipment(装备)、dungeon(副本)、other(其他)' },
           name: { type: 'string', description: '条目名称' },
           description: { type: 'string', description: '详细描述' },
           references: { type: 'string', description: '参考文献（可选）' },
+          sort_order: { type: 'number', description: '排序（数字越小越靠前，用于境界/等级等有序体系）' },
         },
-        required: ['label', 'name', 'description'],
+        required: ['name', 'description'],
       },
     },
   },
@@ -537,7 +541,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'delete_science_entry',
-      description: '删除指定科幻设定条目。此操作不可逆，请谨慎使用。',
+      description: '删除指定设定体系条目。此操作不可逆，请谨慎使用。',
       parameters: {
         type: 'object',
         properties: { id: { type: 'string', description: '条目ID' } },
@@ -1001,9 +1005,10 @@ const HANDLERS = {
     category: '爽点设计',
     run(ctx) {
       const { pdb, args } = ctx;
-      const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
-      if (!genres.includes('power-fantasy')) {
-        return { error: '当前项目不是爽文（power-fantasy）类型，无法创建爽点' };
+      const hasStyle = pdb.prepare("SELECT 1 AS x FROM project_styles WHERE style = 'power-fantasy'").get();
+      const legacy = pdb.prepare("SELECT value FROM project_meta WHERE key = 'power_fantasy'").get();
+      if (!hasStyle && legacy?.value !== '1') {
+        return { error: '当前项目未开启爽文模式，无法创建爽点' };
       }
       const id = randomUUID();
       const intensity = Math.max(1, Math.min(5, Number(args.intensity) || 3));
@@ -1176,24 +1181,34 @@ const HANDLERS = {
       return { deleted: true, volume_id: args.volume_id };
     },
   },
-  // ── Science ──
+  // ── Settings (science_entries) ──
   list_science: {
     entity: null,
-    category: '科幻设定',
+    category: '设定体系',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT * FROM science_entries ORDER BY label, name').all();
+      return pdb.prepare('SELECT * FROM science_entries ORDER BY sort_order, category, label, name').all();
     },
   },
   create_science_entry: {
     entity: 'science',
-    category: '科幻设定',
+    category: '设定体系',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
-      pdb.prepare('INSERT INTO science_entries (id, label, name, description, "references") VALUES (?, ?, ?, ?, ?)')
-        .run(id, args.label, args.name, args.description, args.references || '');
-      return { created: true, id, label: args.label, name: args.name };
+      const category = ALLOWED_SETTING_CATEGORIES.has(args.category) ? args.category : '';
+      pdb.prepare(`INSERT INTO science_entries (id, label, name, description, "references", category, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .run(
+          id,
+          args.label || 'known',
+          args.name,
+          args.description,
+          args.references || '',
+          category,
+          Number(args.sort_order) || 0,
+        );
+      return { created: true, id, label: args.label || 'known', category, name: args.name };
     },
   },
   // ── World update/delete ──
@@ -1267,7 +1282,7 @@ const HANDLERS = {
   // ── Science delete ──
   delete_science_entry: {
     entity: 'science',
-    category: '科幻设定',
+    category: '设定体系',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       return deleteById(args.id, 'science_entries', 'id', '条目');
@@ -1375,7 +1390,7 @@ const HANDLERS = {
     },
   },
   create_clue: {
-    entity: null,
+    entity: 'clue',
     category: '伏笔与线索',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1391,7 +1406,7 @@ const HANDLERS = {
     },
   },
   update_clue: {
-    entity: null,
+    entity: 'clue',
     category: '伏笔与线索',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1413,7 +1428,7 @@ const HANDLERS = {
     },
   },
   delete_clue: {
-    entity: null,
+    entity: 'clue',
     category: '伏笔与线索',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1429,11 +1444,15 @@ const HANDLERS = {
       const meta = {};
       pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
       const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
-      const genreLabels = { 'sci-fi': '科幻', 'fantasy': '玄幻', 'romance': '言情', 'history': '历史', 'urban': '都市', 'power-fantasy': '爽文', 'biography': '传记', 'other': '其他' };
+      const styles = pdb.prepare('SELECT style FROM project_styles').all().map(s => s.style);
+      const genreLabels = { 'sci-fi': '科幻', 'fantasy': '玄幻', 'xianxia': '仙侠', 'wuxia': '武侠', 'romance': '言情', 'history': '历史', 'urban': '都市', 'mystery': '悬疑', 'game': '游戏', 'biography': '传记', 'other': '其他' };
       return {
         name: meta.name || '',
         genres: genres,
         genreLabels: genres.map(g => genreLabels[g] || g),
+        styles: styles,
+        styleLabels: styles.map(s => STYLE_LABELS[s] || s),
+        powerFantasy: styles.includes('power-fantasy') || meta.power_fantasy === '1',
         mode: meta.mode || 'medium-novel',
         language: meta.language || 'zh',
         phase: meta.workflow_phase || 'idea',

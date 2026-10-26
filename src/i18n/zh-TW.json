@@ -22,7 +22,8 @@
     "dashboard": "專案概覽",
     "characters": "角色",
     "world": "世界觀",
-    "science": "科學設定",
+    "science": "設定體系",
+    "clue": "線索板",
     "outline_page": "大綱",
     "foreshadow": "伏筆管理",
     "payoff": "爽點管理",
@@ -123,6 +124,16 @@
     "defaultName": "未曾設想的道路",
     "namePlaceholder": "為小說取個名字...",
     "genresLabel": "創作類型（可多選）",
+    "styleLabel": "寫作風格",
+    "style": {
+      "dark": "暗黑",
+      "realistic": "寫實",
+      "healing": "治癒",
+      "poetic": "詩意",
+      "power-fantasy": "爽文",
+      "light": "輕快"
+    },
+    "styleHint": "風格會影響 AI 寫法，部分風格會啟用專屬看板",
     "modeLabel": "寫作模式",
     "shortStory": "短篇（≤3萬字）",
     "mediumNovel": "中篇（5-10萬字）",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "科幻",
       "fantasy": "玄幻",
+      "xianxia": "仙俠",
+      "wuxia": "武俠",
       "romance": "言情",
       "history": "歷史",
       "urban": "都市",
-      "power-fantasy": "爽文",
+      "mystery": "懸疑",
+      "game": "遊戲",
       "biography": "傳記",
       "other": "其他"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "繼續寫作",
     "export": "匯出",
     "exportAll": "匯出全部",
-    "scienceSettings": "科學設定",
+    "scienceSettings": "設定體系",
     "newSetting": "新增設定",
     "narrativeMemory": "敘事記憶",
     "semanticSearch": "語意搜尋",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "伏筆管理",
     "cardVolumes": "卷結構",
     "cardClueBoard": "線索板",
+    "clueBoard": "線索板",
     "cardNarrative": "敘事記錄",
     "cardAiUsage": "AI 用量",
     "appearance": "外貌",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "科幻",
       "fantasy": "玄幻",
+      "xianxia": "仙俠",
+      "wuxia": "武俠",
       "romance": "言情",
       "history": "歷史",
       "urban": "都市",
-      "power-fantasy": "爽文",
+      "mystery": "懸疑",
+      "game": "遊戲",
       "biography": "傳記",
       "other": "其他"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "字",
     "switchPhaseTitle": "切換專案階段",
     "confirmSwitch": "確認切換",
-    "switchPhaseBody": "將階段切換為「{phase}」？"
+    "switchPhaseBody": "將階段切換為「{phase}」？",
+    "writingStyles": "寫作風格"
   },
   "characters": {
     "namePlaceholder": "為角色取個名字",
@@ -599,6 +618,51 @@
     "description": "描述",
     "namePlaceholder": "設定名稱",
     "descriptionPlaceholder": "科學設定的詳細說明..."
+  },
+  "clue": {
+    "titleField": "線索標題",
+    "titlePlaceholder": "如：死者手中的車票",
+    "descriptionField": "描述",
+    "descriptionPlaceholder": "這條線索的細節與指向",
+    "kindField": "類型",
+    "kind": {
+      "clue": "線索",
+      "red-herring": "誤導",
+      "deduction": "推理結論",
+      "question": "待解問題"
+    },
+    "relatedChapterField": "關聯章節",
+    "relatedChapterPlaceholder": "章節編號（可選）",
+    "chapterRef": "第 {n} 章",
+    "statusField": "狀態",
+    "unresolved": "未解決",
+    "resolved": "已解決",
+    "statTotal": "總條目",
+    "statUnresolved": "未解決",
+    "statResolved": "已解決",
+    "statRedHerring": "誤導項",
+    "empty": "暫無條目"
+  },
+  "setting": {
+    "categoryLabel": "分類",
+    "sortOrder": "排序",
+    "sortOrderHint": "數字越小越靠前",
+    "uncategorized": "未分類",
+    "empty": "暫無條目",
+    "category": {
+      "realm": "境界",
+      "technique": "功法",
+      "artifact": "法寶",
+      "sect": "宗門",
+      "martial-art": "武功",
+      "school": "門派",
+      "weapon": "兵器",
+      "system": "系統",
+      "skill": "技能",
+      "equipment": "裝備",
+      "dungeon": "副本",
+      "other": "其他"
+    }
   },
   "timeline": {
     "yearLabel": "年份",

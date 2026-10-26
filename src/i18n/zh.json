@@ -22,7 +22,8 @@
     "dashboard": "项目概览",
     "characters": "角色",
     "world": "世界观",
-    "science": "科学设定",
+    "science": "设定体系",
+    "clue": "线索板",
     "outline_page": "大纲",
     "foreshadow": "伏笔管理",
     "payoff": "爽点管理",
@@ -123,6 +124,16 @@
     "defaultName": "未曾设想的道路",
     "namePlaceholder": "给小说取个名字...",
     "genresLabel": "创作类型（可多选）",
+    "styleLabel": "写作风格",
+    "style": {
+      "dark": "暗黑",
+      "realistic": "写实",
+      "healing": "治愈",
+      "poetic": "诗意",
+      "power-fantasy": "爽文",
+      "light": "轻快"
+    },
+    "styleHint": "风格会影响 AI 写法，部分风格会启用专属看板",
     "modeLabel": "写作模式",
     "shortStory": "短篇（≤3万字）",
     "mediumNovel": "中篇（5-10万字）",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "科幻",
       "fantasy": "玄幻",
+      "xianxia": "仙侠",
+      "wuxia": "武侠",
       "romance": "言情",
       "history": "历史",
       "urban": "都市",
-      "power-fantasy": "爽文",
+      "mystery": "悬疑",
+      "game": "游戏",
       "biography": "传记",
       "other": "其他"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "继续写作",
     "export": "导出",
     "exportAll": "导出全部",
-    "scienceSettings": "科学设定",
+    "scienceSettings": "设定体系",
     "newSetting": "新建设定",
     "narrativeMemory": "叙事记忆",
     "semanticSearch": "语义检索",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "伏笔管理",
     "cardVolumes": "卷结构",
     "cardClueBoard": "线索板",
+    "clueBoard": "线索板",
     "cardNarrative": "叙事记录",
     "cardAiUsage": "AI 用量",
     "appearance": "外貌",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "科幻",
       "fantasy": "玄幻",
+      "xianxia": "仙侠",
+      "wuxia": "武侠",
       "romance": "言情",
       "history": "历史",
       "urban": "都市",
-      "power-fantasy": "爽文",
+      "mystery": "悬疑",
+      "game": "游戏",
       "biography": "传记",
       "other": "其他"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "字",
     "switchPhaseTitle": "切换项目阶段",
     "confirmSwitch": "确认切换",
-    "switchPhaseBody": "将阶段切换到「{phase}」？"
+    "switchPhaseBody": "将阶段切换到「{phase}」？",
+    "writingStyles": "写作风格"
   },
   "characters": {
     "namePlaceholder": "给角色取个名字",
@@ -599,6 +618,51 @@
     "description": "描述",
     "namePlaceholder": "设定名称",
     "descriptionPlaceholder": "科学设定的详细说明..."
+  },
+  "clue": {
+    "titleField": "线索标题",
+    "titlePlaceholder": "如：死者手中的车票",
+    "descriptionField": "描述",
+    "descriptionPlaceholder": "这条线索的细节与指向",
+    "kindField": "类型",
+    "kind": {
+      "clue": "线索",
+      "red-herring": "误导",
+      "deduction": "推理结论",
+      "question": "待解问题"
+    },
+    "relatedChapterField": "关联章节",
+    "relatedChapterPlaceholder": "章节编号（可选）",
+    "chapterRef": "第 {n} 章",
+    "statusField": "状态",
+    "unresolved": "未解决",
+    "resolved": "已解决",
+    "statTotal": "总条目",
+    "statUnresolved": "未解决",
+    "statResolved": "已解决",
+    "statRedHerring": "误导项",
+    "empty": "暂无条目"
+  },
+  "setting": {
+    "categoryLabel": "分类",
+    "sortOrder": "排序",
+    "sortOrderHint": "数字越小越靠前",
+    "uncategorized": "未分类",
+    "empty": "暂无条目",
+    "category": {
+      "realm": "境界",
+      "technique": "功法",
+      "artifact": "法宝",
+      "sect": "宗门",
+      "martial-art": "武功",
+      "school": "门派",
+      "weapon": "兵器",
+      "system": "系统",
+      "skill": "技能",
+      "equipment": "装备",
+      "dungeon": "副本",
+      "other": "其他"
+    }
   },
   "timeline": {
     "yearLabel": "年份",

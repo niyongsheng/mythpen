@@ -3,6 +3,7 @@ import { useProjectStore } from '@/stores/useProjectStore'
 import type {
   Character,
   CharacterRelation,
+  Clue,
   Foreshadow,
   Memory,
   PayoffPoint,
@@ -13,6 +14,7 @@ import type {
 } from '@/types'
 import {
   charactersApi,
+  cluesApi,
   foreshadowsApi,
   memoriesApi,
   payoffsApi,
@@ -86,6 +88,11 @@ export function useForeshadows(status?: string) {
 export function usePayoffs(status?: string) {
   const project = useProjectName()
   return useApiData<PayoffPoint[]>(project ? () => payoffsApi.list(project, status) : null, [project, status])
+}
+
+export function useClues(status?: string) {
+  const project = useProjectName()
+  return useApiData<Clue[]>(project ? () => cluesApi.list(project, status) : null, [project, status])
 }
 
 export function useRelations() {

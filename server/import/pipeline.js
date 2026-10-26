@@ -16,6 +16,7 @@ const {
 } = require('./text');
 const { callJson, processBatches, codedError } = require('./ai-json');
 const { LANGUAGE_CODES, languageName, normalizeLanguageCode, perChapterTokens } = require('../languages');
+const { ALLOWED_STYLES } = require('../styles');
 const prompts = require('../prompts/import');
 
 const MAX_TEXT_CHARS = 20_000_000;
@@ -31,10 +32,13 @@ const CANDIDATE_CAP = 3000;
 const ALLOWED_GENRES = new Set([
   'sci-fi',
   'fantasy',
+  'xianxia',
+  'wuxia',
   'romance',
   'history',
   'urban',
-  'power-fantasy',
+  'mystery',
+  'game',
   'biography',
   'other',
 ]);
@@ -97,6 +101,11 @@ function escapeClosingTag(value, tag) {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+/** Models sometimes emit booleans as strings; accept the common spellings. */
+function asBool(value) {
+  return value === true || value === 'true' || value === 1 || value === '1';
 }
 
 function clampInt(value, min, max, fallback) {
@@ -328,11 +337,18 @@ function buildEndingSample(volumes) {
 
 function normalizeMetadata(data, source, options) {
   const value = data && typeof data === 'object' ? data : {};
-  const aiGenres = asArray(value.genres).filter((genre) => ALLOWED_GENRES.has(genre));
+  const rawGenres = asArray(value.genres);
+  const aiGenres = rawGenres.filter((genre) => ALLOWED_GENRES.has(genre));
   const genres = [...new Set([
     ...asArray(options.genres).filter((genre) => ALLOWED_GENRES.has(genre)),
     ...aiGenres,
   ])];
+  // 爽文 is a style flag; legacy models may still report it as a genre.
+  const powerFantasy = asBool(value.powerFantasy)
+    || options.powerFantasy === true
+    || rawGenres.includes('power-fantasy');
+  const styleSet = new Set(asArray(options.styles).filter((style) => ALLOWED_STYLES.has(style)));
+  if (powerFantasy) styleSet.add('power-fantasy');
   return {
     title: cleanName(value.title, 200) || cleanName(source.title, 200) || options.name,
     author: cleanName(value.author, 100) || cleanName(source.author, 100) || '佚名',
@@ -340,6 +356,8 @@ function normalizeMetadata(data, source, options) {
     language: normalizeLanguageCode(options.language),
     mode: options.mode,
     genres,
+    styles: [...styleSet],
+    powerFantasy,
     synopsis: cleanText(value.synopsis, 2400) || cleanText(value.description, 1200) || '',
   };
 }

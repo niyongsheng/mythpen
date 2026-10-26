@@ -22,7 +22,8 @@
     "dashboard": "Resumen del proyecto",
     "characters": "Personajes",
     "world": "Mundo",
-    "science": "Ciencia",
+    "science": "Sistema de ambientación",
+    "clue": "Tablero de pistas",
     "outline_page": "Esquema",
     "foreshadow": "Presagios",
     "payoff": "Puntos de satisfacción",
@@ -123,6 +124,16 @@
     "defaultName": "Un camino nunca imaginado",
     "namePlaceholder": "Ponle un nombre a tu novela...",
     "genresLabel": "Género (selección múltiple)",
+    "styleLabel": "Estilos de escritura",
+    "style": {
+      "dark": "Oscuro",
+      "realistic": "Realista",
+      "healing": "Sanador",
+      "poetic": "Poético",
+      "power-fantasy": "Fantasía de poder",
+      "light": "Ligero y ágil"
+    },
+    "styleHint": "Los estilos moldean la escritura de la IA; algunos activan paneles específicos",
     "modeLabel": "Modo de escritura",
     "shortStory": "Relato corto (≤30 000 palabras)",
     "mediumNovel": "Novela media (50 000-100 000 palabras)",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "Ciencia ficción",
       "fantasy": "Fantasía",
+      "xianxia": "Xianxia",
+      "wuxia": "Wuxia",
       "romance": "Romance",
       "history": "Historia",
       "urban": "Urbano",
-      "power-fantasy": "Fantasía de poder",
+      "mystery": "Misterio",
+      "game": "Juegos",
       "biography": "Biografía",
       "other": "Otro"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "Continuar escribiendo",
     "export": "Exportar",
     "exportAll": "Exportar todo",
-    "scienceSettings": "Ambientación científica",
+    "scienceSettings": "Sistema de ambientación",
     "newSetting": "Nuevo elemento",
     "narrativeMemory": "Memoria narrativa",
     "semanticSearch": "Búsqueda semántica",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "Gestión de presagios",
     "cardVolumes": "Estructura de volúmenes",
     "cardClueBoard": "Panel de pistas",
+    "clueBoard": "Tablero de pistas",
     "cardNarrative": "Registros narrativos",
     "cardAiUsage": "Uso de AI",
     "appearance": "Apariencia",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "Ciencia ficción",
       "fantasy": "Fantasía",
+      "xianxia": "Xianxia",
+      "wuxia": "Wuxia",
       "romance": "Romance",
       "history": "Historia",
       "urban": "Urbano",
-      "power-fantasy": "Fantasía de poder",
+      "mystery": "Misterio",
+      "game": "Juegos",
       "biography": "Biografía",
       "other": "Otro"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "palabras",
     "switchPhaseTitle": "Cambiar la fase del proyecto",
     "confirmSwitch": "Confirmar cambio",
-    "switchPhaseBody": "¿Cambiar la fase a «{phase}»?"
+    "switchPhaseBody": "¿Cambiar la fase a «{phase}»?",
+    "writingStyles": "Estilos de escritura"
   },
   "characters": {
     "namePlaceholder": "Ponle un nombre al personaje",
@@ -599,6 +618,51 @@
     "description": "Descripción",
     "namePlaceholder": "Nombre del elemento",
     "descriptionPlaceholder": "Descripción detallada del elemento científico..."
+  },
+  "clue": {
+    "titleField": "Título de la pista",
+    "titlePlaceholder": "p. ej., el billete en la mano de la víctima",
+    "descriptionField": "Descripción",
+    "descriptionPlaceholder": "Qué revela esta pista",
+    "kindField": "Tipo",
+    "kind": {
+      "clue": "Pista",
+      "red-herring": "Pista falsa",
+      "deduction": "Deducción",
+      "question": "Pregunta abierta"
+    },
+    "relatedChapterField": "Capítulo relacionado",
+    "relatedChapterPlaceholder": "Número de capítulo (opcional)",
+    "chapterRef": "Capítulo {n}",
+    "statusField": "Estado",
+    "unresolved": "Sin resolver",
+    "resolved": "Resuelta",
+    "statTotal": "Total",
+    "statUnresolved": "Sin resolver",
+    "statResolved": "Resueltas",
+    "statRedHerring": "Pistas falsas",
+    "empty": "Aún no hay entradas"
+  },
+  "setting": {
+    "categoryLabel": "Categoría",
+    "sortOrder": "Orden",
+    "sortOrderHint": "Los números menores aparecen primero",
+    "uncategorized": "Sin categoría",
+    "empty": "No hay entradas",
+    "category": {
+      "realm": "Reino",
+      "technique": "Técnica",
+      "artifact": "Artefacto",
+      "sect": "Secta",
+      "martial-art": "Arte marcial",
+      "school": "Escuela",
+      "weapon": "Arma",
+      "system": "Sistema",
+      "skill": "Habilidad",
+      "equipment": "Equipo",
+      "dungeon": "Mazmorra",
+      "other": "Otro"
+    }
   },
   "timeline": {
     "yearLabel": "Año",

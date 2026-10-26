@@ -22,7 +22,8 @@
     "dashboard": "Dashboard",
     "characters": "Characters",
     "world": "World",
-    "science": "Science",
+    "science": "Lore System",
+    "clue": "Clue Board",
     "outline_page": "Outline",
     "foreshadow": "Foreshadows",
     "payoff": "Payoff Points",
@@ -123,6 +124,16 @@
     "defaultName": "An Unimagined Path",
     "namePlaceholder": "Name your novel...",
     "genresLabel": "Genre (multi-select)",
+    "styleLabel": "Writing Styles",
+    "style": {
+      "dark": "Dark",
+      "realistic": "Realistic",
+      "healing": "Healing",
+      "poetic": "Poetic",
+      "power-fantasy": "Power Fantasy",
+      "light": "Light & Brisk"
+    },
+    "styleHint": "Styles shape the AI's writing; some enable dedicated boards",
     "modeLabel": "Writing Mode",
     "shortStory": "Short Story",
     "mediumNovel": "Medium Novel",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "Sci-Fi",
       "fantasy": "Fantasy",
+      "xianxia": "Xianxia",
+      "wuxia": "Wuxia",
       "romance": "Romance",
       "history": "History",
       "urban": "Urban",
-      "power-fantasy": "Power Fantasy",
+      "mystery": "Mystery",
+      "game": "Game",
       "biography": "Biography",
       "other": "Other"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "Continue Writing",
     "export": "Export",
     "exportAll": "Export All",
-    "scienceSettings": "Science Settings",
+    "scienceSettings": "Lore System",
     "newSetting": "New Setting",
     "narrativeMemory": "Narrative Memory",
     "semanticSearch": "Search",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "Foreshadows",
     "cardVolumes": "Volume Structure",
     "cardClueBoard": "Clue Board",
+    "clueBoard": "Clue Board",
     "cardNarrative": "Narrative Records",
     "cardAiUsage": "AI Usage",
     "appearance": "Appearance",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "Sci-Fi",
       "fantasy": "Fantasy",
+      "xianxia": "Xianxia",
+      "wuxia": "Wuxia",
       "romance": "Romance",
       "history": "History",
       "urban": "Urban",
-      "power-fantasy": "Power Fantasy",
+      "mystery": "Mystery",
+      "game": "Game",
       "biography": "Biography",
       "other": "Other"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "words",
     "switchPhaseTitle": "Switch Project Phase",
     "confirmSwitch": "Confirm Switch",
-    "switchPhaseBody": "Switch phase to「{phase}」?"
+    "switchPhaseBody": "Switch phase to「{phase}」?",
+    "writingStyles": "Writing Styles"
   },
   "characters": {
     "namePlaceholder": "Give the character a name",
@@ -599,6 +618,51 @@
     "description": "Description",
     "namePlaceholder": "Setting name",
     "descriptionPlaceholder": "Detailed description of the setting..."
+  },
+  "clue": {
+    "titleField": "Clue Title",
+    "titlePlaceholder": "e.g. The ticket in the victim's hand",
+    "descriptionField": "Description",
+    "descriptionPlaceholder": "What this clue reveals",
+    "kindField": "Kind",
+    "kind": {
+      "clue": "Clue",
+      "red-herring": "Red Herring",
+      "deduction": "Deduction",
+      "question": "Open Question"
+    },
+    "relatedChapterField": "Related Chapter",
+    "relatedChapterPlaceholder": "Chapter number (optional)",
+    "chapterRef": "Chapter {n}",
+    "statusField": "Status",
+    "unresolved": "Unresolved",
+    "resolved": "Resolved",
+    "statTotal": "Total",
+    "statUnresolved": "Unresolved",
+    "statResolved": "Resolved",
+    "statRedHerring": "Red Herrings",
+    "empty": "No entries yet"
+  },
+  "setting": {
+    "categoryLabel": "Category",
+    "sortOrder": "Order",
+    "sortOrderHint": "Lower numbers appear first",
+    "uncategorized": "Uncategorized",
+    "empty": "No entries yet",
+    "category": {
+      "realm": "Realm",
+      "technique": "Technique",
+      "artifact": "Artifact",
+      "sect": "Sect",
+      "martial-art": "Martial Art",
+      "school": "School",
+      "weapon": "Weapon",
+      "system": "System",
+      "skill": "Skill",
+      "equipment": "Equipment",
+      "dungeon": "Dungeon",
+      "other": "Other"
+    }
   },
   "timeline": {
     "yearLabel": "Year",

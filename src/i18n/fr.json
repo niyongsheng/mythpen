@@ -22,7 +22,8 @@
     "dashboard": "Tableau de bord",
     "characters": "Personnages",
     "world": "Univers",
-    "science": "Science",
+    "science": "Système d'univers",
+    "clue": "Tableau d'indices",
     "outline_page": "Plan",
     "foreshadow": "Fils narratifs",
     "payoff": "Points de satisfaction",
@@ -123,6 +124,16 @@
     "defaultName": "Un chemin insoupçonné",
     "namePlaceholder": "Donnez un nom à votre roman…",
     "genresLabel": "Genre (sélection multiple)",
+    "styleLabel": "Styles d'écriture",
+    "style": {
+      "dark": "Sombre",
+      "realistic": "Réaliste",
+      "healing": "Guérison",
+      "poetic": "Poétique",
+      "power-fantasy": "Power fantasy",
+      "light": "Léger et rythmé"
+    },
+    "styleHint": "Les styles orientent l'écriture de l'IA ; certains activent des tableaux dédiés",
     "modeLabel": "Mode d’écriture",
     "shortStory": "Nouvelle (≤ 30 000 mots)",
     "mediumNovel": "Roman court (50 000 à 100 000 mots)",
@@ -150,10 +161,13 @@
     "genre": {
       "sci-fi": "Science-fiction",
       "fantasy": "Fantasy",
+      "xianxia": "Xianxia",
+      "wuxia": "Wuxia",
       "romance": "Romance",
       "history": "Historique",
       "urban": "Urbain",
-      "power-fantasy": "Power fantasy",
+      "mystery": "Mystère",
+      "game": "Jeu",
       "biography": "Biographie",
       "other": "Autre"
     },
@@ -279,7 +293,7 @@
     "continueWriting": "Continuer l’écriture",
     "export": "Exporter",
     "exportAll": "Tout exporter",
-    "scienceSettings": "Paramètres scientifiques",
+    "scienceSettings": "Système d'univers",
     "newSetting": "Nouvel élément",
     "narrativeMemory": "Mémoire narrative",
     "semanticSearch": "Recherche sémantique",
@@ -309,6 +323,7 @@
     "cardForeshadowManage": "Fils narratifs",
     "cardVolumes": "Structure en tomes",
     "cardClueBoard": "Tableau des indices",
+    "clueBoard": "Tableau d'indices",
     "cardNarrative": "Notes narratives",
     "cardAiUsage": "Utilisation de l’AI",
     "appearance": "Apparence",
@@ -344,10 +359,13 @@
     "genre": {
       "sci-fi": "Science-fiction",
       "fantasy": "Fantasy",
+      "xianxia": "Xianxia",
+      "wuxia": "Wuxia",
       "romance": "Romance",
       "history": "Historique",
       "urban": "Urbain",
-      "power-fantasy": "Power fantasy",
+      "mystery": "Mystère",
+      "game": "Jeu",
       "biography": "Biographie",
       "other": "Autre"
     }
@@ -415,7 +433,8 @@
     "wordCountSuffix": "mots",
     "switchPhaseTitle": "Changer la phase du projet",
     "confirmSwitch": "Confirmer",
-    "switchPhaseBody": "Passer à la phase « {phase} » ?"
+    "switchPhaseBody": "Passer à la phase « {phase} » ?",
+    "writingStyles": "Styles d'écriture"
   },
   "characters": {
     "namePlaceholder": "Donnez un nom au personnage",
@@ -599,6 +618,51 @@
     "description": "Description",
     "namePlaceholder": "Nom de l’élément",
     "descriptionPlaceholder": "Description détaillée de l’élément…"
+  },
+  "clue": {
+    "titleField": "Titre de l'indice",
+    "titlePlaceholder": "ex. le billet dans la main de la victime",
+    "descriptionField": "Description",
+    "descriptionPlaceholder": "Ce que cet indice révèle",
+    "kindField": "Type",
+    "kind": {
+      "clue": "Indice",
+      "red-herring": "Fausse piste",
+      "deduction": "Déduction",
+      "question": "Question ouverte"
+    },
+    "relatedChapterField": "Chapitre lié",
+    "relatedChapterPlaceholder": "Numéro de chapitre (facultatif)",
+    "chapterRef": "Chapitre {n}",
+    "statusField": "Statut",
+    "unresolved": "Non résolu",
+    "resolved": "Résolu",
+    "statTotal": "Total",
+    "statUnresolved": "Non résolus",
+    "statResolved": "Résolus",
+    "statRedHerring": "Fausses pistes",
+    "empty": "Aucune entrée pour l'instant"
+  },
+  "setting": {
+    "categoryLabel": "Catégorie",
+    "sortOrder": "Ordre",
+    "sortOrderHint": "Les nombres les plus petits apparaissent en premier",
+    "uncategorized": "Sans catégorie",
+    "empty": "Aucune entrée",
+    "category": {
+      "realm": "Royaume",
+      "technique": "Technique",
+      "artifact": "Artefact",
+      "sect": "Secte",
+      "martial-art": "Art martial",
+      "school": "École",
+      "weapon": "Arme",
+      "system": "Système",
+      "skill": "Compétence",
+      "equipment": "Équipement",
+      "dungeon": "Donjon",
+      "other": "Autre"
+    }
   },
   "timeline": {
     "yearLabel": "Année",

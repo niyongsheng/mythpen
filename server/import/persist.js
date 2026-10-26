@@ -5,14 +5,18 @@
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 const db = require('../db');
+const { ALLOWED_STYLES } = require('../styles');
 
 const ALLOWED_GENRES = new Set([
   'sci-fi',
   'fantasy',
+  'xianxia',
+  'wuxia',
   'romance',
   'history',
   'urban',
-  'power-fantasy',
+  'mystery',
+  'game',
   'biography',
   'other',
 ]);
@@ -119,6 +123,16 @@ function createProjectFromImport(input) {
       ...asArray(options.genres),
       ...asArray(meta.genres),
     ].filter((genre) => ALLOWED_GENRES.has(genre)))];
+    // 爽文 is a style flag; accept the legacy genre value from older clients.
+    const powerFantasy = options.powerFantasy === true
+      || meta.powerFantasy === true
+      || asArray(options.genres).includes('power-fantasy')
+      || asArray(meta.genres).includes('power-fantasy');
+    const styles = [...new Set([
+      ...asArray(options.styles),
+      ...asArray(meta.styles),
+    ].filter((style) => ALLOWED_STYLES.has(style)))];
+    if (powerFantasy && !styles.includes('power-fantasy')) styles.push('power-fantasy');
     const description = cleanText(meta.description, 1200) || cleanText(meta.synopsis, 1200);
     const synopsis = cleanText(archive.synopsis || meta.synopsis, 2400);
     const bookTitle = cleanName(meta.title, 200) || name;
@@ -129,6 +143,7 @@ function createProjectFromImport(input) {
       description,
       mode: options.mode || 'medium-novel',
       language: options.language || 'zh',
+      power_fantasy: powerFantasy ? '1' : '0',
       author_name: author,
       workflow_phase: 'writing',
       book_title: bookTitle,
@@ -142,6 +157,7 @@ function createProjectFromImport(input) {
       ai_synopsis: synopsis,
     });
     db.initProjectGenres(name, genres);
+    db.initProjectStyles(name, styles);
 
     let wordCount = 0;
     let insertedCharacters = 0;

@@ -1,4 +1,17 @@
-import { BookOpen, Building, Heart, Landmark, type LucideIcon, Rocket, Scroll, Wand, Zap } from 'lucide-react'
+import {
+  BookOpen,
+  Building,
+  Fingerprint,
+  Gamepad2,
+  Heart,
+  Landmark,
+  type LucideIcon,
+  Mountain,
+  Rocket,
+  Scroll,
+  Swords,
+  Wand,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ImportBookPanel } from '@/components/ImportBookPanel'
 import { ToastContainer } from '@/components/ToastContainer'
@@ -16,13 +29,18 @@ import type { WritingLanguage } from '@/types'
 const GENRES: { key: string; icon: LucideIcon }[] = [
   { key: 'sci-fi', icon: Rocket },
   { key: 'fantasy', icon: Wand },
+  { key: 'xianxia', icon: Mountain },
+  { key: 'wuxia', icon: Swords },
   { key: 'romance', icon: Heart },
   { key: 'history', icon: Landmark },
   { key: 'urban', icon: Building },
-  { key: 'power-fantasy', icon: Zap },
+  { key: 'mystery', icon: Fingerprint },
+  { key: 'game', icon: Gamepad2 },
   { key: 'biography', icon: BookOpen },
   { key: 'other', icon: Scroll },
 ]
+
+const STYLES = ['dark', 'realistic', 'healing', 'poetic', 'power-fantasy', 'light'] as const
 
 const MODES = [
   { key: 'short-story', labelKey: 'project.shortStory' },
@@ -67,6 +85,7 @@ export function NewProjectDialog() {
   const [name, setName] = useState(() => t('project.defaultName'))
   const [nameTouched, setNameTouched] = useState(false)
   const [selectedGenres, setSelectedGenres] = useState<string[]>(['sci-fi', 'romance'])
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([])
   const [mode, setMode] = useState('medium-novel')
   const [language, setLanguage] = useState<WritingLanguage>('zh')
 
@@ -94,6 +113,7 @@ export function NewProjectDialog() {
     setName(t('project.defaultName'))
     setNameTouched(false)
     setSelectedGenres(['sci-fi', 'romance'])
+    setSelectedStyles([])
     setMode('medium-novel')
     setLanguage('zh')
     setFile(null)
@@ -149,7 +169,7 @@ export function NewProjectDialog() {
 
     if (tab === 'blank') {
       try {
-        await createProject(name.trim(), { mode, language, genres: selectedGenres })
+        await createProject(name.trim(), { mode, language, genres: selectedGenres, styles: selectedStyles })
         setProjectDialogOpen(false)
       } catch {
         // The store has already set a user-facing error.
@@ -167,7 +187,7 @@ export function NewProjectDialog() {
     try {
       const result = await importProject(
         projectName,
-        { mode, language, genres: selectedGenres },
+        { mode, language, genres: selectedGenres, styles: selectedStyles },
         source,
         {
           onStage: (payload) => setProgress(payload),
@@ -315,6 +335,33 @@ export function NewProjectDialog() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="mb-5">
+            <label className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1.5">
+              {t('project.styleLabel')}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {STYLES.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={selectedStyles.includes(key)}
+                  className={selectedStyles.includes(key) ? activeBtn : inactiveBtn}
+                  onClick={() =>
+                    setSelectedStyles((prev) =>
+                      prev.includes(key) ? prev.filter((style) => style !== key) : [...prev, key],
+                    )
+                  }
+                  disabled={busy}
+                >
+                  {t(`project.style.${key}`)}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-tertiary)]">
+              {t('project.styleHint')}
+            </p>
           </div>
 
           <div className="mb-5">

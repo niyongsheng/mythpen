@@ -41,10 +41,13 @@ const PHASE_LABELS: Record<WorkflowPhase, { key: string; num: string }> = {
 const GENRE_LABELS: Record<string, { labelKey: string; color: string }> = {
   'sci-fi': { labelKey: 'pages.genre.sci-fi', color: '#5b8af0' },
   fantasy: { labelKey: 'pages.genre.fantasy', color: '#a855f7' },
+  xianxia: { labelKey: 'pages.genre.xianxia', color: '#10b981' },
+  wuxia: { labelKey: 'pages.genre.wuxia', color: '#dc2626' },
   romance: { labelKey: 'pages.genre.romance', color: '#ec4899' },
   history: { labelKey: 'pages.genre.history', color: '#d97706' },
   urban: { labelKey: 'pages.genre.urban', color: '#14b8a6' },
-  'power-fantasy': { labelKey: 'pages.genre.power-fantasy', color: '#f97316' },
+  mystery: { labelKey: 'pages.genre.mystery', color: '#6366f1' },
+  game: { labelKey: 'pages.genre.game', color: '#84cc16' },
   biography: { labelKey: 'pages.genre.biography', color: '#6b7280' },
   other: { labelKey: 'pages.genre.other', color: '#8b8b8b' },
 }
@@ -272,6 +275,21 @@ export function Dashboard() {
               <span className="text-[13px] text-[var(--ink-tertiary)]">{t('dashboard.notSet')}</span>
             )}
           </div>
+          {(s.styles || []).length > 0 ? (
+            <div className="mt-2.5">
+              <div className="text-[11px] text-[var(--ink-tertiary)] mb-1">{t('dashboard.writingStyles')}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {s.styles!.map((style) => (
+                  <span
+                    key={style}
+                    className="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] text-[var(--ink-secondary)] border border-dashed border-[var(--hairline-light)]"
+                  >
+                    {t(`project.style.${style}`)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="text-[12px] text-[var(--ink-tertiary)] mt-2.5">
             {t('dashboard.volumeChapterCount', { n: s.volumeCount || 0, m: s.chapterCount })}
           </div>

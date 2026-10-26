@@ -1,12 +1,28 @@
-import { BookOpen, Building, Heart, Landmark, type LucideIcon, Rocket, Scroll, Wand, Zap } from 'lucide-react'
+import {
+  BookOpen,
+  Building,
+  Fingerprint,
+  Gamepad2,
+  Heart,
+  Landmark,
+  type LucideIcon,
+  Mountain,
+  Rocket,
+  Scroll,
+  Swords,
+  Wand,
+} from 'lucide-react'
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Rocket,
   Wand,
+  Mountain,
+  Swords,
   Heart,
   Landmark,
   Building,
-  Zap,
+  Fingerprint,
+  Gamepad2,
   BookOpen,
   Scroll,
 }

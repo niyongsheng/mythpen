@@ -1,5 +1,6 @@
 const express = require('express');
 const db = require('../db');
+const { ALLOWED_STYLES } = require('../styles');
 const { createAIAdapter } = require('../ai-adapter');
 const { getAiConfig } = require('../ai-config');
 const {
@@ -30,6 +31,11 @@ function cleanString(value, maxLength) {
 function normalizeGenres(value) {
   const list = Array.isArray(value) ? value : [];
   return [...new Set(list.filter((genre) => ALLOWED_GENRES.has(genre)))];
+}
+
+function normalizeStyles(value) {
+  const list = Array.isArray(value) ? value : [];
+  return [...new Set(list.filter((style) => ALLOWED_STYLES.has(style)))];
 }
 
 router.post('/projects/import-ai', async (req, res) => {
@@ -70,11 +76,15 @@ router.post('/projects/import-ai', async (req, res) => {
     description: cleanString(rawSource.description, 2000),
     language: cleanString(rawSource.language, 20),
   };
+  const requestedGenres = Array.isArray(body.genres) ? body.genres : [];
   const options = {
     name,
     mode: ALLOWED_MODES.has(body.mode) ? body.mode : 'medium-novel',
     language: ALLOWED_LANGUAGES.has(body.language) ? body.language : 'zh',
     genres: normalizeGenres(body.genres),
+    styles: normalizeStyles(body.styles),
+    // 爽文 is a style flag; accept the legacy genre value from older clients.
+    powerFantasy: body.powerFantasy === true || requestedGenres.includes('power-fantasy'),
   };
 
   // From here on the response is an SSE stream; errors are events, not JSON.
