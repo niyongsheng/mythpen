@@ -1,6 +1,6 @@
 [package]
 name = "mythpen"
-version = "0.0.16"
+version = "0.0.17"
 description = "AI 辅助小说创作工具"
 authors = ["Nico"]
 license = "GPL-3.0-only"
