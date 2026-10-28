@@ -54,7 +54,13 @@ function loadSettings(): AppSettings {
   return { ...DEFAULT_SETTINGS }
 }
 
+/** Switch the palette by toggling the html[data-theme] attribute. */
+function applyTheme(theme: AppSettings['theme']) {
+  document.documentElement.setAttribute('data-theme', theme)
+}
+
 const initialSettings = loadSettings()
+applyTheme(initialSettings.theme)
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   settings: initialSettings,
@@ -136,6 +142,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         setLanguage(value as Lang)
         extra.langVersion = s.langVersion + 1
       }
+      if (key === 'theme') applyTheme(value as AppSettings['theme'])
       return { settings: newSettings, ...extra }
     }),
 }))

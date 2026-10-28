@@ -102,6 +102,44 @@ html[data-theme="light"] {
   --accent-gold-soft-bg: rgba(184, 148, 62, 0.12);
 }
 
+/* ─── Eye-care Theme ─── */
+/* Soft sage paper with low-glare contrast for long writing sessions. */
+html[data-theme="eyecare"] {
+  --canvas: #e3edd9;
+  --canvas-soft: #dbe6d0;
+  --canvas-card: #d6e2ca;
+  --canvas-elevated: #ccdabf;
+  --canvas-mid: #c0d0b2;
+  --canvas-pop: #b4c6a5;
+  --hairline: #c6d5b8;
+  --hairline-light: #b9cbaa;
+
+  --ink: #2b3528;
+  --ink-hover: #1c251a;
+  --ink-secondary: #4d5b45;
+  --ink-tertiary: #6e7b64;
+  --ink-mute: #93a087;
+
+  --accent-gold: #a17c33;
+  --accent-gold-soft: #bf9d55;
+  --accent-gold-soft-bg: rgba(161, 124, 51, 0.13);
+  --accent-ember: #b4693a;
+  --accent-mist: #6b8090;
+
+  --success: #3f835c;
+  --success-soft: rgba(63, 131, 92, 0.15);
+  --warning: #a2741f;
+  --warning-soft: rgba(162, 116, 31, 0.16);
+  --error: #b04a41;
+  --error-soft: rgba(176, 74, 65, 0.13);
+  --info: #4d7695;
+  --info-soft: rgba(77, 118, 149, 0.15);
+  --pending: #5a6554;
+  --pending-soft: #c8d5bf;
+
+  --shadow-pop: 0 12px 28px -10px rgba(46, 60, 40, 0.25), 0 2px 6px rgba(46, 60, 40, 0.1);
+}
+
 /* ─── Global Reset ─── */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; }

@@ -235,6 +235,7 @@
     "theme": "Tema",
     "dark": "Oscuro",
     "light": "Claro",
+    "eyecare": "Cuidado ocular",
     "editor": "Editor",
     "fontSize": "Tamaño de fuente",
     "fontSizeDesc": "Tamaño de fuente base del contenido del editor",

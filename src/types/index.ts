@@ -176,7 +176,7 @@ export interface AppSettings {
   apiModel: string
   apiType: 'openai' | 'claude'
   uiLanguage: UiLanguage
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'eyecare'
   editorFontSize: number
   editorFontFamily: string
   autoSaveInterval: number

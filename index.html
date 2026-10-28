@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mythpen</title>
+    <script>
+      // Apply the saved theme before the first paint to avoid a flash.
+      try {
+        var savedTheme = JSON.parse(localStorage.getItem('mythpen-settings') || '{}').theme
+        if (['dark', 'light', 'eyecare'].indexOf(savedTheme) !== -1) {
+          document.documentElement.setAttribute('data-theme', savedTheme)
+        }
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&family=Instrument+Serif:opsz@8&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />

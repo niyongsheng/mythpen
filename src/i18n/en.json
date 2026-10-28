@@ -235,6 +235,7 @@
     "theme": "Theme",
     "dark": "Dark",
     "light": "Light",
+    "eyecare": "Eye Care",
     "editor": "Editor",
     "fontSize": "Font Size",
     "fontSizeDesc": "Base font size for editor content",

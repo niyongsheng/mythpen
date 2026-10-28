@@ -11,6 +11,12 @@ import { useUpdateStore } from '@/stores/useUpdateStore'
 
 const ACCENT_COLORS = ['#c9a96e', '#e06c75', '#61afef', '#98c379', '#c678dd', '#d4a040', '#56b6c2']
 
+const THEME_OPTIONS = [
+  { value: 'dark', swatch: '#0e0e10', labelKey: 'settings.dark' },
+  { value: 'light', swatch: '#f5f0e8', labelKey: 'settings.light' },
+  { value: 'eyecare', swatch: '#cfe0bd', labelKey: 'settings.eyecare' },
+] as const
+
 /** Apply accent color to CSS custom property so the UI updates immediately. */
 function applyAccentColor(color: string) {
   document.documentElement.style.setProperty('--accent-gold', color)
@@ -122,23 +128,14 @@ export function SettingsDrawer() {
               <Palette className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.theme')}
             </div>
             <div className="flex gap-3">
-              {(['dark', 'light'] as const).map((themeVal) => (
-                <div
-                  key={themeVal}
-                  className="text-center cursor-pointer"
-                  onClick={() => {
-                    updateSetting('theme', themeVal)
-                    document.documentElement.setAttribute('data-theme', themeVal)
-                  }}
-                >
+              {THEME_OPTIONS.map(({ value, swatch, labelKey }) => (
+                <div key={value} className="text-center cursor-pointer" onClick={() => updateSetting('theme', value)}>
                   <div
                     className={`w-9 h-9 rounded-[var(--radius-sm)] border-2 transition-colors
-                      ${settings.theme === themeVal ? 'border-[var(--accent-gold)]' : 'border-[var(--hairline)] hover:border-[var(--ink-mute)]'}`}
-                    style={{ background: themeVal === 'dark' ? '#0e0e10' : '#f5f0e8' }}
+                      ${settings.theme === value ? 'border-[var(--accent-gold)]' : 'border-[var(--hairline)] hover:border-[var(--ink-mute)]'}`}
+                    style={{ background: swatch }}
                   />
-                  <div className="text-[11px] text-[var(--ink-tertiary)] mt-1">
-                    {themeVal === 'dark' ? t('settings.dark') : t('settings.light')}
-                  </div>
+                  <div className="text-[11px] text-[var(--ink-tertiary)] mt-1">{t(labelKey)}</div>
                 </div>
               ))}
             </div>
