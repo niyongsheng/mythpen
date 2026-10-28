@@ -218,6 +218,57 @@ pre::-webkit-scrollbar-track { background: transparent; }
   .dropdown-menu { animation: none; }
 }
 
+/* ─── AI stop-button shimmer ─── */
+/* A comet of light orbits the stop button while an AI run is streaming:
+   one blurred layer for the halo, one clipped layer for a crisp rim. */
+.ai-stop-glow {
+  position: absolute;
+  inset: -4px;
+  border-radius: calc(var(--radius-sm) + 4px);
+  filter: blur(2px);
+  pointer-events: none;
+}
+.ai-stop-glow-clip {
+  position: absolute;
+  inset: 2px;
+  border-radius: calc(var(--radius-sm) + 2px);
+  overflow: hidden;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+.ai-stop-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: calc(var(--radius-sm) + 2px);
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+/* Oversized so the clip's corners stay covered at every rotation angle. */
+.ai-stop-streak {
+  position: absolute;
+  inset: -25%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 140deg,
+    rgba(200, 74, 74, 0) 165deg,
+    rgba(216, 96, 74, 0.55) 210deg,
+    rgba(230, 150, 82, 0.9) 248deg,
+    rgba(201, 169, 110, 1) 272deg,
+    rgba(232, 213, 163, 1) 292deg,
+    rgba(255, 244, 214, 1) 312deg,
+    rgba(255, 244, 214, 0) 330deg
+  );
+  animation: ai-stop-glow-spin 1.5s linear infinite;
+  will-change: transform;
+}
+@keyframes ai-stop-glow-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-stop-streak { animation: none; }
+}
+
 /* ─── Tailwind-style utility layers ─── */
 @theme {
   --color-canvas: var(--canvas);

@@ -619,12 +619,25 @@ export function AIPanel() {
           {isRunning ? (
             <button
               type="button"
-              className="w-7 h-7 rounded-[var(--radius-sm)] border border-[var(--hairline-light)] bg-[var(--error-soft)] text-[var(--error)] cursor-pointer flex items-center justify-center shrink-0 hover:bg-[var(--error)] hover:text-white hover:border-[var(--error)] transition-colors"
+              className="group relative w-7 h-7 rounded-[var(--radius-sm)] border-none bg-transparent text-[var(--error)] cursor-pointer flex items-center justify-center shrink-0"
               onClick={stopTask}
               title={t('ai.cancel')}
               aria-label={t('ai.cancel')}
             >
-              <Square className="w-3 h-3 fill-current" />
+              {/* Warm comet sweeping around the button while the run streams. */}
+              <span aria-hidden="true" className="ai-stop-glow">
+                <span className="ai-stop-glow-clip">
+                  <span className="ai-stop-streak" />
+                </span>
+              </span>
+              <span aria-hidden="true" className="ai-stop-ring">
+                <span className="ai-stop-streak" />
+              </span>
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 rounded-[inherit] border border-[var(--hairline-light)] bg-[var(--error-soft)] transition-colors duration-150 group-hover:bg-[var(--error)] group-hover:border-[var(--error)]"
+              />
+              <Square className="relative w-3 h-3 fill-current transition-colors duration-150 group-hover:text-white" />
             </button>
           ) : (
             <button
