@@ -499,8 +499,10 @@ export function AIPanel() {
           {messages.map((msg) => (
             <div key={msg.id}>
               {msg.role === 'user' && (
-                <div className="p-2.5 rounded-lg text-[13px] leading-[1.6] mb-2 bg-[var(--canvas-elevated)] text-[var(--ink)]">
-                  <MarkdownContent content={msg.content} />
+                <div className="mb-2 flex justify-end">
+                  <div className="max-w-[85%] p-2.5 rounded-lg text-[13px] leading-[1.6] bg-[var(--canvas-elevated)] text-[var(--ink)]">
+                    <MarkdownContent content={msg.content} />
+                  </div>
                 </div>
               )}
               {msg.role === 'ai' && msg.content && (
