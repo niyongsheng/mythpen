@@ -163,12 +163,6 @@ html[data-theme="light"] .mockup-frame { box-shadow: 0 8px 40px rgba(0,0,0,0.12)
 .feature-title-zh { font-family: var(--font-display); font-size: 20px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
 .feature-title-en { font-size: 11px; color: var(--ink-mute); font-weight: 500; margin-bottom: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
 .feature-desc { font-size: 16px; color: var(--ink-tertiary); line-height: 1.65; }
-.tagline-reveal { padding: 120px 0; }
-.tagline-reveal .container { max-width: 1000px; text-align: center; }
-.tagline-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-mute); margin-bottom: 24px; }
-.tagline-line { font-family: var(--font-display); font-size: clamp(40px, 6vw, 76px); font-weight: 600; line-height: 1.08; letter-spacing: -0.025em; color: var(--ink); text-wrap: balance; }
-.tagline-word { color: color-mix(in srgb, var(--ink) 26%, transparent); transition: color .7s var(--ease); }
-.tagline-word.lit { color: var(--ink); }
 .preview-frame { background: var(--canvas-soft); border: 1px solid var(--hairline-light); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 820px; margin: 0 auto; position: relative; }
 .preview-header { height: 36px; background: var(--canvas-card); border-bottom: 1px solid var(--hairline); display: flex; align-items: center; padding: 0 14px; gap: 8px; }
 .preview-tabs { display: flex; gap: 0; margin-left: 20px; border-bottom: none; }
@@ -254,6 +248,7 @@ html[data-theme="light"] .mockup-frame { box-shadow: 0 8px 40px rgba(0,0,0,0.12)
 .faq details[open] summary::after { color: var(--accent-gold); transform: translateY(-50%) rotate(45deg); }
 .faq details p { padding: 0 48px 22px 0; color: var(--ink-tertiary); font-size: 15px; line-height: 1.75; }
 .cta { text-align: center; padding: 80px 0; }
+.cta .section-title { margin-left: auto; margin-right: auto; }
 .cta-desc { font-size: 16px; color: var(--ink-tertiary); max-width: 480px; margin: 0 auto 32px; }
 .cta .download-buttons { justify-content: center; }
 .cta .download-alt { justify-content: center; }
@@ -292,7 +287,7 @@ to { opacity: 1; transform: scale(1); }
 }
 .typewriter-cursor::after { content: '|'; display: inline; color: var(--accent-gold); animation: typewriterCursor 0.8s step-end infinite; margin-left: 2px; font-weight: 400; }
 .typewriter-done::after { content: ''; }
-.section-title.typewriter-target { min-height: 1.1em; }
+.section-title.typewriter-target { font-size: 36px; max-width: 1100px; min-height: 1.1em; }
 .animate-on-scroll { opacity: 0; }
 .animate-on-scroll.revealed { animation: fadeInUp 0.7s var(--ease) forwards; }
 .animate-on-scroll.from-left.revealed { animation: fadeInLeft 0.7s var(--ease) forwards; }
@@ -333,7 +328,6 @@ to { opacity: 1; transform: scale(1); }
 .mockup-editor { padding: 14px 16px; }
 .features-grid { grid-template-columns: 1fr; }
 .feature-card { padding: 24px; }
-.tagline-reveal { padding: 80px 0; }
 .platform-grid { grid-template-columns: 1fr; gap: 12px; }
 .section { padding: 64px 0; }
 .section-title { font-size: 30px; }
@@ -712,14 +706,6 @@ to { opacity: 1; transform: scale(1); }
     </div>
   </div>
 </section>
-<section class="tagline-reveal" id="tagline">
-  <div class="container">
-    <p class="tagline-kicker" data-i18n="tagline.kicker">创作主张</p>
-    <h2 class="tagline-line" data-tagline-line data-i18n="tagline.line1">不是替你写。</h2>
-    <h2 class="tagline-line" data-tagline-line data-i18n="tagline.line2">而是陪你写完。</h2>
-  </div>
-</section>
-
 <section class="section section-alt" id="preview" aria-labelledby="previewTitle">
   <div class="container">
     <div class="section-header animate-on-scroll">
@@ -918,7 +904,7 @@ to { opacity: 1; transform: scale(1); }
 <section class="section" id="faq" aria-labelledby="faqTitle">
   <div class="container">
     <div class="section-header animate-on-scroll">
-      <h2 class="section-title" id="faqTitle" data-i18n="faq.title">关于 Mythpen，你可能想知道</h2>
+      <h2 class="section-title" id="faqTitle" data-i18n="faq.title">常见问题解答</h2>
       <p class="section-desc" data-i18n="faq.desc">关于数据、AI、安装与导入导出的常见疑问。</p>
       <a class="faq-action" href="https://github.com/niyongsheng/mythpen/issues" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -1005,8 +991,8 @@ to { opacity: 1; transform: scale(1); }
     </div>
     <div class="footer-links">
       <a href="https://github.com/niyongsheng/mythpen" target="_blank" rel="noopener">GitHub</a>
-      <a href="#faq" data-i18n="nav.faq">常见问题</a>
       <a href="https://github.com/niyongsheng/mythpen/releases" target="_blank" rel="noopener" data-i18n="footer.releases">Releases</a>
+      <a href="#faq" data-i18n="nav.faq">常见问题</a>
       <a href="https://github.com/niyongsheng/mythpen/issues" target="_blank" rel="noopener" data-i18n="footer.issues">Issues</a>
     </div>
     <div class="footer-tech">
@@ -1077,12 +1063,9 @@ const i18n = {
     'workflow.desc5': '修订与润色',
     'workflow.desc6': 'AI 检查矛盾',
     'workflow.desc7': '完成你的作品',
-    'tagline.kicker': '创作主张',
-    'tagline.line1': '不是替你写。',
-    'tagline.line2': '而是陪你写完。',
     'a11y.skip': '跳到主要内容',
     'faq.submitIssue': '提交 Issue',
-    'faq.title': '关于 Mythpen，你可能想知道',
+    'faq.title': '常见问题解答',
     'faq.desc': '关于数据、AI、安装与导入导出的常见疑问。',
     'faq.q1': 'Mythpen 免费吗？开源吗？',
     'faq.a1': '免费且开源，采用 GPLv3 许可证，代码托管在 GitHub。你可以免费下载使用，也可以自行编译。',
@@ -1164,12 +1147,9 @@ const i18n = {
     'workflow.desc5': 'Revise & polish',
     'workflow.desc6': 'AI checks conflicts',
     'workflow.desc7': 'Ship your novel',
-    'tagline.kicker': 'Our belief',
-    'tagline.line1': 'Not writing for you.',
-    'tagline.line2': 'Writing with you.',
     'a11y.skip': 'Skip to content',
     'faq.submitIssue': 'Open an issue',
-    'faq.title': 'Questions, answered',
+    'faq.title': 'Frequently asked questions',
     'faq.desc': 'Common questions about data, AI, installation, and import/export.',
     'faq.q1': 'Is Mythpen free and open source?',
     'faq.a1': 'Yes. Mythpen is free and open source under GPLv3, with the code on GitHub. You can download it for free or build it yourself.',
@@ -1200,7 +1180,6 @@ let currentTheme = localStorage.getItem('mythpen-theme') || 'dark';
 let currentSlide = 0;
 const TOTAL_SLIDES = 4;
 let carouselTimer = null;
-let taglineObserver = null;
 // Carousel DOM cache (populated once in DOMContentLoaded)
 let slideEls, dotEls, tabEls;
 /* ═══ DOM Ready ═══ */
@@ -1319,50 +1298,9 @@ function applyLanguage() {
   if (shouldRestartTW && featuresTitle) {
     startTypewriter(featuresTitle, langData['features.title']);
   }
-  renderTaglineReveal();
 }
 
-function renderTaglineReveal() {
-  if (taglineObserver) {
-    taglineObserver.disconnect();
-    taglineObserver = null;
-  }
-  const lines = document.querySelectorAll('[data-tagline-line]');
-  if (!lines.length) return;
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const words = [];
-  lines.forEach(function(line) {
-    const text = line.textContent.trim();
-    if (!text) return;
-    line.textContent = '';
-    const isCjk = /[\u3400-\u9fff]/.test(text);
-    const parts = isCjk ? Array.from(text) : text.split(/(\s+)/).filter(Boolean);
-    parts.forEach(function(part) {
-      if (!isCjk && /^\s+$/.test(part)) {
-        line.appendChild(document.createTextNode(' '));
-        return;
-      }
-      const span = document.createElement('span');
-      span.className = 'tagline-word';
-      span.textContent = part;
-      line.appendChild(span);
-      words.push(span);
-    });
-  });
-  if (reduce) {
-    words.forEach(function(w) { w.classList.add('lit'); });
-    return;
-  }
-  const observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (!entry.isIntersecting) return;
-      entry.target.classList.add('lit');
-      observer.unobserve(entry.target);
-    });
-  }, { rootMargin: '-30% 0px -30% 0px', threshold: 0 });
-  taglineObserver = observer;
-  words.forEach(function(w) { observer.observe(w); });
-}
+
 /* ═══ Theme ═══ */
 function toggleTheme() {
   const html = document.documentElement;
@@ -1418,12 +1356,6 @@ let typewriterTimer = null;
 function startTypewriter(el, customText) {
   const text = customText || el.textContent;
   if (!text) return;
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    el.textContent = text;
-    el.classList.remove('typewriter-cursor');
-    el.classList.add('typewriter-done');
-    return;
-  }
   el.textContent = '';
   el.classList.add('typewriter-target', 'typewriter-cursor');
   el.classList.remove('typewriter-done');
