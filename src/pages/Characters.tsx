@@ -4,7 +4,9 @@ import { Select } from '@/components/Select'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { charactersApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useCharacters, useProjectName } from '@/lib/useProjectData'
 import type { Character } from '@/types'
 
@@ -192,6 +194,7 @@ export function Characters() {
           ]}
           onSubmit={async (vals) => {
             await charactersApi.create(project, vals)
+            track('entity_created', { entity_type: 'character', source: 'manual', ...projectProps(project) })
             reload()
           }}
           onClose={() => setShowCreate(false)}

@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { type Field, SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { cluesApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useClues, useProjectName } from '@/lib/useProjectData'
 import type { Clue, ClueKind } from '@/types'
 
@@ -146,6 +148,7 @@ export function ClueBoard() {
           fields={fields(false)}
           onSubmit={async (vals) => {
             await cluesApi.create(project, vals)
+            track('entity_created', { entity_type: 'clue', source: 'manual', ...projectProps(project) })
             reload()
           }}
           onClose={() => setShowCreate(false)}

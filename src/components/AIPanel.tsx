@@ -1,4 +1,4 @@
-import { Lightbulb, MessageSquare, Plus, SendHorizonal, ShieldCheck, Square, X } from 'lucide-react'
+import { Gamepad2, Joystick, Lightbulb, MessageSquare, Plus, SendHorizonal, ShieldCheck, Square, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { SessionSelect } from '@/components/SessionSelect'
@@ -6,9 +6,13 @@ import { ToastContainer } from '@/components/ToastContainer'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
 import { getSessionTitlePlaceholders } from '@/i18n'
+import { aiErrorCode, aiRuntimeProps, aiToolNames } from '@/lib/aiAnalytics'
 import { track } from '@/lib/analytics'
 import { aiApi, chatApi } from '@/lib/api'
 import { type EntityType, notifyDataChanged } from '@/lib/dataEvents'
+import { trackMilestone } from '@/lib/milestones'
+import { bucketCount, projectKey, projectProps } from '@/lib/projectIdentity'
+import { playAiCompletionSound, primeCompletionSound } from '@/lib/sound'
 import { useProjectName } from '@/lib/useProjectData'
 import { useAgentStore } from '@/stores/useAgentStore'
 import { useChapterStore } from '@/stores/useChapterStore'
@@ -20,7 +24,24 @@ import { useUIStore } from '@/stores/useUIStore'
 const EMPTY_TOOL_CALLS: any[] = []
 const abortControllers = new Map<string, AbortController>()
 const runModifiedEntities = new Map<string, Set<EntityType>>()
+// Timing for analytics lives outside the store: it is only needed by the
+// handlers that finish (or fail) a run.
+const runMetrics = new Map<string, { startedAt: number; firstTokenAt?: number }>()
 const runKey = (project: string, sessionId: string) => `${project}\u0000${sessionId}`
+
+/** Tool name → entity type, for entity_created on successful collab writes. */
+const AI_CREATE_ENTITIES: Record<string, string> = {
+  create_character: 'character',
+  create_world_entry: 'world',
+  create_foreshadow: 'foreshadow',
+  create_payoff: 'payoff',
+  create_relation: 'relation',
+  create_memory: 'memory',
+  create_timeline_event: 'timeline',
+  create_volume: 'volume',
+  create_science_entry: 'science',
+  create_clue: 'clue',
+}
 
 export function AIPanel() {
   const {
@@ -199,6 +220,22 @@ export function AIPanel() {
     const key = runKey(project, currentSessionId)
     const run = useAgentStore.getState().runs[project]?.[currentSessionId]
     if (!run) return
+    const metrics = runMetrics.get(key)
+    runMetrics.delete(key)
+    const tools = aiToolNames(run.toolCalls)
+    track('ai_run_finished', {
+      mode: mode === 'collab' ? 'collab' : 'writing',
+      ok: 0,
+      canceled: 1,
+      duration_ms: metrics ? Date.now() - metrics.startedAt : 0,
+      ...(metrics?.firstTokenAt ? { first_token_ms: metrics.firstTokenAt - metrics.startedAt } : {}),
+      tool_calls: run.toolCalls.length,
+      ...(tools ? { tools } : {}),
+      partial_bucket: bucketCount(run.streamText.length),
+      error_code: 'user_canceled',
+      ...aiRuntimeProps(),
+      ...projectProps(project),
+    })
     abortControllers.get(key)?.abort()
     abortControllers.delete(key)
     const modified = [...(runModifiedEntities.get(key) || [])]
@@ -243,7 +280,10 @@ export function AIPanel() {
     const key = runKey(runProject, runSessionId)
     const userMsg = input.trim()
     const isChat = mode === 'collab'
-    track('ai_chat', { mode: isChat ? 'collab' : 'writing' })
+    // Unlock audio while we still have the send gesture; the cue plays later.
+    primeCompletionSound()
+    track('ai_message_sent', { mode: isChat ? 'collab' : 'writing', ...projectProps(runProject) })
+    runMetrics.set(key, { startedAt: Date.now() })
     startRun(runProject, runSessionId, isChat ? t('ai.taskCollab') : t('ai.taskContinue'))
     runModifiedEntities.set(key, new Set())
 
@@ -277,17 +317,37 @@ export function AIPanel() {
       (text: string) => {
         const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
         if (!run) return // stopped
+        const metrics = runMetrics.get(key)
+        if (metrics && !metrics.firstTokenAt) metrics.firstTokenAt = Date.now()
         updateRun(runProject, runSessionId, {
           streamText: run.streamText + text,
           genTokens: run.genTokens + 1,
         })
       },
       // onComplete
-      async () => {
+      async (endData?: any) => {
         const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
         if (!run) return // stopped
+        playAiCompletionSound()
         const fullText = run.streamText
         const runToolCalls = run.toolCalls
+        const metrics = runMetrics.get(key)
+        runMetrics.delete(key)
+        const tools = aiToolNames(runToolCalls)
+        track('ai_run_finished', {
+          mode: isChat ? 'collab' : 'writing',
+          ok: 1,
+          canceled: 0,
+          duration_ms: metrics ? Date.now() - metrics.startedAt : 0,
+          ...(metrics?.firstTokenAt ? { first_token_ms: metrics.firstTokenAt - metrics.startedAt } : {}),
+          tokens_in: Number(endData?.inputTokens ?? endData?.usage?.prompt_tokens) || 0,
+          tokens_out: Number(endData?.outputTokens ?? endData?.usage?.completion_tokens) || 0,
+          tool_calls: runToolCalls.length,
+          ...(tools ? { tools } : {}),
+          ...aiRuntimeProps(),
+          ...projectProps(runProject),
+        })
+        trackMilestone('first_ai', projectKey(runProject))
         const defaultMsg = isChat ? t('ai.dialogComplete') : t('ai.execComplete')
         const aiMsg = {
           role: 'ai' as const,
@@ -331,6 +391,21 @@ export function AIPanel() {
       (err: any) => {
         const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
         if (!run) return // stopped
+        const metrics = runMetrics.get(key)
+        runMetrics.delete(key)
+        const tools = aiToolNames(run.toolCalls)
+        track('ai_run_finished', {
+          mode: isChat ? 'collab' : 'writing',
+          ok: 0,
+          canceled: 0,
+          duration_ms: metrics ? Date.now() - metrics.startedAt : 0,
+          ...(metrics?.firstTokenAt ? { first_token_ms: metrics.firstTokenAt - metrics.startedAt } : {}),
+          tool_calls: run.toolCalls.length,
+          ...(tools ? { tools } : {}),
+          error_code: aiErrorCode(err),
+          ...aiRuntimeProps(),
+          ...projectProps(runProject),
+        })
         const visible = isRunVisible()
         const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
         if (visible) {
@@ -354,6 +429,18 @@ export function AIPanel() {
         if (tr.entity) runModifiedEntities.get(key)?.add(tr.entity as EntityType)
         const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
         if (!run) return
+        if (!tr.result?.error) {
+          if (tr.name === 'create_chapter') {
+            track('chapter_created', { source: 'ai_collab', ...projectProps(runProject) })
+            trackMilestone('first_chapter', projectKey(runProject))
+          } else if (AI_CREATE_ENTITIES[tr.name]) {
+            track('entity_created', {
+              entity_type: AI_CREATE_ENTITIES[tr.name],
+              source: 'ai_collab',
+              ...projectProps(runProject),
+            })
+          }
+        }
         updateRun(runProject, runSessionId, {
           toolCalls: run.toolCalls.map((tc) => (tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc)),
         })
@@ -413,21 +500,23 @@ export function AIPanel() {
             <button
               type="button"
               aria-pressed={mode === 'collab'}
-              className={`relative z-10 flex-1 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
+              className={`relative z-10 flex flex-1 items-center justify-center gap-1.5 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
                 mode === 'collab' ? 'text-[var(--canvas)]' : 'text-[var(--ink-tertiary)] hover:text-[var(--ink)]'
               }`}
               onClick={() => setMode('collab')}
             >
+              <Joystick className="w-4 h-4" aria-hidden="true" />
               {t('ai.modeCollab')}
             </button>
             <button
               type="button"
               aria-pressed={mode === 'writing'}
-              className={`relative z-10 flex-1 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
+              className={`relative z-10 flex flex-1 items-center justify-center gap-1.5 h-[26px] rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer border-none bg-transparent ${
                 mode === 'writing' ? 'text-[var(--canvas)]' : 'text-[var(--ink-tertiary)] hover:text-[var(--ink)]'
               }`}
               onClick={() => setMode('writing')}
             >
+              <Gamepad2 className="w-4 h-4" aria-hidden="true" />
               {t('ai.modeWriting')}
             </button>
           </div>

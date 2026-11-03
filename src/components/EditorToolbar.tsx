@@ -1,9 +1,13 @@
 import { Loader, Pen, Redo2, RemoveFormatting, Save, Sparkles, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { aiErrorCode, aiRuntimeProps } from '@/lib/aiAnalytics'
 import { track } from '@/lib/analytics'
 import { aiApi } from '@/lib/api'
 import { performHistory } from '@/lib/editorHistory'
+import { trackMilestone } from '@/lib/milestones'
+import { bucketWords, projectKey, projectProps } from '@/lib/projectIdentity'
+import { playAiCompletionSound, primeCompletionSound } from '@/lib/sound'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
 
@@ -179,7 +183,11 @@ export function EditorToolbar() {
   const handleContinue = useCallback(() => {
     if (loading || !currentProject || !currentChapter) return
     setLoading('continue')
+    // Unlock audio inside the click gesture; the cue plays when the stream ends.
+    primeCompletionSound()
     const ch = currentChapter
+    const startedAt = Date.now()
+    const beforeWords = ch?.wordCount || 0
     // The server reads the tail of the chapter itself; only send metadata so
     // very large imported chapters don't bloat the request.
     const context = t('editor.continuePrompt', {
@@ -188,7 +196,7 @@ export function EditorToolbar() {
       title: ch?.title,
     })
 
-    track('ai_continue')
+    track('ai_continue', projectProps(currentProject))
     abortRef.current = aiApi.continueWriting(
       ch?.num || 1,
       context,
@@ -196,10 +204,31 @@ export function EditorToolbar() {
       () => {}, // chunk handler — no-op for toolbar (streaming handled server-side)
       async () => {
         setLoading(null)
+        playAiCompletionSound()
         if (ch?.num) await loadChapterContent(currentProject, ch.num, ch.volumeId)
+        const updated = useChapterStore.getState().currentChapter
+        const afterWords = updated?.num === ch?.num ? updated.wordCount || 0 : beforeWords
+        track('ai_generation_finished', {
+          kind: 'continue',
+          ok: 1,
+          duration_ms: Date.now() - startedAt,
+          words_before_bucket: bucketWords(beforeWords),
+          words_after_bucket: bucketWords(afterWords),
+          ...aiRuntimeProps(),
+          ...projectProps(currentProject),
+        })
+        trackMilestone('first_ai', projectKey(currentProject))
       },
-      () => {
+      (err: any) => {
         setLoading(null)
+        track('ai_generation_finished', {
+          kind: 'continue',
+          ok: 0,
+          duration_ms: Date.now() - startedAt,
+          error_code: aiErrorCode(err),
+          ...aiRuntimeProps(),
+          ...projectProps(currentProject),
+        })
       },
     )
   }, [loading, currentProject, currentChapter, loadChapterContent])
@@ -227,10 +256,13 @@ export function EditorToolbar() {
   const handlePolish = useCallback(() => {
     if (loading || !currentProject || !currentChapter) return
     setLoading('polish')
+    primeCompletionSound()
     const ch = currentChapter
+    const startedAt = Date.now()
+    const beforeWords = ch?.wordCount || 0
     const context = t('editor.polishPrompt', { project: currentProject, num: ch?.num, title: ch?.title })
 
-    track('ai_polish')
+    track('ai_polish', projectProps(currentProject))
     abortRef.current = aiApi.continueWriting(
       ch?.num || 1,
       context,
@@ -238,10 +270,31 @@ export function EditorToolbar() {
       () => {},
       async () => {
         setLoading(null)
+        playAiCompletionSound()
         if (ch?.num) await loadChapterContent(currentProject, ch.num, ch.volumeId)
+        const updated = useChapterStore.getState().currentChapter
+        const afterWords = updated?.num === ch?.num ? updated.wordCount || 0 : beforeWords
+        track('ai_generation_finished', {
+          kind: 'polish',
+          ok: 1,
+          duration_ms: Date.now() - startedAt,
+          words_before_bucket: bucketWords(beforeWords),
+          words_after_bucket: bucketWords(afterWords),
+          ...aiRuntimeProps(),
+          ...projectProps(currentProject),
+        })
+        trackMilestone('first_ai', projectKey(currentProject))
       },
-      () => {
+      (err: any) => {
         setLoading(null)
+        track('ai_generation_finished', {
+          kind: 'polish',
+          ok: 0,
+          duration_ms: Date.now() - startedAt,
+          error_code: aiErrorCode(err),
+          ...aiRuntimeProps(),
+          ...projectProps(currentProject),
+        })
       },
       'polish',
     )

@@ -119,8 +119,20 @@ function App() {
 
   // Analytics: which screen is visible (no project names or content)
   useEffect(() => {
-    track('screen_view', { screen: showProjectList ? 'project_list' : activePage.replace(/^page-/, '') })
-  }, [activePage, showProjectList])
+    track('screen_view', {
+      screen: showProjectList ? 'project_list' : activePage.replace(/^page-/, ''),
+      has_project: currentProject ? 1 : 0,
+    })
+  }, [activePage, showProjectList, currentProject])
+
+  // Focus/blur lets the active writing time be separated from wall-clock span.
+  useEffect(() => {
+    const onVisibility = () => {
+      track('app_visibility_changed', { state: document.visibilityState === 'hidden' ? 'hidden' : 'visible' })
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [])
 
   // Restore sidebar / AI panel widths. Restore the sidebar first so the panel
   // clamp accounts for it.

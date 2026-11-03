@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   editorFontSize: 17,
   editorFontFamily: "'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif",
   autoSaveInterval: 30,
+  soundEffect: 'chime',
   backupEnabled: true,
   accentColor: '#c9a96e',
   maxOutputTokens: 8192,
@@ -88,11 +89,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       merged.editorFontSize = get().settings.editorFontSize
       merged.editorFontFamily = get().settings.editorFontFamily
       merged.accentColor = get().settings.accentColor
+      // Sound is a per-device preference; never overwrite it with server defaults.
+      merged.soundEffect = get().settings.soundEffect
       // Auto-save can be disabled (0); prefer the persisted server value.
       const serverAutoSave = Number(serverSettings.auto_save_interval)
-      merged.autoSaveInterval = Number.isFinite(serverAutoSave)
-        ? serverAutoSave
-        : get().settings.autoSaveInterval
+      merged.autoSaveInterval = Number.isFinite(serverAutoSave) ? serverAutoSave : get().settings.autoSaveInterval
       // Preserve per-provider API keys from local state (server only has one api_key slot)
       merged.apiKeyDeepseek = get().settings.apiKeyDeepseek || DEFAULT_SETTINGS.apiKeyDeepseek
       merged.apiKeyAnthropic = get().settings.apiKeyAnthropic || DEFAULT_SETTINGS.apiKeyAnthropic

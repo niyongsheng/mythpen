@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { aiApi, extractAIJsonArray, getAIResponseText, payoffsApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { usePayoffs, useProjectName } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
 import type { PayoffPoint, PayoffStatus, PayoffType } from '@/types'
@@ -87,6 +89,12 @@ export function Payoffs() {
             })
           }),
         )
+        track('entity_created', {
+          entity_type: 'payoff',
+          source: 'ai',
+          count: suggestions.length,
+          ...projectProps(project),
+        })
         reload()
       }
     } catch (e) {
@@ -201,6 +209,7 @@ export function Payoffs() {
               setup_chapter: parseInt(vals.setup_chapter, 10) || 0,
               payoff_chapter: parseInt(vals.payoff_chapter, 10) || 0,
             })
+            track('entity_created', { entity_type: 'payoff', source: 'manual', ...projectProps(project) })
             reload()
           }}
           onClose={() => setShowCreate(false)}

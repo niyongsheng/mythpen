@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { aiApi, extractAIJsonArray, getAIResponseText, memoriesApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useMemories, useProjectName } from '@/lib/useProjectData'
 import type { Memory as MemoryItem } from '@/types'
 
@@ -78,6 +80,7 @@ export function Memory() {
             }),
           ),
         )
+        track('entity_created', { entity_type: 'memory', source: 'ai', count: items.length, ...projectProps(project) })
         reload()
       }
     } catch (e) {

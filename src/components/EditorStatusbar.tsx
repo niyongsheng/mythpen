@@ -1,5 +1,4 @@
 import { useT } from '@/hooks/useT'
-import { track } from '@/lib/analytics'
 import { formatChapterTitle } from '@/lib/chapterTitle'
 import { NEXT_STATUS } from '@/lib/status'
 import { useProjectName } from '@/lib/useProjectData'
@@ -23,9 +22,7 @@ export function EditorStatusbar() {
     if (!currentChapter || !project) return
     const from = currentChapter.status
     const next = NEXT_STATUS[from] || 'writing'
-    updateChapter(project, currentChapter.num, { status: next })
-      .then(() => track('chapter_status_changed', { from, to: next }))
-      .catch(() => {})
+    updateChapter(project, currentChapter.num, { status: next }).catch(() => {})
   }
 
   if (!currentChapter) {

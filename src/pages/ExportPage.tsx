@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { track } from '@/lib/analytics'
 import { apiUrl, projectsApi } from '@/lib/api'
+import { trackMilestone } from '@/lib/milestones'
+import { projectKey, projectProps } from '@/lib/projectIdentity'
 import { useProjectName } from '@/lib/useProjectData'
 
 interface Format {
@@ -76,23 +78,46 @@ export function ExportPage() {
   }
 
   const handleExport = async () => {
+    if (!project) return
     setExporting(true)
     setExportMsg('')
+    const startedAt = Date.now()
     try {
       const fmt = activeFormat
-      // Single request: the backend generates + sends the file
-      const a = document.createElement('a')
-      a.href = apiUrl(`/${encodeURIComponent(project)}/export?format=${fmt}&download=1`)
+      // Fetch first so `project_exported` means the file was actually built,
+      // not merely that a download link was clicked.
+      const res = await fetch(apiUrl(`/${encodeURIComponent(project)}/export?format=${fmt}&download=1`))
+      if (!res.ok) {
+        const e: any = new Error(`HTTP ${res.status}`)
+        e.code = `HTTP_${res.status}`
+        throw e
+      }
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
       const extMap: Record<string, string> = { epub: 'epub', html: 'html', md: 'md', txt: 'txt' }
+      const a = document.createElement('a')
+      a.href = objectUrl
       a.download = `${project}.${extMap[fmt] || 'txt'}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      track('project_exported', { format: fmt })
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000)
+      track('project_exported', {
+        format: fmt,
+        duration_ms: Date.now() - startedAt,
+        ...projectProps(project),
+      })
+      trackMilestone('first_export', projectKey(project))
       setExportMsg(t('export.downloadingFile', { fmt: fmt.toUpperCase() }))
       setExportStatus('success')
       setTimeout(() => setExportMsg(''), 3000)
     } catch (err: any) {
+      track('export_failed', {
+        format: activeFormat,
+        duration_ms: Date.now() - startedAt,
+        error_code: String(err?.code || (err?.name && err.name !== 'Error' ? err.name : 'export_error')).slice(0, 48),
+        ...projectProps(project),
+      })
       setExportMsg(t('export.exportError', { msg: err.message }))
       setExportStatus('error')
     } finally {

@@ -1,13 +1,29 @@
-import { Bot, Download, Eye, EyeOff, Globe, Palette, Pen, RotateCw, SwatchBook, X, Zap } from 'lucide-react'
+import {
+  Bot,
+  Download,
+  Eye,
+  EyeOff,
+  Globe,
+  Palette,
+  Pen,
+  Play,
+  RotateCw,
+  SwatchBook,
+  Volume2,
+  X,
+  Zap,
+} from 'lucide-react'
 import { useState } from 'react'
 import { LanguageSelect } from '@/components/LanguageSelect'
 import { Select } from '@/components/Select'
 import { useT } from '@/hooks/useT'
 import { apiUrl } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
+import { playSound } from '@/lib/sound'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
 import { useUpdateStore } from '@/stores/useUpdateStore'
+import type { SoundEffect } from '@/types'
 
 const ACCENT_COLORS = ['#c9a96e', '#e06c75', '#61afef', '#98c379', '#c678dd', '#d4a040', '#56b6c2']
 
@@ -141,6 +157,69 @@ export function SettingsDrawer() {
             </div>
           </div>
 
+          {/* ── Accent Color ── */}
+          <div className="mb-7">
+            <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
+              <SwatchBook className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.accentColor')}
+            </div>
+            <div className="flex gap-2 flex-wrap mb-2">
+              {ACCENT_COLORS.map((c) => (
+                <div
+                  key={c}
+                  className={`w-[30px] h-[30px] rounded-full border-2 cursor-pointer transition-all hover:scale-110 shrink-0
+                    ${settings.accentColor === c ? 'border-[var(--ink)] shadow-[0_0_0_1px_var(--canvas)]' : 'border-transparent'}`}
+                  style={{ background: c }}
+                  onClick={() => handleAccentChange(c)}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-[var(--ink-mute)]">{t('settings.customColor')}</span>
+              <input
+                type="color"
+                className="w-8 h-7 p-0 border border-[var(--hairline)] rounded-[var(--radius-sm)] bg-none cursor-pointer"
+                value={settings.accentColor}
+                onChange={(e) => handleAccentChange(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* ── Completion Sound ── */}
+          <div className="mb-7">
+            <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
+              <Volume2 className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.sound')}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select<SoundEffect>
+                ariaLabel={t('settings.sound')}
+                className="flex-1"
+                value={settings.soundEffect}
+                options={[
+                  { value: 'chime', label: t('settings.soundChime') },
+                  { value: 'soft', label: t('settings.soundSoft') },
+                  { value: 'piano', label: t('settings.soundPiano') },
+                  { value: 'wood', label: t('settings.soundWood') },
+                  { value: 'pulse', label: t('settings.soundPulse') },
+                  { value: 'off', label: t('settings.soundOff') },
+                ]}
+                onChange={(value) => {
+                  updateSetting('soundEffect', value)
+                  // Preview immediately so the choice is audible.
+                  playSound(value)
+                }}
+              />
+              <button
+                type="button"
+                className="h-[30px] px-3 rounded-[var(--radius-sm)] border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink-secondary)] text-[12px] cursor-pointer hover:bg-[var(--canvas-mid)] disabled:opacity-40 disabled:cursor-default flex items-center gap-1 shrink-0"
+                onClick={() => playSound(settings.soundEffect)}
+                disabled={settings.soundEffect === 'off'}
+              >
+                <Play className="w-3 h-3" />
+                {t('settings.previewSound')}
+              </button>
+            </div>
+          </div>
+
           {/* ── Editor ── */}
           <div className="mb-7">
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
@@ -197,33 +276,6 @@ export function SettingsDrawer() {
                 onChange={handleFontFamilyChange}
               />
             </SettingRow>
-          </div>
-
-          {/* ── Accent Color ── */}
-          <div className="mb-7">
-            <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
-              <SwatchBook className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.accentColor')}
-            </div>
-            <div className="flex gap-2 flex-wrap mb-2">
-              {ACCENT_COLORS.map((c) => (
-                <div
-                  key={c}
-                  className={`w-[30px] h-[30px] rounded-full border-2 cursor-pointer transition-all hover:scale-110 shrink-0
-                    ${settings.accentColor === c ? 'border-[var(--ink)] shadow-[0_0_0_1px_var(--canvas)]' : 'border-transparent'}`}
-                  style={{ background: c }}
-                  onClick={() => handleAccentChange(c)}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[var(--ink-mute)]">{t('settings.customColor')}</span>
-              <input
-                type="color"
-                className="w-8 h-7 p-0 border border-[var(--hairline)] rounded-[var(--radius-sm)] bg-none cursor-pointer"
-                value={settings.accentColor}
-                onChange={(e) => handleAccentChange(e.target.value)}
-              />
-            </div>
           </div>
 
           {/* ── AI Service ── */}

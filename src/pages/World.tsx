@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { worldApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useProjectName, useWorldEntries } from '@/lib/useProjectData'
 import type { WorldEntry } from '@/types'
 
@@ -95,6 +97,7 @@ export function World() {
           ]}
           onSubmit={async (vals) => {
             await worldApi.create(project, vals)
+            track('entity_created', { entity_type: 'world', source: 'manual', ...projectProps(project) })
             reload()
           }}
           onClose={() => setShowCreate(false)}

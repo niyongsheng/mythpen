@@ -167,6 +167,9 @@ export type WritingLanguage = LanguageCode
 
 // ─── Settings ───
 
+/** Completion cue played after an AI reply finishes. */
+export type SoundEffect = 'off' | 'chime' | 'soft' | 'piano' | 'wood' | 'pulse'
+
 export interface AppSettings {
   apiKey: string
   apiKeyDeepseek: string
@@ -180,6 +183,7 @@ export interface AppSettings {
   editorFontSize: number
   editorFontFamily: string
   autoSaveInterval: number
+  soundEffect: SoundEffect
   backupEnabled: boolean
   accentColor: string
   maxOutputTokens: number

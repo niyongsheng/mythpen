@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { aiApi, extractAIJsonArray, foreshadowsApi, getAIResponseText } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useForeshadows, useProjectName } from '@/lib/useProjectData'
 import { useChapterStore } from '@/stores/useChapterStore'
 import type { Foreshadow } from '@/types'
@@ -58,6 +60,12 @@ export function Foreshadows() {
             }),
           ),
         )
+        track('entity_created', {
+          entity_type: 'foreshadow',
+          source: 'ai',
+          count: suggestions.length,
+          ...projectProps(project),
+        })
         reload()
       }
     } catch (e) {
@@ -154,6 +162,7 @@ export function Foreshadows() {
           ]}
           onSubmit={async (vals) => {
             await foreshadowsApi.create(project, vals)
+            track('entity_created', { entity_type: 'foreshadow', source: 'manual', ...projectProps(project) })
             reload()
           }}
           onClose={() => setShowCreate(false)}

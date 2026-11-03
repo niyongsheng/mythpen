@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { timelineApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useProjectName, useTimelineEvents } from '@/lib/useProjectData'
 import type { TimelineEvent } from '@/types'
 
@@ -67,6 +69,7 @@ export function Timeline() {
               description: vals.description,
               importance: parseInt(vals.importance, 10) || 3,
             })
+            track('entity_created', { entity_type: 'timeline', source: 'manual', ...projectProps(project) })
             reload()
           }}
           onClose={() => setShowCreate(false)}

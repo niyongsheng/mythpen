@@ -8,6 +8,9 @@ export type UpdateStatus = 'idle' | 'checking' | 'upToDate' | 'available' | 'dow
 
 const LAST_CHECK_KEY = 'mythpen-update-last-check'
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
+// One "update available" event per version per session; manual re-checks
+// should not inflate the prompt count.
+const availableReported = new Set<string>()
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -62,7 +65,10 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       localStorage.setItem(LAST_CHECK_KEY, String(Date.now()))
 
       if (update) {
-        track('update_available', { version: update.version })
+        if (!availableReported.has(update.version)) {
+          availableReported.add(update.version)
+          track('update_available', { version: update.version })
+        }
         set({
           status: 'available',
           update,
@@ -97,11 +103,16 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     if (!update || status === 'downloading' || status === 'ready') return
 
     set({ status: 'downloading', progress: 0, error: '', errorContext: null })
+    track('update_install_started', { version: update.version })
     try {
       await downloadAndInstall(update, ({ percent }) => set({ progress: percent }))
       track('update_installed', { version: update.version })
       set({ status: 'ready', progress: 100, dismissed: false })
     } catch (err) {
+      track('update_install_failed', {
+        version: update.version,
+        error_code: err instanceof Error && err.name !== 'Error' ? err.name : 'install_error',
+      })
       set({ status: 'error', error: errorMessage(err), errorContext: 'install' })
     }
   },
@@ -114,5 +125,13 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     }
   },
 
-  dismiss: () => set({ dismissed: true }),
+  dismiss: () => {
+    const { version, status } = get()
+    // Only "later" on an available update is a decline; hiding the restart
+    // prompt after a successful install is not.
+    if (status === 'available') {
+      track('update_dismissed', version ? { version } : {})
+    }
+    set({ dismissed: true })
+  },
 }))

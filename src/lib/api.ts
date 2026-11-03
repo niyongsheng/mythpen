@@ -321,7 +321,7 @@ export const aiApi = {
     messages: any[],
     project: string,
     onChunk: (t: string) => void,
-    onEnd: () => void,
+    onEnd: (data?: any) => void,
     onError: (e: any) => void,
     mode = 'writing',
     onToolCall?: (tc: any) => void,
@@ -335,10 +335,14 @@ export const aiApi = {
     })
       .then(async (response) => {
         let gotError = false
+        let endData: any
         await readSSEStream(response, {
           content_chunk: (data) => onChunk(data.text || ''),
           tool_call: (data) => onToolCall?.(data),
           tool_result: (data) => onToolResult?.(data),
+          task_end: (data) => {
+            endData = data
+          },
           error: (data) => {
             gotError = true
             onError(data)
@@ -348,7 +352,7 @@ export const aiApi = {
             onError(data)
           },
         })
-        if (!gotError) onEnd()
+        if (!gotError) onEnd(endData)
       })
       .catch((e) => {
         // A user-initiated stop aborts the fetch; that is not an AI failure.

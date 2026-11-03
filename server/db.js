@@ -880,6 +880,8 @@ function initProjectMeta(projectName, overrides = {}) {
     word_count: '0',
     author_name: '佚名',
     workflow_phase: 'idea',
+    // Opaque per-project id for product analytics — carries no name or content.
+    analytics_id: randomUUID(),
     ...overrides,
   };
   const insert = getProjectDb(projectName).prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)');

@@ -3,6 +3,8 @@ import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { chaptersApi, volumesApi } from '@/lib/api'
 import { toChapter } from '@/lib/dto'
+import { trackMilestone } from '@/lib/milestones'
+import { projectKey, projectProps } from '@/lib/projectIdentity'
 import { useProjectStore } from '@/stores/useProjectStore'
 import type { Chapter, Volume } from '@/types'
 
@@ -107,6 +109,11 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
   },
 
   updateChapter: async (project, num, data) => {
+    const stateBefore = get()
+    const prevStatus =
+      stateBefore.currentChapter?.num === num
+        ? stateBefore.currentChapter.status
+        : stateBefore.volumes.flatMap((v) => v.chapters).find((c) => c.num === num)?.status
     try {
       const apiData: any = {}
       if (data.title !== undefined) apiData.title = data.title
@@ -120,6 +127,13 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
       if (data.interpersonalTension !== undefined) apiData.interpersonal_tension = data.interpersonalTension
 
       const updated = await chaptersApi.update(project, num, apiData)
+      if (data.status && prevStatus && data.status !== prevStatus) {
+        track('chapter_status_changed', {
+          from: prevStatus,
+          to: data.status,
+          ...projectProps(project),
+        })
+      }
       // Apply the PUT response directly instead of re-fetching the chapter.
       set((s) => ({
         currentChapter: s.currentChapter?.id === updated.id ? updated : s.currentChapter,
@@ -136,7 +150,8 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
   createChapter: async (project, title = t('chapter.defaultTitle'), outline = '', volumeId?: number) => {
     try {
       const created = await chaptersApi.create(project, { title, outline, volume_id: volumeId })
-      track('chapter_created')
+      track('chapter_created', { source: 'manual', ...projectProps(project) })
+      trackMilestone('first_chapter', projectKey(project))
       // Reload chapters to include the new one
       await useChapterStore.getState().loadChapters(project)
       // Set the newly created chapter as current

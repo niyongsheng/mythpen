@@ -1,8 +1,10 @@
 import { Pen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { formatChapterTitle, stripLeadingChapterHeading } from '@/lib/chapterTitle'
 import { performHistory } from '@/lib/editorHistory'
+import { bucketWords, projectProps } from '@/lib/projectIdentity'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useEditorHistoryStore } from '@/stores/useEditorHistoryStore'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -27,12 +29,22 @@ export function EditorContent() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastSavedContentRef = useRef('')
   const hasSavedRef = useRef(false)
+  // Writing-output analytics: compare the server's word count with the value
+  // at the last tracked save, and never emit more than once every two minutes.
+  const lastTrackedWordsRef = useRef(0)
+  const lastTrackedAtRef = useRef(0)
+  const saveTriggerRef = useRef<'auto' | 'manual'>('auto')
   const [isDirty, setIsDirty] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
 
   const allChapters = volumes.flatMap((v) => v.chapters)
   const hasChapters = allChapters.length > 0
+
+  useEffect(() => {
+    lastTrackedWordsRef.current = currentChapter?.wordCount || 0
+    lastTrackedAtRef.current = 0
+  }, [currentChapter?.id])
 
   const handleNewChapter = async () => {
     if (!currentProject) return
@@ -127,6 +139,8 @@ export function EditorContent() {
 
   // Persist editor content to server — capture snapshot before any async gap
   const doSave = useCallback(async () => {
+    const trigger = saveTriggerRef.current
+    saveTriggerRef.current = 'auto'
     const pn = useProjectStore.getState().currentProject
     const ch = useChapterStore.getState().currentChapter
     const chNum = ch?.num
@@ -152,6 +166,24 @@ export function EditorContent() {
       lastSavedContentRef.current = markdown
       hasSavedRef.current = true
       setSaveStatus('saved')
+
+      // Emit actual writing output, throttled so autosave doesn't flood the
+      // event stream. Word counts come from the server's PUT response.
+      const saved = useChapterStore.getState().currentChapter
+      const words = saved?.num === chNum ? saved.wordCount || 0 : 0
+      const delta = words - lastTrackedWordsRef.current
+      const now = Date.now()
+      if (words > 0 && Math.abs(delta) >= 50 && now - lastTrackedAtRef.current >= 120_000) {
+        track('chapter_saved', {
+          words_bucket: bucketWords(words),
+          delta_bucket: bucketWords(Math.abs(delta)),
+          direction: delta >= 0 ? 'up' : 'down',
+          trigger,
+          ...projectProps(pn),
+        })
+        lastTrackedWordsRef.current = words
+        lastTrackedAtRef.current = now
+      }
     }
     setIsDirty(false)
   }, [updateChapter, setSaveStatus]) // no longer depends on chapter/currentProject
@@ -159,6 +191,7 @@ export function EditorContent() {
   // Manual save from the toolbar or Cmd/Ctrl+S.
   useEffect(() => {
     const handleSaveRequest = () => {
+      saveTriggerRef.current = 'manual'
       void doSave()
     }
     window.addEventListener('mythpen:save-chapter', handleSaveRequest)

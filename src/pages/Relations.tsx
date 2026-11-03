@@ -3,7 +3,9 @@ import { useCallback, useMemo, useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { track } from '@/lib/analytics'
 import { aiApi, extractAIJsonArray, getAIResponseText, relationsApi } from '@/lib/api'
+import { projectProps } from '@/lib/projectIdentity'
 import { useCharacters, useProjectName, useRelations } from '@/lib/useProjectData'
 import type { CharacterRelation } from '@/types'
 
@@ -199,6 +201,9 @@ export function Relations() {
       }
       const results = await Promise.all(createOps)
       created = results.length
+      if (created > 0) {
+        track('entity_created', { entity_type: 'relation', source: 'ai', count: created, ...projectProps(project) })
+      }
       await reloadRels()
       setOrgMsg(created > 0 ? t('relations.createdCount', { n: created }) : t('relations.aiNoNewRelations'))
     } catch (e) {

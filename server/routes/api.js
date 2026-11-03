@@ -48,6 +48,13 @@ router.get('/projects', (req, res) => {
         const genres = db2.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
         const styles = db2.prepare('SELECT style FROM project_styles').all().map(s => s.style);
         const wordCount = parseInt(meta.word_count || '0');
+        // Older projects predate the analytics id; assign one lazily so every
+        // project can be followed across days without using its name.
+        let analyticsId = meta.analytics_id;
+        if (!analyticsId) {
+          analyticsId = randomUUID();
+          db2.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('analytics_id', ?)").run(analyticsId);
+        }
         const iconMap = { 'sci-fi': 'Rocket', 'fantasy': 'Wand', 'xianxia': 'Mountain', 'wuxia': 'Swords', 'romance': 'Heart', 'history': 'Landmark', 'urban': 'Building', 'mystery': 'Fingerprint', 'game': 'Gamepad2', 'biography': 'BookOpen', 'other': 'Scroll' };
         // A project can carry several genres; the icon shows the first one.
         const iconName = iconMap[genres[0]] || 'BookOpen';
@@ -58,10 +65,12 @@ router.get('/projects', (req, res) => {
           powerFantasy: styles.includes('power-fantasy'),
           wordCount, chapterCount: chCount, lastOpened: r.last_opened,
           mode: meta.mode || 'medium-novel',
+          analyticsId,
+          createdAt: meta.created_at || null,
           status: wordCount > 30000 ? 'writing' : wordCount > 5000 ? 'inProgress' : 'new',
         };
       } catch (e) {
-        return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], styles: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: 'unknown' };
+        return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], styles: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: 'unknown', analyticsId: null, createdAt: null };
       }
     })
     .filter(Boolean);
@@ -117,7 +126,8 @@ router.post('/projects', (req, res) => {
     throw err;
   }
 
-  res.json({ name, filePath, mode, language: writingLanguage, genres, styles });
+  const analyticsId = pdb.prepare("SELECT value FROM project_meta WHERE key = 'analytics_id'").get()?.value || null;
+  res.json({ name, filePath, mode, language: writingLanguage, genres, styles, analyticsId });
 });
 
 router.get('/projects/:name', (req, res) => {

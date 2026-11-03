@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
+import { ageDays, bucketCount, bucketWords } from '@/lib/analyticsBuckets'
 import { chaptersApi, type ImportSseHandlers, projectsApi } from '@/lib/api'
 import type { ImportResult, ImportSource } from '@/lib/import/types'
+import { trackMilestone } from '@/lib/milestones'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useSidebarStore } from '@/stores/useSidebarStore'
 import type { WorkflowPhase, WritingLanguage } from '@/types'
@@ -18,6 +20,25 @@ interface ProjectSummary {
   lastOpened: string
   status: string
   mode?: string
+  /** Opaque analytics id; never the project name. */
+  analyticsId?: string
+  createdAt?: string | null
+}
+
+/** Fire project_opened at most once per project per app session. */
+const openedProjects = new Set<string>()
+function trackProjectOpened(project: ProjectSummary | undefined, source: 'restore' | 'select') {
+  if (!project?.analyticsId || openedProjects.has(project.analyticsId)) return
+  openedProjects.add(project.analyticsId)
+  const age = ageDays(project.createdAt)
+  track('project_opened', {
+    project_key: project.analyticsId,
+    mode: project.mode || 'unknown',
+    chapters_bucket: bucketCount(project.chapterCount),
+    words_bucket: bucketWords(project.wordCount),
+    source,
+    ...(age === undefined ? {} : { age_days: age }),
+  })
 }
 
 interface ProjectState {
@@ -58,7 +79,7 @@ async function activateProject(name: string, phase: WorkflowPhase) {
   useSidebarStore.getState().setActivePage('page-writing')
 }
 
-export const useProjectStore = create<ProjectState>((set) => ({
+export const useProjectStore = create<ProjectState>((set, get) => ({
   currentProject: null,
   projects: [],
   showProjectList: false,
@@ -69,6 +90,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
   setCurrentProject: (name) => {
     localStorage.setItem('mythpen-current-project', name || '')
     set({ currentProject: name, showProjectList: false })
+    trackProjectOpened(
+      get().projects.find((p) => p.name === name),
+      'select',
+    )
   },
 
   toggleProjectList: () => set((s) => ({ showProjectList: !s.showProjectList })),
@@ -85,6 +110,10 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // No projects → show the project list (new user / all deleted)
       const showProjectList = projects.length === 0
       set({ projects, currentProject, showProjectList, loading: false })
+      trackProjectOpened(
+        projects.find((p: ProjectSummary) => p.name === currentProject),
+        'restore',
+      )
       // Load phase for the current project
       if (currentProject) {
         const { phase } = await projectsApi.getPhase(currentProject)
@@ -105,9 +134,14 @@ export const useProjectStore = create<ProjectState>((set) => ({
   },
 
   setPhase: async (project, phase) => {
+    const from = get().workflowPhase
     try {
       await projectsApi.setPhase(project, phase)
       set({ workflowPhase: phase })
+      if (from !== phase) {
+        const key = get().projects.find((p) => p.name === project)?.analyticsId
+        track('project_phase_changed', { from, to: phase, ...(key ? { project_key: key } : {}) })
+      }
     } catch {
       /* ignore */
     }
@@ -118,7 +152,8 @@ export const useProjectStore = create<ProjectState>((set) => ({
     set({ loading: true, error: null })
     try {
       // 1. Create the project
-      await projectsApi.create({ name, mode, language, genres, styles })
+      const created = await projectsApi.create({ name, mode, language, genres, styles })
+      const key = created?.analyticsId as string | undefined
 
       // 2. Auto-create Chapter 1 so user can start writing immediately
       await chaptersApi.create(name, { title: t('chapter.firstChapterTitle') })
@@ -126,7 +161,18 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // 3. Reload project list, select it, load chapters & navigate to Writing
       await activateProject(name, 'idea')
 
-      track('project_created', { mode, language, genres: genres.join(','), styles: styles.join(',') })
+      track('project_created', {
+        mode,
+        language,
+        genres: genres.join(','),
+        styles: styles.join(','),
+        ...(key ? { project_key: key } : {}),
+      })
+      // The first chapter is created here, not through the chapter store, so
+      // it needs its own event — otherwise the create → chapter funnel is wrong.
+      track('chapter_created', { source: 'auto', ...(key ? { project_key: key } : {}) })
+      trackMilestone('first_project', key)
+      trackMilestone('first_chapter', key)
     } catch (err) {
       set({ error: (err as any).message || t('project.createFailed'), loading: false })
       throw err
@@ -135,7 +181,20 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   importProject: async (name, opts, source, handlers, signal) => {
     const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [] } = opts
+    const startedAt = Date.now()
+    const sizeBucket = bucketWords(source.text?.length || 0)
+    let lastStage = 'start'
+    // Track the last pipeline stage so failures can be attributed to
+    // structure/metadata/chapters/archive instead of just "import failed".
+    const wrappedHandlers: ImportSseHandlers = {
+      ...(handlers || {}),
+      onStage: (payload) => {
+        if (payload?.stage) lastStage = payload.stage
+        handlers?.onStage?.(payload)
+      },
+    }
     set({ loading: true, error: null })
+    track('import_started', { format: source.format, size_bucket: sizeBucket, mode })
     try {
       // The server analyzes the whole book and creates the project atomically.
       const result = await projectsApi.importWithAI(
@@ -155,7 +214,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
           },
           text: source.text,
         },
-        handlers,
+        wrappedHandlers,
         signal,
       )
 
@@ -163,19 +222,36 @@ export const useProjectStore = create<ProjectState>((set) => ({
       // import it falls back to the last chapter (the end of the source book).
       await activateProject(name, 'writing')
 
+      const key = get().projects.find((p) => p.name === name)?.analyticsId
       track('project_imported', {
         format: source.format,
         volumes: result.volumes,
         chapters: result.chapters,
         words: result.wordCount,
+        duration_ms: Date.now() - startedAt,
+        ...(key ? { project_key: key } : {}),
       })
+      trackMilestone('first_import', key)
       return result as ImportResult
     } catch (err: any) {
       // A user-initiated cancel closes the SSE stream; no project was created.
       if (err?.name === 'AbortError') {
+        track('import_canceled', {
+          format: source.format,
+          size_bucket: sizeBucket,
+          stage: lastStage,
+          duration_ms: Date.now() - startedAt,
+        })
         set({ loading: false })
         return null
       }
+      track('import_failed', {
+        format: source.format,
+        size_bucket: sizeBucket,
+        stage: lastStage,
+        duration_ms: Date.now() - startedAt,
+        error_code: String(err?.code || (err?.name && err.name !== 'Error' ? err.name : 'import_error')),
+      })
       set({
         error: err?.message || t('project.import.importFailed'),
         loading: false,
