@@ -64,6 +64,10 @@ pnpm tauri build    # Build desktop installer (.dmg/.msi/.AppImage)
 > [!TIP]  
 > Prefer Claude Code's workflow? Check out [clark-typer](https://github.com/niyongsheng/clark-typer).
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=niyongsheng/mythpen&type=Date)](https://star-history.com/#niyongsheng/mythpen&Date)
+
 ## License
 
 [GPLv3](./LICENSE)

@@ -64,6 +64,10 @@ pnpm tauri build    # 构建桌面安装包（.dmg/.msi/.AppImage）
 > [!TIP]  
 > 更喜欢 Claude Code 的工作流？看看 [clark-typer](https://github.com/niyongsheng/clark-typer)。
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=niyongsheng/mythpen&type=Date)](https://star-history.com/#niyongsheng/mythpen&Date)
+
 ## 许可证
 
 [GPLv3](./LICENSE)
