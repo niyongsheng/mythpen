@@ -63,7 +63,7 @@ const METADATA_SYSTEM_PROMPT = `你是一位资深出版编辑。请根据作品
 - genres 只能从以下值中选 1–3 个：sci-fi, fantasy, xianxia, wuxia, romance, history, urban, mystery, game, biography, other。
 - powerFantasy 只能是 true / false：判断作品是否为爽文（以打脸、逆袭、装逼、升级突破等爽点释放为核心驱动力）。
 - mode 只能是 short-story / medium-novel / long-novel 之一。
-- language 只能是 zh（简体中文）、zh-TW（繁体中文）、en（英语）、ja（日语）、ko（韩语）、fr（法语）、es（西班牙语）、ru（俄语）之一，必须与正文语言一致。
+- language 只能是 zh（简体中文）、zh-TW（繁体中文）、en（英语）、ja（日语）、ko（韩语）、fr（法语）、es（西班牙语）、ru（俄语）、de（德语）、it（意大利语）、pt（葡萄牙语）之一，必须与正文语言一致。
 - author 不确定时填「佚名」，不要编造。
 - description 和 synopsis 使用与正文相同的语言。
 - 只依据提供的内容，不要杜撰情节。

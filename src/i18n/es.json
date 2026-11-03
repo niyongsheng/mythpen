@@ -279,7 +279,8 @@
     "soundWood": "Madera",
     "soundPulse": "Doble pitido",
     "previewSound": "Escuchar",
-    "soundPiano": "Acorde de piano"
+    "soundPiano": "Acorde de piano",
+    "followSystem": "Seguir el sistema"
   },
   "pages": {
     "characters": "Gestión de personajes",

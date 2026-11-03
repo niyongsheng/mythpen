@@ -34,7 +34,7 @@
 - **AI Writing** — Two modes: *Writing* (guided 6-step workflow) and *Collab* (AI co-writer). Supports OpenAI and Claude.
 - **AI Book Import** — Import an existing TXT/EPUB; the model detects volumes and chapters, then builds characters, world-building, timeline, foreshadows and narrative memories.
 - **Payoff Board** — Plan face-slap, reveal and comeback beats on a kanban board for power-fantasy projects, with AI-designed payoff schedules.
-- **Internationalization (i18n)** — Full UI localization for 8 languages: Simplified/Traditional Chinese, English, Japanese, Korean, French, Spanish and Russian. 
+- **Internationalization (i18n)** — Full UI localization for 11 languages: Simplified/Traditional Chinese, English, Japanese, Korean, French, Spanish, Russian, German, Italian and Portuguese.
 - **Novel Management** — Characters, world-building, chapters, foreshadowing, timeline, and relations — all in one place.
 - **Local-First** — Data stored in SQLite under `~/.mythpen/`. No cloud required, full privacy.
 - **Rich Editor** — Bold, italic, underline via keyboard shortcuts. Chapters auto-save locally.

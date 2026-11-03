@@ -279,7 +279,8 @@
     "soundWood": "Дерево",
     "soundPulse": "Двойной сигнал",
     "previewSound": "Прослушать",
-    "soundPiano": "Фортепианный аккорд"
+    "soundPiano": "Фортепианный аккорд",
+    "followSystem": "Как в системе"
   },
   "pages": {
     "characters": "Персонажи",

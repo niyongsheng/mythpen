@@ -14,6 +14,9 @@ const SUPPORTED_LANGUAGES = {
   fr: { name: 'Français (French)', perChapterTokens: 350 },
   es: { name: 'Español (Spanish)', perChapterTokens: 350 },
   ru: { name: 'Русский (Russian)', perChapterTokens: 450 },
+  de: { name: 'Deutsch (German)', perChapterTokens: 450 },
+  it: { name: 'Italiano (Italian)', perChapterTokens: 350 },
+  pt: { name: 'Português (Portuguese)', perChapterTokens: 350 },
 };
 
 const DEFAULT_LANGUAGE = 'zh';

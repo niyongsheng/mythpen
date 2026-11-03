@@ -1,7 +1,7 @@
 import { create } from 'zustand'
-import { type Lang, setLanguage } from '@/i18n'
+import { isUiLanguage, resolveUiLanguage, setLanguage } from '@/i18n'
 import { settingsApi } from '@/lib/api'
-import type { AppSettings } from '@/types'
+import type { AppSettings, UiLanguage } from '@/types'
 
 interface SettingsState {
   settings: AppSettings
@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   apiBaseUrl: 'https://api.deepseek.com',
   apiModel: 'deepseek-flash',
   apiType: 'openai',
-  uiLanguage: 'zh',
+  uiLanguage: 'system',
   theme: 'dark',
   editorFontSize: 17,
   editorFontFamily: "'Noto Serif SC', 'Source Han Serif SC', 'STSong', Georgia, serif",
@@ -38,6 +38,7 @@ function loadSettings(): AppSettings {
     if (stored) {
       const parsed = JSON.parse(stored)
       const restored: AppSettings = { ...DEFAULT_SETTINGS, ...parsed }
+      if (!isUiLanguage(restored.uiLanguage)) restored.uiLanguage = DEFAULT_SETTINGS.uiLanguage
       // If the active apiKey is empty, fall back to per-provider slot
       if (!restored.apiKey) {
         if (restored.apiBaseUrl.includes('deepseek') && restored.apiKeyDeepseek)
@@ -140,7 +141,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const extra: Partial<SettingsState> = {}
       // When uiLanguage changes, sync the i18n module so t() returns correct locale
       if (key === 'uiLanguage') {
-        setLanguage(value as Lang)
+        setLanguage(resolveUiLanguage(value as UiLanguage))
         extra.langVersion = s.langVersion + 1
       }
       if (key === 'theme') applyTheme(value as AppSettings['theme'])

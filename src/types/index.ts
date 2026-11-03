@@ -161,8 +161,8 @@ export interface ChatMessage {
 
 // ─── Language ───
 /** Languages supported by the system, for both the interface and project writing. */
-export type LanguageCode = 'zh' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'fr' | 'es' | 'ru'
-export type UiLanguage = LanguageCode
+export type LanguageCode = 'zh' | 'zh-TW' | 'en' | 'ja' | 'ko' | 'fr' | 'es' | 'ru' | 'de' | 'it' | 'pt'
+export type UiLanguage = LanguageCode | 'system'
 export type WritingLanguage = LanguageCode
 
 // ─── Settings ───

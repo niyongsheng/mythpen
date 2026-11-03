@@ -279,7 +279,8 @@
     "soundWood": "Woodblock",
     "soundPulse": "Double Beep",
     "previewSound": "Preview",
-    "soundPiano": "Piano Chord"
+    "soundPiano": "Piano Chord",
+    "followSystem": "Follow system"
   },
   "pages": {
     "characters": "Characters",

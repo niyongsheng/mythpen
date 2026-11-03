@@ -279,7 +279,8 @@
     "soundWood": "木の音",
     "soundPulse": "電子音",
     "previewSound": "試聴",
-    "soundPiano": "ピアノコード"
+    "soundPiano": "ピアノコード",
+    "followSystem": "システムに従う"
   },
   "pages": {
     "characters": "キャラクター管理",

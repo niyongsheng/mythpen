@@ -32,6 +32,16 @@ const LANGUAGE_ALIASES: Record<string, WritingLanguage> = {
   fr: 'fr',
   es: 'es',
   ru: 'ru',
+  de: 'de',
+  'de-de': 'de',
+  'de-at': 'de',
+  'de-ch': 'de',
+  it: 'it',
+  'it-it': 'it',
+  'it-ch': 'it',
+  pt: 'pt',
+  'pt-br': 'pt',
+  'pt-pt': 'pt',
 }
 
 function normalizeLanguage(value?: string): WritingLanguage | undefined {

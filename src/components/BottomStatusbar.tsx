@@ -84,7 +84,9 @@ export function BottomStatusbar() {
       </span>
 
       <span className="inline-flex items-center gap-1 text-[10px] px-[7px] py-[1px] rounded-full bg-[var(--canvas-card)] border border-[var(--hairline)] text-[var(--ink-tertiary)]">
-        {LANGUAGES.find((language) => language.code === settings.uiLanguage)?.label ?? settings.uiLanguage}
+        {settings.uiLanguage === 'system'
+          ? t('settings.followSystem')
+          : (LANGUAGES.find((language) => language.code === settings.uiLanguage)?.label ?? settings.uiLanguage)}
       </span>
       <span
         className="inline-flex items-center gap-1 text-[10px] px-[7px] py-[1px] rounded-full bg-[var(--canvas-card)] border"

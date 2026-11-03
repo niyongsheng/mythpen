@@ -279,7 +279,8 @@
     "soundWood": "나무 소리",
     "soundPulse": "전자음",
     "previewSound": "미리 듣기",
-    "soundPiano": "피아노 코드"
+    "soundPiano": "피아노 코드",
+    "followSystem": "시스템 설정 따르기"
   },
   "pages": {
     "characters": "캐릭터 관리",

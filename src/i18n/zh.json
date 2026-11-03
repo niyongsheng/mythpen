@@ -279,7 +279,8 @@
     "soundWood": "木质轻响",
     "soundPulse": "电子双音",
     "previewSound": "试听",
-    "soundPiano": "钢琴和弦"
+    "soundPiano": "钢琴和弦",
+    "followSystem": "跟随系统"
   },
   "pages": {
     "characters": "角色管理",

@@ -1,9 +1,11 @@
 import { Dropdown, type DropdownOption } from '@/components/Dropdown'
 import { useT } from '@/hooks/useT'
-import { LANGUAGES, type Lang } from '@/i18n'
+import { LANGUAGES } from '@/i18n'
+import type { UiLanguage } from '@/types'
 
 /** Compact glyph shown in the trigger badge — keeps the control narrow. */
-const BADGES: Record<Lang, string> = {
+const BADGES: Record<UiLanguage, string> = {
+  system: 'SYS',
   zh: '中',
   'zh-TW': '繁',
   en: 'EN',
@@ -12,26 +14,31 @@ const BADGES: Record<Lang, string> = {
   fr: 'FR',
   es: 'ES',
   ru: 'RU',
+  de: 'DE',
+  it: 'IT',
+  pt: 'PT',
 }
 
-const OPTIONS: DropdownOption<Lang>[] = LANGUAGES.map((language) => ({
-  value: language.code,
-  label: language.label,
-  meta: language.code,
-}))
-
 interface LanguageSelectProps {
-  value: Lang
-  onChange: (lang: Lang) => void
+  value: UiLanguage
+  onChange: (lang: UiLanguage) => void
 }
 
 /** Language picker built on the shared Dropdown, with a locale badge trigger. */
 export function LanguageSelect({ value, onChange }: LanguageSelectProps) {
   const { t } = useT()
+  const options: DropdownOption<UiLanguage>[] = [
+    { value: 'system', label: t('settings.followSystem'), meta: 'system' },
+    ...LANGUAGES.map((language) => ({
+      value: language.code,
+      label: language.label,
+      meta: language.code,
+    })),
+  ]
   return (
-    <Dropdown<Lang>
+    <Dropdown<UiLanguage>
       value={value}
-      options={OPTIONS}
+      options={options}
       onChange={onChange}
       ariaLabel={t('settings.uiLanguage')}
       renderLeading={(selected) =>

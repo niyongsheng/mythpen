@@ -279,7 +279,8 @@
     "soundWood": "Bois",
     "soundPulse": "Double bip",
     "previewSound": "Écouter",
-    "soundPiano": "Accord de piano"
+    "soundPiano": "Accord de piano",
+    "followSystem": "Suivre le système"
   },
   "pages": {
     "characters": "Personnages",

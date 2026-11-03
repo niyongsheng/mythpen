@@ -22,7 +22,7 @@
   - 两种主键类型不可混用外键引用
 - **时间戳**: 所有时间戳 MUST 以 ISO-8601 本地时间格式存储和传输，SQLite 默认 `datetime('now')` 生成
 - **文本编码**: 所有文件/内容 MUST 使用 UTF-8 编码
-- **国际化**: 支持 8 种 UI 语言（简体中文 / 繁体中文 / 英语 / 日语 / 韩语 / 法语 / 西班牙语 / 俄语），AI 写作语言为项目级配置
+- **国际化**: 支持 11 种 UI 语言（简体中文 / 繁体中文 / 英语 / 日语 / 韩语 / 法语 / 西班牙语 / 俄语 / 德语 / 意大利语 / 葡萄牙语），AI 写作语言为项目级配置
 
 ---
 
@@ -389,7 +389,7 @@ CREATE TABLE project_meta (
 | `name` | string | 项目名称 |
 | `description` | string | 项目简介 |
 | `mode` | `'short-story' | 'medium-novel' | 'long-novel'` | 篇幅模式 |
-| `language` | `LanguageCode`（8 种） | 写作语言 |
+| `language` | `LanguageCode`（11 种） | 写作语言 |
 | `version` | string | 数据库版本 |
 | `created_at` | ISO string | 创建时间 |
 | `updated_at` | ISO string | 更新时间 |
@@ -1035,7 +1035,7 @@ POST /api/ai/chat/stream
 t('editor.wordCount', { count: 42 })  // → "42 字"
 ```
 
-- 翻译文件：`src/i18n/{zh,zh-TW,en,ja,ko,fr,es,ru}.json`，8 个语言包保持 key 对齐
+- 翻译文件：`src/i18n/{zh,zh-TW,en,ja,ko,fr,es,ru,de,it,pt}.json`，11 个语言包保持 key 对齐
 - 语言切换即时生效，写入 localStorage 和服务端；同时更新 `<html lang>` 与页面标题
 - 所有 UI 文本 MUST 通过 `t()` 函数引用
 - 服务端 `server/languages.js` 维护写作语言码、提示词语言名与导入 token 预算
@@ -1057,13 +1057,13 @@ t('editor.wordCount', { count: 42 })  // → "42 字"
 }
 ```
 
-所有语言包使用相同的嵌套 key 结构；新增文案 MUST 同步更新全部 8 个文件。
+所有语言包使用相同的嵌套 key 结构；新增文案 MUST 同步更新全部 11 个文件。
 
 ### 8.3 双维度语言模型
 
 | 维度 | 存储位置 | 描述 |
 |---|---|---|
-| UI 语言 | localStorage + `config.db` | 界面文字语言，8 种语言码 |
+| UI 语言 | localStorage + `config.db` | 界面文字语言，11 种语言码 |
 | 写作语言 | `project_meta.language` | AI 生成内容语言，与 UI 语言独立 |
 
 统一语言码：`zh` / `zh-TW` / `en` / `ja` / `ko` / `fr` / `es` / `ru`。

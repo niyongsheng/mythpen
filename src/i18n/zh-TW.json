@@ -279,7 +279,8 @@
     "soundWood": "木質輕響",
     "soundPulse": "電子雙音",
     "previewSound": "試聽",
-    "soundPiano": "鋼琴和弦"
+    "soundPiano": "鋼琴和弦",
+    "followSystem": "跟隨系統"
   },
   "pages": {
     "characters": "角色管理",
