@@ -718,6 +718,7 @@
     "failedTitle": "Update failed",
     "installFailed": "Update failed: {message}",
     "retry": "Retry",
-    "unsupported": "Auto-update is only available in the desktop app"
+    "unsupported": "Auto-update is only available in the desktop app",
+    "manual": "Manual update"
   }
 }

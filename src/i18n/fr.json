@@ -718,6 +718,7 @@
     "failedTitle": "Échec de la mise à jour",
     "installFailed": "Échec de la mise à jour : {message}",
     "retry": "Réessayer",
-    "unsupported": "La mise à jour automatique n’est disponible que dans l’application de bureau"
+    "unsupported": "La mise à jour automatique n’est disponible que dans l’application de bureau",
+    "manual": "Mise à jour manuelle"
   }
 }

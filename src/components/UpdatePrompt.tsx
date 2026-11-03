@@ -1,6 +1,20 @@
+import { open } from '@tauri-apps/plugin-shell'
 import { Download, RefreshCw, X } from 'lucide-react'
 import { useT } from '@/hooks/useT'
+import { isTauri } from '@/lib/runtime'
 import { useUpdateStore } from '@/stores/useUpdateStore'
+
+const DOWNLOAD_URL = 'https://mythpen.looplooptech.com/#download'
+
+function openDownloadPage() {
+  if (!isTauri) {
+    window.open(DOWNLOAD_URL, '_blank', 'noopener')
+    return
+  }
+  open(DOWNLOAD_URL).catch(() => {
+    window.open(DOWNLOAD_URL, '_blank', 'noopener')
+  })
+}
 
 /**
  * Global update card. It appears when a newer release is found (startup or
@@ -112,9 +126,12 @@ export function UpdatePrompt() {
             <button
               type="button"
               className="h-[30px] px-3 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[12px] cursor-pointer hover:bg-[var(--canvas-mid)] transition-colors"
-              onClick={dismiss}
+              onClick={() => {
+                openDownloadPage()
+                dismiss()
+              }}
             >
-              {t('update.later')}
+              {t('update.manual')}
             </button>
             <button
               type="button"

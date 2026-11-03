@@ -718,6 +718,7 @@
     "failedTitle": "Falha na atualização",
     "installFailed": "Falha na atualização: {message}",
     "retry": "Tentar novamente",
-    "unsupported": "A atualização automática está disponível apenas no aplicativo para desktop"
+    "unsupported": "A atualização automática está disponível apenas no aplicativo para desktop",
+    "manual": "Atualizar manualmente"
   }
 }

@@ -718,6 +718,7 @@
     "failedTitle": "Error de actualización",
     "installFailed": "Error de actualización: {message}",
     "retry": "Reintentar",
-    "unsupported": "La actualización automática solo está disponible en la app de escritorio"
+    "unsupported": "La actualización automática solo está disponible en la app de escritorio",
+    "manual": "Actualización manual"
   }
 }

@@ -718,6 +718,7 @@
     "failedTitle": "アップデートに失敗しました",
     "installFailed": "アップデートに失敗しました：{message}",
     "retry": "再試行",
-    "unsupported": "自動アップデートはデスクトップアプリのみ対応しています"
+    "unsupported": "自動アップデートはデスクトップアプリのみ対応しています",
+    "manual": "手動更新"
   }
 }

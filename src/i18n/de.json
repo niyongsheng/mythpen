@@ -718,6 +718,7 @@
     "failedTitle": "Update fehlgeschlagen",
     "installFailed": "Update fehlgeschlagen: {message}",
     "retry": "Erneut versuchen",
-    "unsupported": "Automatische Updates sind nur in der Desktop-App verfügbar"
+    "unsupported": "Automatische Updates sind nur in der Desktop-App verfügbar",
+    "manual": "Manuell aktualisieren"
   }
 }

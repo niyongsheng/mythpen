@@ -718,6 +718,7 @@
     "failedTitle": "更新失败",
     "installFailed": "更新失败：{message}",
     "retry": "重试",
-    "unsupported": "自动更新仅支持桌面应用"
+    "unsupported": "自动更新仅支持桌面应用",
+    "manual": "手动更新"
   }
 }

@@ -718,6 +718,7 @@
     "failedTitle": "업데이트 실패",
     "installFailed": "업데이트 실패: {message}",
     "retry": "재시도",
-    "unsupported": "자동 업데이트는 데스크톱 앱에서만 지원됩니다"
+    "unsupported": "자동 업데이트는 데스크톱 앱에서만 지원됩니다",
+    "manual": "수동 업데이트"
   }
 }

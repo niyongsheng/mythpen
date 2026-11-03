@@ -718,6 +718,7 @@
     "failedTitle": "Aggiornamento non riuscito",
     "installFailed": "Aggiornamento non riuscito: {message}",
     "retry": "Riprova",
-    "unsupported": "L'aggiornamento automatico è disponibile solo nell'app desktop"
+    "unsupported": "L'aggiornamento automatico è disponibile solo nell'app desktop",
+    "manual": "Aggiorna manualmente"
   }
 }
