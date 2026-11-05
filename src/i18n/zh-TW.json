@@ -600,7 +600,7 @@
     "aiNoNewRelations": "未發現需要新增的關係",
     "aiPrompt": "你是一個小說人物關係分析助手。根據目前小說中的角色列表和既有關係，推斷角色之間可能存在的其他重要關係。直接回傳 JSON 陣列。",
     "noCharacters": "還沒有角色，先建立角色才能建構關係圖譜",
-    "noRelations": "還沒有關係連線，點擊右側的「AI 整理圖譜」自動產生",
+    "noRelations": "還沒有關係連線，點擊「新增關係」手動新增，或用「AI 整理圖譜」自動產生",
     "aiOrganize": "AI 整理圖譜",
     "appearsIn": "角色出場",
     "relationType": "關係類型",
@@ -612,6 +612,11 @@
     "relationList": "關係列表",
     "descriptionField": "描述",
     "intensityField": "關係強度",
+    "characterA": "角色 A",
+    "characterB": "角色 B",
+    "relationTypePlaceholder": "如：朋友、宿敵、師徒",
+    "sameCharacterError": "請選擇兩個不同的角色",
+    "editHint": "點擊編輯「{a} ↔ {b}」的關係",
     "userPrompt": "角色：{charList}\n\n既有關係：\n{existingRels}\n\n請推斷可能存在的其他角色關係。"
   },
   "science": {

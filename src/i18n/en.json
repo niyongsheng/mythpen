@@ -600,7 +600,7 @@
     "aiNoNewRelations": "No new relations needed",
     "aiPrompt": "You are a novel character relationship analysis assistant. Based on the current novel's character list and existing relations, infer other important relationships.",
     "noCharacters": "No characters yet. Create characters first.",
-    "noRelations": "No relations yet. Click \"AI Organize\" to auto-generate.",
+    "noRelations": "No relations yet. Click \"New Relation\" to add one manually, or \"AI Organize\" to auto-generate.",
     "aiOrganize": "AI Organize",
     "appearsIn": "Appears in",
     "relationType": "Relation Type",
@@ -612,6 +612,11 @@
     "relationList": "Relations",
     "descriptionField": "Description",
     "intensityField": "Intensity",
+    "characterA": "Character A",
+    "characterB": "Character B",
+    "relationTypePlaceholder": "e.g. friend, rival, mentor",
+    "sameCharacterError": "Choose two different characters",
+    "editHint": "Click to edit the relation between {a} and {b}",
     "userPrompt": "Characters: {charList}\n\nExisting relationships:\n{existingRels}\n\nPlease infer other possible character relationships."
   },
   "science": {

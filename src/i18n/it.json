@@ -600,7 +600,7 @@
     "aiNoNewRelations": "Nessuna nuova relazione necessaria",
     "aiPrompt": "Sei un assistente per l'analisi delle relazioni tra i personaggi di un romanzo. In base all'elenco dei personaggi e alle relazioni esistenti del romanzo attuale, deduci altre relazioni importanti.",
     "noCharacters": "Nessun personaggio. Crea prima dei personaggi.",
-    "noRelations": "Nessuna relazione. Clicca su «Organizza con IA» per generarle automaticamente.",
+    "noRelations": "Nessuna relazione. Clicca su «Nuova relazione» per aggiungerne una manualmente o su «Organizza con IA» per generarle automaticamente.",
     "aiOrganize": "Organizza con IA",
     "appearsIn": "Compare in",
     "relationType": "Tipo di relazione",
@@ -612,6 +612,11 @@
     "relationList": "Relazioni",
     "descriptionField": "Descrizione",
     "intensityField": "Intensità",
+    "characterA": "Personaggio A",
+    "characterB": "Personaggio B",
+    "relationTypePlaceholder": "es.: amico, rivale, mentore",
+    "sameCharacterError": "Scegli due personaggi diversi",
+    "editHint": "Clicca per modificare la relazione tra {a} e {b}",
     "userPrompt": "Personaggi: {charList}\n\nRelazioni esistenti:\n{existingRels}\n\nDeduci altre possibili relazioni tra i personaggi."
   },
   "science": {

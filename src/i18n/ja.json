@@ -600,7 +600,7 @@
     "aiNoNewRelations": "追加すべき新しい関係は見つかりませんでした",
     "aiPrompt": "あなたは小説の人物関係分析アシスタントです。現在の小説のキャラクター一覧と既存の関係に基づき、キャラクター間に存在し得るその他の重要な関係を推測してください。JSON配列を直接返してください。",
     "noCharacters": "まだキャラクターがいません。関係グラフを作成するには、先にキャラクターを作成してください",
-    "noRelations": "まだ関係の線がありません。右側の「AIで整理」をクリックすると自動生成されます",
+    "noRelations": "まだ関係の線がありません。「新しい関係」から手動で追加するか、「AIで整理」で自動生成してください",
     "aiOrganize": "AIで整理",
     "appearsIn": "登場キャラクター",
     "relationType": "関係タイプ",
@@ -612,6 +612,11 @@
     "relationList": "関係一覧",
     "descriptionField": "説明",
     "intensityField": "関係の強さ",
+    "characterA": "キャラクターA",
+    "characterB": "キャラクターB",
+    "relationTypePlaceholder": "例：友人、宿敵、師弟",
+    "sameCharacterError": "異なるキャラクターを2人選択してください",
+    "editHint": "「{a} ↔ {b}」の関係を編集するにはクリック",
     "userPrompt": "キャラクター：{charList}\n\n既存の関係：\n{existingRels}\n\n存在し得るその他のキャラクター関係を推測してください。"
   },
   "science": {

@@ -600,7 +600,7 @@
     "aiNoNewRelations": "추가할 새 관계를 찾지 못했습니다",
     "aiPrompt": "당신은 소설 인물 관계 분석 어시스턴트입니다. 현재 소설의 캐릭터 목록과 기존 관계를 바탕으로 캐릭터 간에 존재할 수 있는 다른 중요한 관계를 추론하세요. JSON 배열만 반환하세요.",
     "noCharacters": "아직 캐릭터가 없습니다. 관계도를 만들려면 먼저 캐릭터를 생성하세요",
-    "noRelations": "아직 관계선이 없습니다. 오른쪽의「AI 관계 정리」를 클릭하면 자동으로 생성됩니다",
+    "noRelations": "아직 관계선이 없습니다. 「새 관계」로 직접 추가하거나 「AI 관계 정리」로 자동 생성하세요",
     "aiOrganize": "AI 관계 정리",
     "appearsIn": "캐릭터 출연",
     "relationType": "관계 유형",
@@ -612,6 +612,11 @@
     "relationList": "관계 목록",
     "descriptionField": "설명",
     "intensityField": "관계 강도",
+    "characterA": "캐릭터 A",
+    "characterB": "캐릭터 B",
+    "relationTypePlaceholder": "예: 친구, 숙적, 스승",
+    "sameCharacterError": "서로 다른 캐릭터 두 명을 선택하세요",
+    "editHint": "클릭하여 「{a} ↔ {b}」 관계 편집",
     "userPrompt": "캐릭터: {charList}\n\n기존 관계:\n{existingRels}\n\n가능한 다른 캐릭터 관계를 추론해 주세요."
   },
   "science": {

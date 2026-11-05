@@ -600,7 +600,7 @@
     "aiNoNewRelations": "No se encontraron relaciones nuevas que añadir",
     "aiPrompt": "Eres un asistente de análisis de relaciones entre personajes de novelas. Basándote en la lista de personajes y las relaciones existentes de la novela actual, infiere otras relaciones importantes que podrían existir. Devuelve directamente un array JSON.",
     "noCharacters": "Aún no hay personajes. Crea personajes primero para construir el grafo de relaciones.",
-    "noRelations": "Aún no hay relaciones. Haz clic en «Organizar con AI» a la derecha para generarlas automáticamente.",
+    "noRelations": "Aún no hay relaciones. Haz clic en «Nueva relación» para añadir una manualmente o en «Organizar con AI» para generarlas automáticamente.",
     "aiOrganize": "Organizar con AI",
     "appearsIn": "Apariciones del personaje",
     "relationType": "Tipo de relación",
@@ -612,6 +612,11 @@
     "relationList": "Relaciones",
     "descriptionField": "Descripción",
     "intensityField": "Intensidad",
+    "characterA": "Personaje A",
+    "characterB": "Personaje B",
+    "relationTypePlaceholder": "p. ej.: amigo, rival, mentor",
+    "sameCharacterError": "Elige dos personajes diferentes",
+    "editHint": "Haz clic para editar la relación entre {a} y {b}",
     "userPrompt": "Personajes: {charList}\n\nRelaciones existentes:\n{existingRels}\n\nInfiere otras relaciones posibles entre los personajes."
   },
   "science": {

@@ -1,5 +1,5 @@
-import { HeartHandshake, Link2, Loader, RefreshCcw, Sparkles, Users } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { HeartHandshake, Link2, Loader, Plus, RefreshCcw, Sparkles, Users } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
@@ -22,6 +22,7 @@ interface PositionedNode {
 }
 
 interface PositionedLink {
+  id: string
   source: string
   target: string
   type: string
@@ -30,6 +31,10 @@ interface PositionedLink {
   dashed: boolean
   label: string
 }
+
+const INTENSITY_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))
+
+const ROLE_ORDER: Record<string, number> = { major: 0, minor: 1, extra: 2 }
 
 const ROLE_COLORS: Record<string, string> = {
   major: 'var(--accent-gold)',
@@ -95,6 +100,7 @@ function computeCircleLayout(
   const links: PositionedLink[] = relations
     .filter((r) => nodeMap.has(r.characterAId) && nodeMap.has(r.characterBId))
     .map((r) => ({
+      id: r.id,
       source: r.characterAId,
       target: r.characterBId,
       type: r.relationType,
@@ -114,8 +120,10 @@ export function Relations() {
   const { t } = useT()
   const project = useProjectName()
   const [layoutSeed, setLayoutSeed] = useState(0)
+  const [relayouting, setRelayouting] = useState(false)
   const [organizing, setOrganizing] = useState(false)
   const [orgMsg, setOrgMsg] = useState('')
+  const [creatingRelation, setCreatingRelation] = useState(false)
   const [editingRelation, setEditingRelation] = useState<CharacterRelation | null>(null)
 
   const loading = charsLoading || relsLoading
@@ -124,10 +132,30 @@ export function Relations() {
 
   const { nodes, links } = useMemo(() => computeCircleLayout(chars, rels, layoutSeed), [chars, rels, layoutSeed])
   const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes])
+  const relationById = useMemo(() => new Map(rels.map((r) => [r.id, r])), [rels])
+  const characterOptions = useMemo(
+    () =>
+      [...chars]
+        .sort(
+          (a, b) =>
+            (ROLE_ORDER[a.role || 'extra'] ?? 3) - (ROLE_ORDER[b.role || 'extra'] ?? 3) || a.name.localeCompare(b.name),
+        )
+        .map((c) => ({ value: c.id, label: c.name })),
+    [chars],
+  )
 
-  const handleRelayout = useCallback(() => {
-    setLayoutSeed((s) => s + 1)
-  }, [])
+  // Re-layout is synchronous — spin the icon briefly so the click gives feedback.
+  useEffect(() => {
+    if (!relayouting) return
+    const frame = requestAnimationFrame(() => setLayoutSeed((s) => s + 1))
+    const timer = window.setTimeout(() => setRelayouting(false), 500)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [relayouting])
+
+  const handleRelayout = useCallback(() => setRelayouting(true), [])
 
   const handleOrganize = async () => {
     if (!project) return
@@ -248,14 +276,78 @@ export function Relations() {
         <div className="page-header-actions">
           <button
             type="button"
-            className="btn-secondary flex items-center gap-1.5"
+            className="btn-primary flex items-center gap-1.5"
+            style={{ height: 30, padding: '0 14px' }}
+            onClick={() => setCreatingRelation(true)}
+          >
+            <Plus className="w-3.5 h-3.5" /> {t('pages.newRelation')}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ height: 30, padding: '0 14px' }}
             onClick={handleRelayout}
+            disabled={relayouting}
           >
-            <RefreshCcw className="w-3.5 h-3.5" /> {t('pages.reLayout')}
+            <RefreshCcw className={`w-3.5 h-3.5 ${relayouting ? 'animate-spin' : ''}`} /> {t('pages.reLayout')}
           </button>
         </div>
       </div>
+
+      {creatingRelation && (
+        <SimpleCreateDialog
+          title={`+ ${t('pages.newRelation')}`}
+          fields={[
+            {
+              key: 'character_a_id',
+              label: t('relations.characterA'),
+              type: 'select',
+              required: true,
+              options: characterOptions,
+            },
+            {
+              key: 'character_b_id',
+              label: t('relations.characterB'),
+              type: 'select',
+              required: true,
+              options: characterOptions,
+            },
+            {
+              key: 'relation_type',
+              label: t('relations.relationType'),
+              required: true,
+              placeholder: t('relations.relationTypePlaceholder'),
+            },
+            {
+              key: 'description',
+              label: t('relations.descriptionField'),
+              type: 'textarea',
+            },
+            {
+              key: 'intensity',
+              label: t('relations.intensityField'),
+              type: 'select',
+              options: INTENSITY_OPTIONS,
+            },
+          ]}
+          initialValues={{ intensity: '3' }}
+          onSubmit={async (vals) => {
+            if (vals.character_a_id === vals.character_b_id) {
+              throw new Error(t('relations.sameCharacterError'))
+            }
+            await relationsApi.create(project, {
+              character_a_id: vals.character_a_id,
+              character_b_id: vals.character_b_id,
+              relation_type: vals.relation_type.trim(),
+              description: vals.description || '',
+              intensity: parseInt(vals.intensity, 10) || 3,
+            })
+            track('entity_created', { entity_type: 'relation', source: 'manual', ...projectProps(project) })
+            await reloadRels()
+          }}
+          onClose={() => setCreatingRelation(false)}
+        />
+      )}
 
       {editingRelation && (
         <SimpleCreateDialog
@@ -275,7 +367,8 @@ export function Relations() {
             {
               key: 'intensity',
               label: t('relations.intensityField'),
-              type: 'number',
+              type: 'select',
+              options: INTENSITY_OPTIONS,
             },
           ]}
           initialValues={{
@@ -341,8 +434,34 @@ export function Relations() {
               const mx = (from.x + to.x) / 2
               const my = (from.y + to.y) / 2 - 14
               const labelW = link.label.length * 7 + 12
+              const relation = relationById.get(link.id)
+              const openRelation = relation ? () => setEditingRelation(relation) : undefined
               return (
-                <g key={`link-${i}`}>
+                <g
+                  key={link.id}
+                  onClick={openRelation}
+                  onKeyDown={(e) => {
+                    if (relation && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      setEditingRelation(relation)
+                    }
+                  }}
+                  tabIndex={relation ? 0 : undefined}
+                  role="button"
+                  aria-label={`${from.name} ↔ ${to.name}: ${link.label}`}
+                  style={relation ? { cursor: 'pointer' } : undefined}
+                >
+                  {relation && <title>{t('relations.editHint', { a: from.name, b: to.name })}</title>}
+                  {/* Wider invisible hit area for easier clicking */}
+                  <line
+                    x1={from.x}
+                    y1={from.y}
+                    x2={to.x}
+                    y2={to.y}
+                    stroke="transparent"
+                    strokeWidth="14"
+                    pointerEvents="stroke"
+                  />
                   <line
                     x1={from.x}
                     y1={from.y}

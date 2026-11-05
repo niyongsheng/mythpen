@@ -600,7 +600,7 @@
     "aiNoNewRelations": "Keine neuen Beziehungen erforderlich",
     "aiPrompt": "Sie sind ein Assistent zur Analyse der Figurenbeziehungen in einem Roman. Leiten Sie anhand der Figurenliste und der bestehenden Beziehungen des aktuellen Romans weitere wichtige Beziehungen ab.",
     "noCharacters": "Noch keine Figuren. Legen Sie zuerst eine an.",
-    "noRelations": "Noch keine Beziehungen. Klicken Sie auf „KI sortieren“, um sie automatisch zu erzeugen.",
+    "noRelations": "Noch keine Beziehungen. Klicken Sie auf „Neue Beziehung“, um manuell eine hinzuzufügen, oder auf „KI sortieren“, um sie automatisch zu erzeugen.",
     "aiOrganize": "KI sortieren",
     "appearsIn": "Kommt vor in",
     "relationType": "Beziehungstyp",
@@ -612,6 +612,11 @@
     "relationList": "Beziehungen",
     "descriptionField": "Beschreibung",
     "intensityField": "Intensität",
+    "characterA": "Figur A",
+    "characterB": "Figur B",
+    "relationTypePlaceholder": "z. B. Freund, Rivale, Mentor",
+    "sameCharacterError": "Bitte wählen Sie zwei unterschiedliche Figuren",
+    "editHint": "Klicken, um die Beziehung zwischen {a} und {b} zu bearbeiten",
     "userPrompt": "Figuren: {charList}\n\nBestehende Beziehungen:\n{existingRels}\n\nBitte leiten Sie weitere mögliche Figurenbeziehungen ab."
   },
   "science": {
