@@ -144,7 +144,10 @@ export function Timeline() {
                 className={`w-3 h-3 rounded-full shrink-0 z-[1] mt-1 ml-[30px]
                 ${ev.importance < 3 ? 'bg-[var(--canvas-pop)] shadow-none' : 'bg-[var(--accent-gold)] border-2 border-[var(--canvas)] shadow-[0_0_0_2px_var(--accent-gold-soft-bg)]'}`}
               />
-              <div className="font-display text-lg text-[var(--accent-gold)] w-[90px] shrink-0 text-right">
+              <div
+                className="font-display text-lg text-[var(--accent-gold)] w-[112px] shrink-0 text-right whitespace-nowrap leading-tight"
+                title={ev.year}
+              >
                 {ev.year}
               </div>
               <div className="flex-1">
