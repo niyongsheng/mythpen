@@ -50,6 +50,17 @@ jobs:
         with:
           targets: aarch64-apple-darwin
 
+      # Tag runs can only restore caches created on the default branch, so
+      # warm-rust-cache.yml keeps these entries available for releases.
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-deps
+          # Keep compiled dependencies when a later packaging/upload step fails
+          # so re-running the job does not recompile them.
+          cache-on-failure: "true"
+
       - name: Install bun (for sidecar)
         uses: oven-sh/setup-bun@v2
 
@@ -66,6 +77,15 @@ jobs:
 
       - name: Build Tauri app (DMG)
         run: pnpm tauri build
+
+      - name: Verify macOS code signature
+        run: |
+          APP=src-tauri/target/release/bundle/macos/Mythpen.app
+          # An unsigned bundle only carries the linker's ad-hoc signature on the
+          # main executable, which macOS reports as "damaged" once quarantined.
+          test -f "$APP/Contents/_CodeSignature/CodeResources"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv --verbose=4 "$APP" 2>&1 | grep -E 'Identifier|Signature|TeamIdentifier|Sealed Resources'
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
@@ -100,6 +120,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-deps
+          # Keep compiled dependencies when a later packaging/upload step fails
+          # so re-running the job does not recompile them.
+          cache-on-failure: "true"
 
       - name: Install bun (for sidecar)
         uses: oven-sh/setup-bun@v2
@@ -151,6 +180,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-deps
+          # Keep compiled dependencies when a later packaging/upload step fails
+          # so re-running the job does not recompile them.
+          cache-on-failure: "true"
 
       - name: Install system dependencies (Linux)
         run: |
