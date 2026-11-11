@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { AIPanel } from '@/components/AIPanel'
+import { AIPanelShell } from '@/components/AIPanel'
 import { BottomStatusbar } from '@/components/BottomStatusbar'
 import { NewProjectDialog } from '@/components/NewProjectDialog'
 import { SettingsDrawer } from '@/components/SettingsDrawer'
@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/useToast'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { refreshAllData } from '@/lib/dataEvents'
+import { useOpenProjectFiles } from '@/lib/openFiles'
+import { saveProjectNow } from '@/lib/projectFiles'
 import { About } from '@/pages/About'
 import { Characters } from '@/pages/Characters'
 import { ClueBoard } from '@/pages/ClueBoard'
@@ -59,11 +61,13 @@ function App() {
   const loadProjects = useProjectStore((s) => s.loadProjects)
   const loadChapters = useChapterStore((s) => s.loadChapters)
   const loadSettings = useSettingsStore((s) => s.loadFromServer)
-  const rightPanelVisible = useUIStore((s) => s.rightPanelVisible)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth)
   const autoCheckForUpdates = useUpdateStore((s) => s.autoCheck)
   const { toasts, show: showToast, dismiss: dismissToast } = useToast()
+
+  // Consume .mythpen paths delivered by the OS (double-click / second launch).
+  useOpenProjectFiles()
 
   // Mount a page the first time it is visited, then keep it alive so local
   // state survives navigation. Avoids firing every page's data fetches at launch.
@@ -101,9 +105,9 @@ function App() {
           showToast(t('common.dataRefreshed'), 'success', 3000)
         })
       }
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's' && activePage === 'page-writing') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        window.dispatchEvent(new Event('mythpen:save-chapter'))
+        void saveProjectNow()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -180,8 +184,8 @@ function App() {
                       </div>
                     ))}
                 </div>
-                {/* AI Panel - toggle via Titlebar button */}
-                {!showProjectList && rightPanelVisible && <AIPanel />}
+                {/* AI Panel - toggle via Titlebar button; shell animates open/close */}
+                {!showProjectList && <AIPanelShell />}
               </div>
             </div>
           </>

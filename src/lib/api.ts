@@ -37,7 +37,11 @@ async function request(path: string, options: any = {}) {
   const res = await fetch(apiUrl(path), requestConfig(options))
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: { message: res.statusText } }))
-    throw new Error(err.error?.message || err.message || `HTTP ${res.status}`)
+    const error = new Error(err.error?.message || err.message || `HTTP ${res.status}`)
+    // Preserve the server error code so callers can map feature-gated errors.
+    ;(error as any).code = err.error?.code
+    ;(error as any).status = res.status
+    throw error
   }
   return res.json()
 }
@@ -103,7 +107,15 @@ export const projectsApi = {
           reject(error)
         })
     }),
-  delete: (name: string) => request(`/projects/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  openFile: (path: string) => request('/projects/open-file', { method: 'POST', body: { path } }),
+  save: (name: string) => request(`/projects/${encodeURIComponent(name)}/save`, { method: 'POST' }),
+  saveAs: (name: string, path: string, overwrite = false) =>
+    request(`/projects/${encodeURIComponent(name)}/save-as`, { method: 'POST', body: { path, overwrite } }),
+  delete: (name: string, deleteFile = false) =>
+    request(`/projects/${encodeURIComponent(name)}${deleteFile ? '?deleteFile=1' : ''}`, { method: 'DELETE' }),
+  getMeta: (name: string) => request(`/${encodeURIComponent(name)}/meta`),
+  updateAuthorNotes: (name: string, authorNotes: string) =>
+    request(`/${encodeURIComponent(name)}/author-notes`, { method: 'PUT', body: { authorNotes } }),
   getPhase: (name: string) => request(`/${encodeURIComponent(name)}/workflow/phase`),
   setPhase: (name: string, phase: string) =>
     request(`/${encodeURIComponent(name)}/workflow/phase`, { method: 'PUT', body: { phase } }),
@@ -129,12 +141,16 @@ export const chaptersApi = {
     toChapter(await request(`/${encodeURIComponent(project)}/chapters/${num}`, { method: 'PUT', body: data })),
   create: (project: string, data: any) =>
     request(`/${encodeURIComponent(project)}/chapters`, { method: 'POST', body: data }),
+  remove: (project: string, num: number) =>
+    request(`/${encodeURIComponent(project)}/chapters/${num}`, { method: 'DELETE' }),
 }
 
 // ─── Volumes ───
 
 export const volumesApi = {
   list: (project: string, slim = false) => request(`/${encodeURIComponent(project)}/volumes${slim ? '?slim=1' : ''}`),
+  update: (project: string, id: number, data: { title?: string; summary?: string }) =>
+    request(`/${encodeURIComponent(project)}/volumes/${id}`, { method: 'PUT', body: data }),
 }
 
 // ─── Characters ───

@@ -5,10 +5,16 @@ import { useT } from '@/hooks/useT'
 export interface Field {
   key: string
   label: string
-  type?: 'text' | 'textarea' | 'select' | 'number'
+  type?: 'text' | 'textarea' | 'select' | 'number' | 'range'
   options?: { value: string; label: string }[]
   required?: boolean
   placeholder?: string
+  /** Range bounds; default to 1–5 with step 1. */
+  min?: number
+  max?: number
+  step?: number
+  /** Hide the field unless the current form values match this predicate. */
+  showWhen?: (values: Record<string, string>) => boolean
 }
 
 interface Props {
@@ -58,9 +64,11 @@ export function SimpleCreateDialog({
     }
   }
 
+  const visibleFields = fields.filter((f) => !f.showWhen || f.showWhen(values))
+
   const handleSubmit = async () => {
     // Check required
-    for (const f of fields) {
+    for (const f of visibleFields) {
       if (f.required && !values[f.key]?.trim()) {
         setError(t('common.requiredField', { label: f.label }))
         return
@@ -80,19 +88,19 @@ export function SimpleCreateDialog({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[300]" onClick={onClose}>
       <div
-        className="bg-[var(--canvas-card)] border border-[var(--hairline-light)] rounded-xl p-6 w-[460px] max-w-[90vw] shadow-2xl"
+        className="bg-[var(--canvas-card)] border border-[var(--hairline-light)] rounded-xl p-6 w-[460px] max-w-[90vw] max-h-[90vh] shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="font-display text-[20px] font-semibold mb-4">{title}</h3>
+        <h3 className="font-display text-[20px] font-semibold mb-4 shrink-0">{title}</h3>
 
         {error && (
-          <div className="mb-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-[13px] text-red-500">
+          <div className="mb-3 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/25 text-[13px] text-red-500 shrink-0">
             {error}
           </div>
         )}
 
-        <div className="space-y-3 mb-5">
-          {fields.map((f) => (
+        <div className="space-y-3 mb-5 overflow-y-auto custom-scrollbar min-h-0 flex-1 pr-1">
+          {visibleFields.map((f) => (
             <div key={f.key}>
               <div className="block text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-1">
                 {f.label}
@@ -104,6 +112,22 @@ export function SimpleCreateDialog({
                   value={values[f.key] || ''}
                   onChange={(e) => update(f.key, e.target.value)}
                 />
+              ) : f.type === 'range' ? (
+                <div className="flex items-center gap-3 h-[34px]">
+                  <input
+                    type="range"
+                    className="range-slider flex-1"
+                    min={f.min ?? 1}
+                    max={f.max ?? 5}
+                    step={f.step ?? 1}
+                    value={values[f.key] ?? String(f.min ?? 1)}
+                    onChange={(e) => update(f.key, e.target.value)}
+                    aria-label={f.label}
+                  />
+                  <span className="w-10 shrink-0 text-right font-mono text-[12px] text-[var(--ink-secondary)] tabular-nums">
+                    {values[f.key] ?? String(f.min ?? 1)} / {f.max ?? 5}
+                  </span>
+                </div>
               ) : f.type === 'select' && f.options ? (
                 <Select
                   ariaLabel={f.label}
@@ -126,7 +150,7 @@ export function SimpleCreateDialog({
           ))}
         </div>
 
-        <div className="flex gap-2 items-center border-t border-[var(--hairline)] pt-4">
+        <div className="flex gap-2 items-center border-t border-[var(--hairline)] pt-4 shrink-0">
           {onDelete && !confirmingDelete && (
             <button
               type="button"

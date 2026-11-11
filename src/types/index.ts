@@ -14,6 +14,7 @@ export interface Chapter {
   worldTexture: string
   concreteMystery: string
   interpersonalTension: string
+  genreBeat: string
   createdAt: string
   updatedAt: string
 }
@@ -32,6 +33,7 @@ export interface Character {
   name: string
   age: string
   gender: string
+  species: string
   appearance: string
   personality: string
   background: string
@@ -185,6 +187,9 @@ export interface AppSettings {
   autoSaveInterval: number
   soundEffect: SoundEffect
   backupEnabled: boolean
+  anonymousStats: boolean
+  /** Experimental .mythpen project files (off by default; format may change). */
+  experimentalDocumentMode: boolean
   accentColor: string
   maxOutputTokens: number
   httpTimeout: number

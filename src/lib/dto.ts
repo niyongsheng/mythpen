@@ -32,6 +32,7 @@ export function toChapter(row: any): Chapter {
     worldTexture: row.world_texture ?? '',
     concreteMystery: row.concrete_mystery ?? '',
     interpersonalTension: row.interpersonal_tension ?? '',
+    genreBeat: row.genre_beat ?? '',
     createdAt: row.created_at ?? '',
     updatedAt: row.updated_at ?? '',
   }
@@ -43,6 +44,7 @@ export function toCharacter(row: any): Character {
     name: row.name ?? '',
     age: row.age ?? '',
     gender: row.gender ?? '',
+    species: row.species ?? '',
     appearance: row.appearance ?? '',
     personality: row.personality ?? '',
     background: row.background ?? '',

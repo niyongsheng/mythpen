@@ -19,8 +19,10 @@ import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
 import { LANGUAGES } from '@/i18n'
 import { notifyDataChanged } from '@/lib/dataEvents'
+import { pickSaveLocation } from '@/lib/dialogs'
 import { extractImportSource } from '@/lib/import'
 import type { ImportProgress, ImportSource, TextEncoding } from '@/lib/import/types'
+import { isTauri } from '@/lib/runtime'
 import { useProjectStore } from '@/stores/useProjectStore'
 import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
@@ -95,10 +97,12 @@ export function NewProjectDialog() {
   const [parseError, setParseError] = useState<string | null>(null)
   const [encoding, setEncoding] = useState<TextEncoding>('auto')
   const [progress, setProgress] = useState<ImportProgress | null>(null)
+  const [pickingLocation, setPickingLocation] = useState(false)
   const parseTokenRef = useRef(0)
   const importTokenRef = useRef(0)
   const importControllerRef = useRef<AbortController | null>(null)
   const hasApiKey = useSettingsStore((state) => Boolean(state.settings.apiKey))
+  const documentModeEnabled = useSettingsStore((state) => state.settings.experimentalDocumentMode)
 
   // Clear stale error when the dialog opens; reset import state when it closes.
   useEffect(() => {
@@ -160,16 +164,33 @@ export function NewProjectDialog() {
     if (file) void extractFile(file, next)
   }
 
-  const busy = loading || extracting
+  const busy = loading || extracting || pickingLocation
   const importing = progress !== null
   const canSubmit = !!name.trim() && (tab === 'blank' || (!!source && !extracting && !loading))
 
   const handleSubmit = async () => {
     if (!canSubmit || busy) return
 
+    // Desktop: the project is a user-owned .mythpen document, so ask where it
+    // lives before creating anything. Cancelling aborts the whole flow.
+    let filePath: string | undefined
+    if (isTauri && documentModeEnabled) {
+      setPickingLocation(true)
+      try {
+        const picked = await pickSaveLocation(name.trim())
+        if (!picked) return
+        filePath = picked
+      } catch (err) {
+        showToast((err as Error)?.message || t('project.file.saveFailed'), 'error', 6000)
+        return
+      } finally {
+        setPickingLocation(false)
+      }
+    }
+
     if (tab === 'blank') {
       try {
-        await createProject(name.trim(), { mode, language, genres: selectedGenres, styles: selectedStyles })
+        await createProject(name.trim(), { mode, language, genres: selectedGenres, styles: selectedStyles, filePath })
         setProjectDialogOpen(false)
       } catch {
         // The store has already set a user-facing error.
@@ -187,7 +208,7 @@ export function NewProjectDialog() {
     try {
       const result = await importProject(
         projectName,
-        { mode, language, genres: selectedGenres, styles: selectedStyles },
+        { mode, language, genres: selectedGenres, styles: selectedStyles, filePath },
         source,
         {
           onStage: (payload) => setProgress(payload),
@@ -246,7 +267,7 @@ export function NewProjectDialog() {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]" onClick={handleClose}>
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100]">
         <div
           className="bg-[var(--canvas-card)] border border-[var(--hairline-light)] rounded-xl p-5 sm:p-8 w-[700px] max-w-[92vw] max-h-[88vh] overflow-y-auto custom-scrollbar shadow-2xl"
           onClick={(e) => e.stopPropagation()}
@@ -315,6 +336,13 @@ export function NewProjectDialog() {
                 setNameTouched(true)
               }}
             />
+            <div className="text-[11px] text-[var(--ink-tertiary)] mt-1.5">
+              {isTauri
+                ? documentModeEnabled
+                  ? t('project.file.saveHint')
+                  : t('project.file.featureOffHint')
+                : t('project.file.browserHint')}
+            </div>
           </div>
 
           <div className="mb-5">
@@ -359,9 +387,7 @@ export function NewProjectDialog() {
                 </button>
               ))}
             </div>
-            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-tertiary)]">
-              {t('project.styleHint')}
-            </p>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-tertiary)]">{t('project.styleHint')}</p>
           </div>
 
           <div className="mb-5">

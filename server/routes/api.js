@@ -4,8 +4,9 @@ const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
+const projectFile = require('../project-file');
+const { saveAuthorNotes } = require('../author-notes');
 const { ALLOWED_STYLES } = require('../styles');
-const { ALLOWED_SETTING_CATEGORIES } = require('../settings');
 const { normalizeLanguageCode } = require('../languages');
 const { chapterHeading, volumeHeading, stripLeadingChapterHeading } = require('../titles');
 
@@ -68,9 +69,27 @@ router.get('/projects', (req, res) => {
           analyticsId,
           createdAt: meta.created_at || null,
           status: wordCount > 30000 ? 'writing' : wordCount > 5000 ? 'inProgress' : 'new',
+          filePath: r.file_path,
+          isDocument: db.isDocumentPath(r.file_path),
         };
       } catch (e) {
-        return { id: r.id, name: r.name, iconName: 'BookOpen', genres: [], styles: [], wordCount: r.word_count || 0, chapterCount: 0, lastOpened: r.last_opened, mode: 'medium-novel', status: 'unknown', analyticsId: null, createdAt: null };
+        return {
+          id: r.id,
+          name: r.name,
+          iconName: 'BookOpen',
+          genres: [],
+          styles: [],
+          wordCount: r.word_count || 0,
+          chapterCount: 0,
+          lastOpened: r.last_opened,
+          mode: 'medium-novel',
+          status: e?.code === 'PROJECT_SCHEMA_TOO_NEW' ? 'incompatible' : 'unknown',
+          analyticsId: null,
+          createdAt: null,
+          filePath: r.file_path,
+          isDocument: db.isDocumentPath(r.file_path),
+          incompatible: e?.code === 'PROJECT_SCHEMA_TOO_NEW',
+        };
       }
     })
     .filter(Boolean);
@@ -85,6 +104,7 @@ router.post('/projects', (req, res) => {
     genres: rawGenres = ['other'],
     styles: rawStyles = [],
     powerFantasy,
+    filePath: requestedFilePath,
   } = req.body || {};
   const genreList = Array.isArray(rawGenres) ? rawGenres : ['other'];
   // 爽文 is a writing style now; accept the legacy genre/flag values.
@@ -103,12 +123,32 @@ router.post('/projects', (req, res) => {
     return res.status(409).json({ error: { code: 'PROJECT_ALREADY_EXISTS', message: `项目"${name}"已存在`, recoverable: true } });
   }
 
-  // Create new project DB. The file name is opaque; the display name is the
-  // registry key, so renaming/relocating does not depend on the path.
-  const filePath = db.newProjectFilePath();
-  const pdb = db.openProjectDb(filePath);
-  db.registerRecentProject(name, filePath);
+  if (requestedFilePath && !db.isDocumentModeEnabled()) {
+    return projectFile.documentModeDisabled(res);
+  }
+
+  // A document path comes from the native save dialog; otherwise keep the
+  // legacy opaque internal path (browser dev / older clients).
+  let filePath;
   try {
+    filePath = requestedFilePath ? projectFile.resolveDocumentPath(requestedFilePath) : db.newProjectFilePath();
+    if (requestedFilePath) {
+      projectFile.ensureParentDirectory(filePath);
+      projectFile.ensureTargetAbsent(filePath);
+      if (db.findProjectByPath(filePath)) {
+        throw projectFile.fileError('PROJECT_ALREADY_EXISTS', '该项目文件已在最近项目列表中', 409);
+      }
+    }
+  } catch (err) {
+    return res.status(err.status || 400).json({
+      error: { code: err.code || 'INVALID_PARAMS', message: err.message, recoverable: true },
+    });
+  }
+
+  let pdb;
+  try {
+    pdb = db.openProjectDb(filePath);
+    db.registerRecentProject(name, filePath);
     db.initProjectMeta(name, {
       mode,
       language: writingLanguage,
@@ -119,15 +159,184 @@ router.post('/projects', (req, res) => {
 
     // Default volume
     pdb.prepare("INSERT INTO volumes (id, sort_order, title, summary) VALUES (1, 1, '第一卷', '')").run();
+    // Fail the request now if the chosen location is not writable, instead of
+    // returning success and losing the project on exit.
+    pdb.flush();
   } catch (err) {
-    db.closeProjectDb(filePath);
-    try { fs.unlinkSync(filePath); } catch { /* ignore */ }
-    db.dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
+    if (pdb) {
+      db.closeProjectDb(filePath);
+      try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+      db.dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
+    }
     throw err;
   }
 
   const analyticsId = pdb.prepare("SELECT value FROM project_meta WHERE key = 'analytics_id'").get()?.value || null;
-  res.json({ name, filePath, mode, language: writingLanguage, genres, styles, analyticsId });
+  res.json({
+    name,
+    filePath,
+    isDocument: db.isDocumentPath(filePath),
+    mode,
+    language: writingLanguage,
+    genres,
+    styles,
+    analyticsId,
+  });
+});
+
+// Open a user-owned .mythpen document in place. Validation happens before
+// openProjectDb(), so malformed or newer files are never migrated or written.
+router.post('/projects/open-file', (req, res) => {
+  if (!db.isDocumentModeEnabled()) return projectFile.documentModeDisabled(res);
+  const { path: requestedPath } = req.body || {};
+  let info;
+  try {
+    info = projectFile.validateExistingDocument(requestedPath);
+    if (info.schemaVersion !== undefined) projectFile.assertSchemaSupported(info.schemaVersion);
+  } catch (err) {
+    return res.status(err.status || 400).json({
+      error: { code: err.code || 'PROJECT_FILE_INVALID', message: err.message, recoverable: true },
+    });
+  }
+
+  let pdb;
+  try {
+    pdb = db.openProjectDb(info.filePath);
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      error: { code: err.code || 'PROJECT_FILE_INVALID', message: err.message, recoverable: err.recoverable !== false },
+    });
+  }
+
+  let registeredName = null;
+  try {
+    const meta = {};
+    pdb.prepare('SELECT key, value FROM project_meta').all().forEach((m) => { meta[m.key] = m.value; });
+    const wordCount = parseInt(meta.word_count || '0', 10) || 0;
+    const existing = db.findProjectByPath(info.filePath);
+    const preferred = meta.name || path.basename(info.filePath, db.DOCUMENT_EXT);
+    const name = existing ? existing.name : db.registerDocumentProject(info.filePath, preferred, wordCount);
+    if (!existing) registeredName = name;
+
+    // Keep the registry key, exported title and AI context on the same name.
+    if (meta.name !== name) {
+      pdb.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('name', ?)").run(name);
+      meta.name = name;
+    }
+    if (!meta.analytics_id) {
+      meta.analytics_id = randomUUID();
+      pdb.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('analytics_id', ?)").run(meta.analytics_id);
+    }
+    db.dbExecute('UPDATE recent_projects SET last_opened = ?, word_count = ? WHERE name = ?', [
+      new Date().toISOString(),
+      wordCount,
+      name,
+    ]);
+
+    const genres = pdb.prepare('SELECT genre FROM project_genres').all().map((g) => g.genre);
+    const styles = pdb.prepare('SELECT style FROM project_styles').all().map((s) => s.style);
+    res.json({
+      name,
+      filePath: info.filePath,
+      isDocument: true,
+      mode: meta.mode || 'medium-novel',
+      language: meta.language || 'zh',
+      genres,
+      styles,
+      analyticsId: meta.analytics_id || null,
+      workflowPhase: meta.workflow_phase || 'idea',
+    });
+  } catch (err) {
+    // Do not leave a half-registered project behind if metadata setup failed.
+    if (registeredName) {
+      try { db.unregisterProject(registeredName); } catch { /* ignore */ }
+    }
+    res.status(err.status || 500).json({
+      error: { code: err.code || 'PROJECT_FILE_OPEN_FAILED', message: err.message, recoverable: true },
+    });
+  }
+});
+
+// Explicit save: the editor flush has already reached the DB; this forces the
+// whole SQLite file to disk and surfaces disk errors.
+router.post('/projects/:name/save', (req, res) => {
+  const name = req.params.name;
+  let filePath;
+  try {
+    filePath = db.getProjectDbPath(name);
+  } catch {
+    return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
+  }
+  try {
+    db.getProjectDb(name).flush();
+    db.dbExecute('UPDATE recent_projects SET last_opened = ? WHERE name = ?', [new Date().toISOString(), name]);
+    res.json({ success: true, filePath, savedAt: new Date().toISOString() });
+  } catch (err) {
+    res.status(err.status || 500).json({
+      error: { code: err.code || 'PROJECT_SAVE_FAILED', message: err.message, recoverable: true },
+    });
+  }
+});
+
+// Save As: copy the current DB to a new document, register the copy under a
+// fresh name and switch to it. The original project/file stays untouched.
+router.post('/projects/:name/save-as', (req, res) => {
+  if (!db.isDocumentModeEnabled()) return projectFile.documentModeDisabled(res);
+  const name = req.params.name;
+  const { path: requestedPath, overwrite = false } = req.body || {};
+  let sourcePath;
+  try {
+    sourcePath = db.getProjectDbPath(name);
+  } catch {
+    return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
+  }
+
+  const samePath = (a, b) =>
+    process.platform === 'win32' || process.platform === 'darwin'
+      ? a.toLowerCase() === b.toLowerCase()
+      : a === b;
+
+  let destPath;
+  try {
+    destPath = projectFile.resolveDocumentPath(requestedPath);
+    if (samePath(destPath, sourcePath)) {
+      throw projectFile.fileError('PROJECT_FILE_INVALID', '目标路径与当前项目文件相同');
+    }
+    projectFile.ensureParentDirectory(destPath);
+    const registered = db.findProjectByPath(destPath);
+    if (registered) {
+      throw projectFile.fileError('PROJECT_FILE_EXISTS', `目标文件已属于项目"${registered.name}"`, 409);
+    }
+    if (fs.existsSync(destPath) && overwrite !== true) {
+      throw projectFile.fileError('PROJECT_FILE_EXISTS', '目标文件已存在', 409);
+    }
+  } catch (err) {
+    return res.status(err.status || 400).json({
+      error: { code: err.code || 'PROJECT_FILE_INVALID', message: err.message, recoverable: true },
+    });
+  }
+
+  let newName;
+  try {
+    const sourceDb = db.getProjectDb(name);
+    // Old projects keep the cover outside the DB; pull it in before copying.
+    db.importLegacyCover(name);
+
+    const wordCount = parseInt(db.projectGet(name, "SELECT value FROM project_meta WHERE key = 'word_count'")?.value || '0', 10) || 0;
+    newName = db.allocateProjectName(path.basename(destPath, db.DOCUMENT_EXT), destPath);
+    // Export the in-memory DB instead of copying the source file: this also
+    // works when the original file was moved/deleted (Save As is the recovery
+    // path for PROJECT_FILE_CHANGED). Stamping the new name into the copy
+    // avoids re-reading the file just written; exports/prompts read meta.name.
+    db.writeProjectDocumentCopy(sourceDb, destPath, newName);
+    db.registerRecentProject(newName, destPath, wordCount);
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      error: { code: err.code || 'PROJECT_SAVE_AS_FAILED', message: err.message, recoverable: true },
+    });
+  }
+
+  res.json({ success: true, name: newName, filePath: destPath, isDocument: true });
 });
 
 router.get('/projects/:name', (req, res) => {
@@ -149,16 +358,32 @@ router.get('/projects/:name', (req, res) => {
 
 router.delete('/projects/:name', (req, res) => {
   const { name } = req.params;
+  const deleteFile = req.query.deleteFile === '1' || req.query.deleteFile === 'true';
   let filePath;
   try {
     filePath = db.getProjectDbPath(name);
   } catch {
     return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
   }
+
+  // Flush/close first so a pending editor write is not lost.
   db.closeProjectDb(filePath);
-  try { fs.unlinkSync(filePath); } catch(e) {}
+
+  if (deleteFile) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch (err) {
+      if (err.code !== 'ENOENT') {
+        // Keep the registry row: the user must not be told the file is gone.
+        return res.status(500).json({
+          error: { code: 'PROJECT_DELETE_FAILED', message: `删除项目文件失败：${err.message}`, recoverable: true },
+        });
+      }
+    }
+  }
+
   db.dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
-  res.json({ success: true });
+  res.json({ success: true, deletedFile: deleteFile });
 });
 
 // ═══════════════════════════════════════════
@@ -168,7 +393,7 @@ router.delete('/projects/:name', (req, res) => {
 // Chapter metadata without the body — structure views and validators only need
 // these fields, and imported books can hold tens of megabytes of content.
 const SLIM_CHAPTER_COLS =
-  'c.id, c.volume_id, c.num, c.title, c.outline, c.summary, c.word_count, c.status, c.cognitive_frame, c.emotional_anchor, c.world_texture, c.concrete_mystery, c.interpersonal_tension, c.created_at, c.updated_at';
+  'c.id, c.volume_id, c.num, c.title, c.outline, c.summary, c.word_count, c.status, c.cognitive_frame, c.emotional_anchor, c.world_texture, c.concrete_mystery, c.interpersonal_tension, c.genre_beat, c.created_at, c.updated_at';
 
 router.get('/:project/chapters', (req, res) => {
   const slim = req.query.slim === '1' || req.query.slim === 'true';
@@ -198,7 +423,7 @@ router.get('/:project/chapters/:num', (req, res) => {
 
 router.put('/:project/chapters/:num', (req, res) => {
   const { num } = req.params;
-  const { title, content, outline, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension } = req.body || {};
+  const { title, content, outline, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, genre_beat } = req.body || {};
   const fields = [];
   const params = [];
   if (title !== undefined) { fields.push('title = ?'); params.push(title); }
@@ -223,12 +448,16 @@ router.put('/:project/chapters/:num', (req, res) => {
   if (world_texture !== undefined) { fields.push('world_texture = ?'); params.push(world_texture); }
   if (concrete_mystery !== undefined) { fields.push('concrete_mystery = ?'); params.push(concrete_mystery); }
   if (interpersonal_tension !== undefined) { fields.push('interpersonal_tension = ?'); params.push(interpersonal_tension); }
+  if (genre_beat !== undefined) { fields.push('genre_beat = ?'); params.push(genre_beat); }
 
   fields.push("updated_at = datetime('now')");
   params.push(parseInt(num));
 
   const sql = `UPDATE chapters SET ${fields.join(', ')} WHERE num = ?`;
-  db.projectExecute(project(req.params.project), sql, params);
+  const changes = db.projectExecute(project(req.params.project), sql, params);
+  if (changes === 0) {
+    return res.status(404).json({ error: { message: `章节 ${num} 不存在，可能已被删除` } });
+  }
   db.recalculateWordCount(project(req.params.project));
 
   const updated = db.projectGet(project(req.params.project),
@@ -333,6 +562,7 @@ router.post('/:project/characters', (req, res) => {
     name,
     age = '',
     gender = '',
+    species = '',
     appearance = '',
     personality = '',
     background = '',
@@ -348,8 +578,8 @@ router.post('/:project/characters', (req, res) => {
   }
   const id = randomUUID();
   db.projectExecute(project(req.params.project),
-    'INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, notes, role, ext_markers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, name, age, gender, appearance, personality, background, motivation, arc, notes, role, ext_markers]
+    'INSERT INTO characters (id, name, age, gender, species, appearance, personality, background, motivation, arc, notes, role, ext_markers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, name, age, gender, species, appearance, personality, background, motivation, arc, notes, role, ext_markers]
   );
   res.status(201).json({ id, name });
 });
@@ -360,7 +590,7 @@ router.put('/:project/characters/:id', (req, res) => {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '无效的角色定位', recoverable: true } });
   }
   const fields = []; const params = [];
-  for (const key of ['name', 'age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'ext_markers', 'notes', 'role']) {
+  for (const key of ['name', 'age', 'gender', 'species', 'appearance', 'personality', 'background', 'motivation', 'arc', 'ext_markers', 'notes', 'role']) {
     if (req.body[key] !== undefined) { fields.push(`${key} = ?`); params.push(req.body[key]); }
   }
   if (fields.length === 0) return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '没有要更新的字段', recoverable: true } });
@@ -420,6 +650,12 @@ router.get('/:project/science', (req, res) => {
   res.json(rows);
 });
 
+// Categories are either a built-in preset key or a user-defined name, so the
+// API only trims and length-limits them instead of rejecting unknown values.
+function normalizeScienceCategory(value) {
+  return typeof value === 'string' ? value.trim().slice(0, 40) : '';
+}
+
 router.post('/:project/science', (req, res) => {
   const { label = 'known', name, description = '', references = '', category = '', sort_order = 0 } = req.body || {};
   const id = randomUUID();
@@ -432,7 +668,7 @@ router.post('/:project/science', (req, res) => {
       name,
       description,
       references,
-      ALLOWED_SETTING_CATEGORIES.has(category) ? category : '',
+      normalizeScienceCategory(category),
       Number(sort_order) || 0,
     ]
   );
@@ -441,7 +677,7 @@ router.post('/:project/science', (req, res) => {
 
 router.put('/:project/science/:id', (req, res) => {
   const body = { ...(req.body || {}) };
-  if (body.category !== undefined && !ALLOWED_SETTING_CATEGORIES.has(body.category)) body.category = '';
+  if (body.category !== undefined) body.category = normalizeScienceCategory(body.category);
   if (body.sort_order !== undefined) body.sort_order = Number(body.sort_order) || 0;
   const changes = updateRecord(
     project(req.params.project),
@@ -749,9 +985,14 @@ router.delete('/:project/timeline/:id', (req, res) => {
 // ═══════════════════════════════════════════
 
 router.get('/settings', (req, res) => {
-  const rows = db.dbQuery('SELECT key, value FROM app_settings');
-  const settings = { ...db.DEFAULT_APP_SETTINGS };
-  for (const r of rows) settings[r.key] = r.value;
+  const stored = {};
+  for (const r of db.dbQuery('SELECT key, value FROM app_settings')) stored[r.key] = r.value;
+  const settings = { ...db.DEFAULT_APP_SETTINGS, ...stored };
+  // Show the budget the server will actually use for this model; an absent
+  // stored value falls through to the model-aware default.
+  settings.max_output_tokens = String(
+    db.resolveMaxOutputTokens(stored.max_output_tokens, settings.api_model),
+  );
   // Fill in effective API key from env if the DB entry is empty
   if (!settings.api_key) settings.api_key = process.env.DEEPSEEK_KEY || '';
   res.json(settings);
@@ -769,6 +1010,11 @@ router.put('/settings', (req, res) => {
   db.dbExecute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, normalized]);
   // Invalidate AI config cache so next AI request picks up the change
   if (db.invalidateAiConfigCache) db.invalidateAiConfigCache();
+  // Privacy: apply the anonymous-statistics opt-out to server-side Sentry.
+  if (key === 'anonymous_stats') {
+    const Sentry = require('../instrument');
+    Sentry.setAnonymousStats(normalized === 'true');
+  }
   res.json({ success: true });
 });
 
@@ -782,6 +1028,20 @@ router.get('/:project/meta', (req, res) => {
   for (const r of rows) meta[r.key] = r.value;
   meta.genres = db.projectQuery(project(req.params.project), 'SELECT genre FROM project_genres').map(g => g.genre);
   res.json(meta);
+});
+
+// User-authored writing rules injected into every AI system prompt.
+router.put('/:project/author-notes', (req, res) => {
+  const { authorNotes } = req.body || {};
+  if (typeof authorNotes !== 'string') {
+    return res.status(400).json({ error: { message: 'authorNotes 必须是字符串' } });
+  }
+  try {
+    const notes = saveAuthorNotes(db.getProjectDb(project(req.params.project)), authorNotes);
+    res.json({ success: true, authorNotes: notes });
+  } catch (e) {
+    res.status(400).json({ error: { message: e.message } });
+  }
 });
 
 // ═══════════════════════════════════════════
@@ -915,34 +1175,42 @@ router.post('/:project/cover', (req, res) => {
   const pn = project(req.params.project);
   const { data, mime } = req.body || {};
   if (!data) return res.status(400).json({ error: { message: '缺少图片数据' } });
-  const coverDir = db.getCoverDir(pn);
-  if (!fs.existsSync(coverDir)) fs.mkdirSync(coverDir, { recursive: true });
-  const ext = db.MIME_TO_EXT[mime || 'image/png'] || 'png';
-  const coverPath = path.join(coverDir, `cover.${ext}`);
-  fs.writeFileSync(coverPath, Buffer.from(data, 'base64'));
-  db.projectExecute(pn, "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('cover_mime', ?)", [mime || 'image/png']);
-  db.projectExecute(pn, "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('cover_ext', ?)", [ext]);
-  res.json({ success: true, ext, mime: mime || 'image/png' });
+  const stored = db.writeProjectCover(pn, mime || 'image/png', Buffer.from(data, 'base64'));
+  // Surface an unwritable document instead of reporting a saved cover that is
+  // only in memory.
+  try {
+    db.getProjectDb(pn).flush();
+  } catch (err) {
+    return res.status(err.status || 500).json({
+      error: { code: err.code || 'COVER_SAVE_FAILED', message: err.message, recoverable: true },
+    });
+  }
+  res.json({ success: true, ext: stored.ext, mime: stored.mime });
 });
 
 router.get('/:project/cover', (req, res) => {
   const pn = project(req.params.project);
-  const coverPath = db.findCoverPath(pn);
-  if (coverPath) {
-    const ext = path.extname(coverPath).slice(1);
-    res.setHeader('Content-Type', db.EXT_TO_MIME[ext] || 'image/png');
+  const cover = db.getProjectCover(pn);
+  if (cover) {
+    res.setHeader('Content-Type', cover.mime);
     res.setHeader('Cache-Control', 'public, max-age=31536000');
-    return res.end(fs.readFileSync(coverPath));
+    return res.end(cover.data);
   }
   res.status(404).json({ error: { message: '未上传封面' } });
 });
 
 router.delete('/:project/cover', (req, res) => {
   const pn = project(req.params.project);
-  const coverPath = db.findCoverPath(pn);
-  if (coverPath) {
-    fs.unlinkSync(coverPath);
-    db.projectExecute(pn, "DELETE FROM project_meta WHERE key IN ('cover_mime', 'cover_ext')");
+  const cover = db.getProjectCover(pn);
+  if (cover) {
+    db.deleteProjectCover(pn);
+    try {
+      db.getProjectDb(pn).flush();
+    } catch (err) {
+      return res.status(err.status || 500).json({
+        error: { code: err.code || 'COVER_SAVE_FAILED', message: err.message, recoverable: true },
+      });
+    }
     res.json({ success: true });
   } else {
     res.status(404).json({ error: { message: '未上传封面' } });
@@ -962,13 +1230,142 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function textToHtmlParagraphs(text) {
-  return String(text || '')
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => `<p>${escapeHtml(line)}</p>`)
-    .join('');
+// Ordered inline Markdown rules shared by the HTML and TXT exporters. Each
+// renderer maps a construct to its output, so the two formats agree on what
+// counts as inline markup; only the rendering differs.
+const INLINE_IMAGE_RE = /!\[([^\]]*)\]\(((?:[^()\s]|\([^)]*\))+)\)/g;
+const INLINE_LINK_RE = /\[([^\]]+)\]\(((?:[^()\s]|\([^)]*\))+)\)/g;
+const INLINE_BOLD_ITALIC_RE = /(\*\*\*|___)(?=\S)([^\n]*?\S)\1/g;
+const INLINE_BOLD_RE = /(\*\*|__)(?=\S)([^\n]*?\S)\1/g;
+const INLINE_STRIKE_RE = /~~(?=\S)([^\n]*?\S)~~/g;
+// Italic: keep intraword asterisks (e.g. "2*3*4") untouched.
+const INLINE_ITALIC_RE = /(?<![\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/g;
+const INLINE_CODE_RE = /`([^`\n]+)`/g;
+
+function applyInlineMarkdown(text, render) {
+  return text
+    .replace(INLINE_IMAGE_RE, (match, alt, src) => render.image(alt, src))
+    .replace(INLINE_LINK_RE, (match, label, href) => render.link(label, href))
+    .replace(INLINE_BOLD_ITALIC_RE, (match, marker, inner) => render.boldItalic(inner))
+    .replace(INLINE_BOLD_RE, (match, marker, inner) => render.bold(inner))
+    .replace(INLINE_STRIKE_RE, (match, inner) => render.strike(inner))
+    .replace(INLINE_ITALIC_RE, (match, inner) => render.italic(inner))
+    .replace(INLINE_CODE_RE, (match, code) => render.code(code));
+}
+
+// The text is escaped first, so only the tags generated here can appear.
+const HTML_INLINE = {
+  image: (alt, src) => (/^(?:https?:|data:image\/)/i.test(src) ? `<img src="${src}" alt="${alt}">` : alt),
+  link: (label, href) => (/^(?:https?:|mailto:)/i.test(href) ? `<a href="${href}">${label}</a>` : label),
+  boldItalic: (inner) => `<strong><em>${inner}</em></strong>`,
+  bold: (inner) => `<strong>${inner}</strong>`,
+  strike: (inner) => `<del>${inner}</del>`,
+  italic: (inner) => `<em>${inner}</em>`,
+  code: (code) => `<code>${code}</code>`,
+};
+
+// TXT export is plain prose: drop the inline markers, keep the text.
+const TEXT_INLINE = {
+  image: (alt) => alt,
+  link: (label) => label,
+  boldItalic: (inner) => inner,
+  bold: (inner) => inner,
+  strike: (inner) => inner,
+  italic: (inner) => inner,
+  code: (code) => code,
+};
+
+/** Inline Markdown → HTML for chapter bodies. */
+function inlineMarkdownToHtml(text) {
+  return applyInlineMarkdown(escapeHtml(text), HTML_INLINE);
+}
+
+/**
+ * Render chapter content for HTML/EPUB export. Plain prose stays one <p> per
+ * line (matching how chapters are written); common Markdown block syntax is
+ * upgraded to its HTML equivalent.
+ */
+function markdownToHtmlParagraphs(text) {
+  const out = [];
+  let listType = null;
+  let listItems = [];
+  let quoteLines = [];
+  let codeLines = [];
+  let inFence = false;
+
+  const flushList = () => {
+    if (!listType) return;
+    out.push(`<${listType}>${listItems.map((item) => `<li>${inlineMarkdownToHtml(item)}</li>`).join('')}</${listType}>`);
+    listType = null;
+    listItems = [];
+  };
+  const flushQuote = () => {
+    if (quoteLines.length === 0) return;
+    out.push(`<blockquote><p>${quoteLines.map(inlineMarkdownToHtml).join('<br>')}</p></blockquote>`);
+    quoteLines = [];
+  };
+  const flushCode = () => {
+    if (codeLines.length === 0) return;
+    out.push(`<pre><code>${escapeHtml(codeLines.join('\n'))}</code></pre>`);
+    codeLines = [];
+  };
+
+  for (const raw of String(text || '').replace(/\r\n?/g, '\n').split('\n')) {
+    const line = raw.trim();
+    if (/^(?:`{3,}|~{3,})/.test(line)) {
+      flushList();
+      flushQuote();
+      if (inFence) flushCode();
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) {
+      codeLines.push(raw);
+      continue;
+    }
+    if (!line) {
+      flushList();
+      flushQuote();
+      continue;
+    }
+    // Thematic break / scene separator.
+    if (/^(?:[-*_]\s*){3,}$/.test(line)) {
+      flushList();
+      flushQuote();
+      out.push('<hr>');
+      continue;
+    }
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      flushList();
+      flushQuote();
+      const level = Math.min(heading[1].length + 1, 6);
+      out.push(`<h${level}>${inlineMarkdownToHtml(heading[2])}</h${level}>`);
+      continue;
+    }
+    const quote = line.match(/^>\s?(.*)$/);
+    if (quote) {
+      flushList();
+      quoteLines.push(quote[1]);
+      continue;
+    }
+    flushQuote();
+    const unordered = line.match(/^[-*+]\s+(.*)$/);
+    const ordered = unordered ? null : line.match(/^\d+[.)]\s+(.*)$/);
+    if (unordered || ordered) {
+      const type = unordered ? 'ul' : 'ol';
+      if (listType && listType !== type) flushList();
+      listType = type;
+      listItems.push((unordered || ordered)[1]);
+      continue;
+    }
+    flushList();
+    out.push(`<p>${inlineMarkdownToHtml(line)}</p>`);
+  }
+  flushList();
+  flushQuote();
+  flushCode();
+  return out.join('');
 }
 
 function groupChaptersByVolume(chapters, volumes) {
@@ -983,6 +1380,27 @@ function groupChaptersByVolume(chapters, volumes) {
   return groups;
 }
 
+// TXT export is meant to be read as plain prose, so inline Markdown markers
+// are stripped. Lines made only of -, * or _ are kept: novelists use them as
+// intentional scene breaks. List markers are left alone for the same reason
+// (a leading dash can be meaningful in dialogue).
+function stripMarkdownForTxt(text) {
+  return String(text || '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => {
+      if (/^\s*(?:(?:[-*_])\s*){3,}$/.test(line)) return line;
+      return applyInlineMarkdown(
+        line
+          .replace(/^\s{0,3}#{1,6}\s*/, '') // ATX headings
+          .replace(/^\s*(?:`{3,}|~{3,})[^\n]*$/, '') // fenced code markers
+          .replace(/^\s{0,3}>\s?/, ''), // blockquotes
+        TEXT_INLINE,
+      );
+    })
+    .join('\n');
+}
+
 router.get('/:project/export', async (req, res) => {
   const { format = 'txt' } = req.query;
   const pn = project(req.params.project);
@@ -995,13 +1413,19 @@ router.get('/:project/export', async (req, res) => {
   db.projectQuery(pn, 'SELECT key, value FROM project_meta').forEach(m => meta[m.key] = m.value);
 
   const totalWords = chapters.reduce((s, c) => s + db.countWords(c.content), 0);
-  const EXPORT_DIR = path.join(require('os').homedir(), '.mythpen', 'exports', pn);
+  const EXPORT_DIR = path.join(db.EXPORTS_DIR, pn);
   if (!fs.existsSync(EXPORT_DIR)) fs.mkdirSync(EXPORT_DIR, { recursive: true });
 
-  // Find cover image
-  const coverPath = db.findCoverPath(pn);
-  const coverBase64 = coverPath ? fs.readFileSync(coverPath).toString('base64') : null;
-  const coverMime = coverPath ? (db.EXT_TO_MIME[path.extname(coverPath).slice(1)] || 'image/png') : null;
+  // Cover bytes come from the project DB (documents) or the legacy file.
+  const cover = db.getProjectCover(pn);
+  const coverBase64 = cover ? cover.data.toString('base64') : null;
+  const coverMime = cover?.mime || null;
+  let coverPath = null;
+  if (cover) {
+    const coverExt = db.MIME_TO_EXT[cover.mime] || 'png';
+    coverPath = path.join(EXPORT_DIR, `cover.${coverExt}`);
+    fs.writeFileSync(coverPath, cover.data);
+  }
 
   let ext = 'txt';
   let mime = 'text/plain; charset=utf-8';
@@ -1029,7 +1453,7 @@ router.get('/:project/export', async (req, res) => {
       for (const ch of group.chapters) {
         content.push({
           title: chapterHeading(ch),
-          data: `<h1>${escapeHtml(chapterHeading(ch))}</h1>${textToHtmlParagraphs(ch.content)}`,
+          data: `<h1>${escapeHtml(chapterHeading(ch))}</h1>${markdownToHtmlParagraphs(ch.content)}`,
         });
       }
     }
@@ -1078,7 +1502,7 @@ router.get('/:project/export', async (req, res) => {
           ? `<div class="volume-heading"><h2>${escapeHtml(volumeHeading(group.volume))}</h2></div>`
           : '';
         return volumeHeadingHtml + group.chapters
-          .map((ch) => `<div class="chapter"><h1>${escapeHtml(chapterHeading(ch))}</h1>${textToHtmlParagraphs(ch.content)}</div>`)
+          .map((ch) => `<div class="chapter"><h1>${escapeHtml(chapterHeading(ch))}</h1>${markdownToHtmlParagraphs(ch.content)}</div>`)
           .join('');
       })
       .join('');
@@ -1101,7 +1525,16 @@ router.get('/:project/export', async (req, res) => {
   .chapter { page-break-after: always; padding: 40px; max-width: 700px; margin: 0 auto; }
   .chapter h1 { font-size: 22px; text-align: center; margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #333; }
   .chapter p { text-indent: 2em; margin-bottom: 0.8em; font-size: 16px; }
-  .chapter h1, .chapter h2, .chapter h3, .chapter h4 { text-indent: 0; }
+  .chapter h1, .chapter h2, .chapter h3, .chapter h4, .chapter h5, .chapter h6 { text-indent: 0; }
+  .chapter h2, .chapter h3, .chapter h4, .chapter h5, .chapter h6 { margin: 1.2em 0 0.6em; }
+  .chapter blockquote { margin: 0.8em 0; padding-left: 1em; border-left: 3px solid #ddd; color: #666; }
+  .chapter blockquote p { text-indent: 0; margin-bottom: 0; }
+  .chapter ul, .chapter ol { margin: 0.8em 0 0.8em 1.8em; font-size: 16px; }
+  .chapter li { margin-bottom: 0.3em; }
+  .chapter hr { margin: 1.5em auto; width: 60%; border: none; border-top: 1px solid #ddd; }
+  .chapter pre { margin: 0.8em 0; padding: 10px 12px; background: #f6f6f6; border-radius: 4px; white-space: pre-wrap; }
+  .chapter code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+  .chapter a { color: inherit; text-decoration: underline; }
   .volume-heading { page-break-after: always; padding: 40px; max-width: 700px; margin: 0 auto; text-align: center; }
   .volume-heading h2 { font-size: 26px; }
   .toc-volume { font-weight: 600; margin-top: 12px; }
@@ -1158,7 +1591,7 @@ ${chaptersHtml}
         output += `\n${volumeHeading(group.volume)}\n${'='.repeat(20)}\n`;
       }
       for (const ch of group.chapters) {
-        output += `\n${chapterHeading(ch)}\n${'-'.repeat(20)}\n\n${ch.content.replace(/^#+/gm, '').trim()}\n`;
+        output += `\n${chapterHeading(ch)}\n${'-'.repeat(20)}\n\n${stripMarkdownForTxt(ch.content).trim()}\n`;
       }
     }
   }

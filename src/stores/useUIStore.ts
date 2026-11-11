@@ -26,6 +26,8 @@ interface UIState {
   projectSwitcherOpen: boolean
   rightPanelVisible: boolean
   rightPanelWidth: number
+  /** True while the user drags the AI panel resize handle; disables width transitions. */
+  rightPanelResizing: boolean
   sidebarWidth: number
   toggleSettings: () => void
   closeSettings: () => void
@@ -33,6 +35,7 @@ interface UIState {
   setProjectSwitcherOpen: (open: boolean) => void
   toggleRightPanel: () => void
   setRightPanelWidth: (w: number) => void
+  setRightPanelResizing: (resizing: boolean) => void
   setSidebarWidth: (w: number) => void
 }
 
@@ -42,6 +45,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   projectSwitcherOpen: false,
   rightPanelVisible: true,
   rightPanelWidth: 320,
+  rightPanelResizing: false,
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   toggleSettings: () => set((s) => ({ settingsOpen: !s.settingsOpen })),
   closeSettings: () => set({ settingsOpen: false }),
@@ -61,6 +65,7 @@ export const useUIStore = create<UIState>((set, get) => ({
     document.documentElement.style.setProperty('--right-panel-w', `${clamped}px`)
     localStorage.setItem('mythpen-right-panel-width', String(clamped))
   },
+  setRightPanelResizing: (resizing) => set({ rightPanelResizing: resizing }),
   setSidebarWidth: (w) => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
     const { rightPanelVisible, rightPanelWidth } = get()

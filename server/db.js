@@ -6,9 +6,24 @@ const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 
-const DB_DIR = path.join(require('os').homedir(), '.mythpen');
+// MYTHPEN_DATA_DIR lets tests run against an isolated data root. Production
+// (including the Tauri sidecar) leaves it unset and keeps the historical path.
+const DATA_DIR = process.env.MYTHPEN_DATA_DIR
+  ? path.resolve(process.env.MYTHPEN_DATA_DIR)
+  : path.join(require('os').homedir(), '.mythpen');
+const DB_DIR = DATA_DIR;
 const CONFIG_DB = path.join(DB_DIR, 'config.db');
 const PROJECTS_DIR = path.join(DB_DIR, 'projects');
+const EXPORTS_DIR = path.join(DB_DIR, 'exports');
+
+// Project documents (`.mythpen`) are user files. Internal project DBs stay
+// under PROJECTS_DIR and use the historical 250 ms flush delay.
+const DOCUMENT_EXT = '.mythpen';
+const DOCUMENT_FLUSH_DELAY = 1500;
+// SQLite application_id magic: ASCII "MYTH", big-endian at header offset 68.
+const MYTHPEN_APP_ID = 0x4d595448;
+const DOCUMENT_FORMAT = 'mythpen-project';
+const DOCUMENT_FORMAT_VERSION = '1';
 
 // ─── Ensure directories ───
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
@@ -21,8 +36,8 @@ let configDb;    // wrapped config database
 // Schema versioning — bump these when adding migrations
 // ═══════════════════════════════════════════════════════════════
 
-const CONFIG_SCHEMA_VERSION = 2;
-const PROJECT_SCHEMA_VERSION = 9;
+const CONFIG_SCHEMA_VERSION = 3;
+const PROJECT_SCHEMA_VERSION = 12;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -36,9 +51,36 @@ function _loadDb(filePath) {
   return new SQL.Database();
 }
 
-function _flushDb(db, filePath) {
-  const data = db.export();
-  fs.writeFileSync(filePath, Buffer.from(data));
+/**
+ * Write the in-memory database atomically. A crash mid-write must never leave
+ * a truncated file behind, so write a sibling temp file then rename over the
+ * target (atomic on the same filesystem). User documents also fsync the temp
+ * file; internal DBs skip it because synchronous fsync blocks the event loop
+ * and they are not the user's only copy.
+ */
+function _flushDb(db, filePath, { durable = false } = {}) {
+  const data = Buffer.from(db.export());
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  try {
+    fs.writeFileSync(tmpPath, data);
+    if (durable) {
+      // Some network filesystems reject fsync; those saves still proceed.
+      const fd = fs.openSync(tmpPath, 'r+');
+      try {
+        fs.fsyncSync(fd);
+      } catch (err) {
+        if (err.code !== 'EINVAL' && err.code !== 'ENOTSUP') throw err;
+      } finally {
+        fs.closeSync(fd);
+      }
+    }
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    try { fs.unlinkSync(tmpPath); } catch { /* already gone */ }
+    throw err;
+  }
 }
 
 // sql.js requires null instead of undefined for positional bindings.
@@ -57,15 +99,61 @@ function _bindArgs(params) {
  */
 const DB_FLUSH_DELAY = 250; // ms — batch writes up to this interval
 
-function _wrapDb(db, filePath) {
+/** Identity used to notice a document moved/replaced behind our back. */
+function _fileIdentity(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    return { dev: stat.dev, ino: stat.ino, mtimeMs: stat.mtimeMs };
+  } catch {
+    return null;
+  }
+}
+
+function _fileChangedSince(filePath, identity) {
+  if (!identity) return false;
+  try {
+    const stat = fs.statSync(filePath);
+    return stat.dev !== identity.dev || stat.ino !== identity.ino || stat.mtimeMs !== identity.mtimeMs;
+  } catch {
+    return true;
+  }
+}
+
+function _wrapDb(db, filePath, options = {}) {
+  const flushDelay = options.flushDelay ?? DB_FLUSH_DELAY;
+  const isDocument = options.isDocument === true;
   let dirty = false;
   let flushTimer = null;
+  let lastFlushError = null;
+  // Only documents need external-change detection; internal DBs are app-owned.
+  let identity = isDocument ? _fileIdentity(filePath) : null;
 
-  function _flushSync() {
+  function _flushSync(throwOnError = false) {
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-    if (!dirty) return;
-    dirty = false;
-    _flushDb(db, filePath);
+    if (!dirty) {
+      if (throwOnError && lastFlushError) throw lastFlushError;
+      return;
+    }
+    if (isDocument && identity && _fileChangedSince(filePath, identity)) {
+      const err = Object.assign(
+        new Error('项目文件已被移动、删除或被其他程序修改，未写入以避免覆盖。请使用“另存为”。'),
+        { code: 'PROJECT_FILE_CHANGED', status: 409, recoverable: true },
+      );
+      lastFlushError = err;
+      if (throwOnError) throw err;
+      console.warn(`[DB] Skipped flush for changed document: ${filePath}`);
+      return;
+    }
+    try {
+      _flushDb(db, filePath, { durable: isDocument });
+      dirty = false;
+      lastFlushError = null;
+      if (isDocument) identity = _fileIdentity(filePath);
+    } catch (err) {
+      lastFlushError = err;
+      if (throwOnError) throw err;
+      console.error(`[DB] Flush failed for ${filePath}:`, err.message);
+    }
   }
 
   function _scheduleFlush() {
@@ -73,14 +161,15 @@ function _wrapDb(db, filePath) {
     if (!flushTimer) {
       flushTimer = setTimeout(() => {
         flushTimer = null;
-        _flushSync();
-      }, DB_FLUSH_DELAY);
+        _flushSync(false);
+      }, flushDelay);
     }
   }
 
   return {
     _db: db,
     _path: filePath,
+    _isDocument: isDocument,
 
     pragma(sql) {
       db.run('PRAGMA ' + sql);
@@ -155,11 +244,16 @@ function _wrapDb(db, filePath) {
     },
 
     flush() {
-      _flushSync();
+      _flushSync(true);
+    },
+
+    getLastFlushError() {
+      return lastFlushError;
     },
 
     close() {
-      _flushSync();
+      // Never let a failed final flush prevent the handle from closing.
+      _flushSync(false);
       db.close();
     },
   };
@@ -264,8 +358,67 @@ function getConfigDb() {
 // Generic migration runner
 // ═══════════════════════════════════════════════════════════════
 
+function schemaTooNewError(currentVersion, targetVersion) {
+  const err = new Error(
+    `项目文件由更新版本的 Mythpen 创建（数据版本 ${currentVersion}，当前应用支持 ${targetVersion}），请升级 Mythpen 后再打开。`,
+  );
+  err.status = 409;
+  err.code = 'PROJECT_SCHEMA_TOO_NEW';
+  err.recoverable = true;
+  err.currentVersion = currentVersion;
+  err.targetVersion = targetVersion;
+  return err;
+}
+
+/**
+ * Read a project DB's schema version without creating any table or scheduling
+ * a write. Used before migrations so a newer document is rejected untouched.
+ */
+function peekProjectSchemaVersion(rawDb) {
+  let stmt;
+  try {
+    stmt = rawDb.prepare("SELECT value FROM project_meta WHERE key = 'schema_version'");
+    if (!stmt.step()) return 0;
+    const row = stmt.getAsObject();
+    return parseInt(row.value, 10) || 0;
+  } catch {
+    // project_meta does not exist yet (brand-new or non-Mythpen DB).
+    return 0;
+  } finally {
+    try { stmt?.free(); } catch { /* ignore */ }
+  }
+}
+
+function hasProjectMeta(rawDb) {
+  let stmt;
+  try {
+    stmt = rawDb.prepare("SELECT COUNT(*) AS c FROM project_meta WHERE key IN ('name','schema_version')");
+    if (!stmt.step()) return false;
+    return Number(stmt.getAsObject().c) > 0;
+  } catch {
+    return false;
+  } finally {
+    try { stmt?.free(); } catch { /* ignore */ }
+  }
+}
+
+/**
+ * Read schema/identity hints from a document without migrating or flushing.
+ * Used to validate a legacy file before opening it through the normal path.
+ */
+function inspectProjectFile(filePath) {
+  if (!SQL) throw new Error('Database not initialised');
+  const raw = new SQL.Database(fs.readFileSync(filePath));
+  try {
+    return { schemaVersion: peekProjectSchemaVersion(raw), hasProjectMeta: hasProjectMeta(raw) };
+  } finally {
+    raw.close();
+  }
+}
+
 function runMigrations(db, migrations, targetVersion, getVersionFn, setVersionFn) {
-  let currentVersion = getVersionFn(db);
+  const currentVersion = getVersionFn(db);
+  if (currentVersion > targetVersion) throw schemaTooNewError(currentVersion, targetVersion);
   if (currentVersion >= targetVersion) return;
   for (let v = currentVersion; v < targetVersion; v++) {
     if (migrations[v]) migrations[v](db);
@@ -294,11 +447,36 @@ const SETTING_SCHEMA = {
   auto_save_interval: { type: 'number', default: 30, min: 0, max: 3600 },
   backup_enabled: { type: 'boolean', default: true },
   accent_color: { type: 'string', default: '#c9a96e' },
+  anonymous_stats: { type: 'boolean', default: true },
+  // Experimental .mythpen project files. Off by default because the format may
+  // change in a breaking way in a future release.
+  experimental_document_mode: { type: 'boolean', default: false },
 };
 
 const DEFAULT_APP_SETTINGS = Object.fromEntries(
   Object.entries(SETTING_SCHEMA).map(([key, schema]) => [key, String(schema.default)]),
 );
+
+// Thinking models (e.g. DeepSeek Flash) count reasoning tokens toward
+// `max_tokens`. The historical 8192 default leaves too little room for the
+// final answer or a tool call's JSON arguments, so give these models a larger
+// default while keeping the conservative value for other providers.
+const MODEL_MAX_OUTPUT_DEFAULTS = [
+  { pattern: /^deepseek-(?:flash|v4)/i, tokens: 65536 },
+];
+
+function modelDefaultMaxOutputTokens(model) {
+  const name = String(model || '');
+  const match = MODEL_MAX_OUTPUT_DEFAULTS.find(entry => entry.pattern.test(name));
+  return match ? match.tokens : Number(SETTING_SCHEMA.max_output_tokens.default);
+}
+
+/** Resolve the effective output budget; an explicit stored value wins. */
+function resolveMaxOutputTokens(configured, model) {
+  const value = Number(configured);
+  if (Number.isFinite(value) && value > 0) return value;
+  return modelDefaultMaxOutputTokens(model);
+}
 
 /** Coerce and validate a setting value; undefined means "reject". */
 function normalizeSetting(key, value) {
@@ -361,6 +539,18 @@ const configMigrations = [
       CREATE UNIQUE INDEX IF NOT EXISTS idx_recent_projects_name ON recent_projects(name);
     `);
   },
+  // v2 → v3: DeepSeek Flash enables thinking by default, and reasoning tokens
+  // count toward `max_tokens`. The old 8192 default is exhausted by thinking
+  // before a long tool call (e.g. create_chapter) finishes writing its JSON
+  // arguments. Drop the seeded value so the model-aware default applies; the
+  // old seed is indistinguishable from an explicit 8192, which is harmless to
+  // drop because non-thinking models resolve to the same 8192 anyway.
+  (db) => {
+    const row = db.prepare("SELECT value FROM app_settings WHERE key = 'max_output_tokens'").get();
+    if (row && Number(row.value) === Number(SETTING_SCHEMA.max_output_tokens.default)) {
+      db.prepare("DELETE FROM app_settings WHERE key = 'max_output_tokens'").run();
+    }
+  },
 ];
 
 function makeVersionGetter(tableName) {
@@ -415,6 +605,31 @@ function newProjectFilePath() {
   return path.join(PROJECTS_DIR, `${randomUUID()}.mythpen.db`);
 }
 
+/** True when a project DB is app-managed under ~/.mythpen/projects. */
+function isManagedProjectPath(filePath) {
+  const resolved = path.resolve(filePath);
+  const root = path.resolve(PROJECTS_DIR) + path.sep;
+  if (process.platform === 'win32') {
+    return resolved.toLowerCase().startsWith(root.toLowerCase());
+  }
+  return resolved.startsWith(root);
+}
+
+/** True for a user-facing `.mythpen` document (not an internal `.mythpen.db`). */
+function isDocumentPath(filePath) {
+  return String(filePath).toLowerCase().endsWith(DOCUMENT_EXT) && !isManagedProjectPath(filePath);
+}
+
+/** Experimental .mythpen feature switch (Settings → Experimental). Off by default. */
+function isDocumentModeEnabled() {
+  try {
+    const row = dbGet("SELECT value FROM app_settings WHERE key = 'experimental_document_mode'");
+    return row?.value === 'true';
+  } catch {
+    return false;
+  }
+}
+
 function isProjectOpen(filePath) {
   return projectConnections.has(filePath);
 }
@@ -428,8 +643,30 @@ function openProjectDb(filePath) {
     return existing;
   }
   const db = _loadDb(filePath);
+  const isDocument = isDocumentPath(filePath);
+  // Refuse a document produced by a newer app before creating tables or
+  // scheduling any write; the file must stay byte-identical.
+  const rawVersion = peekProjectSchemaVersion(db);
+  if (rawVersion > PROJECT_SCHEMA_VERSION) {
+    db.close();
+    throw schemaTooNewError(rawVersion, PROJECT_SCHEMA_VERSION);
+  }
+  // A non-empty .mythpen file without project_meta is not ours (or is corrupt).
+  // Empty files are allowed: an import reserves its destination that way.
+  const fileSize = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+  if (isDocument && fileSize > 0 && !hasProjectMeta(db)) {
+    db.close();
+    throw Object.assign(new Error('不是有效的 Mythpen 项目文件'), {
+      status: 400,
+      code: 'PROJECT_FILE_INVALID',
+      recoverable: true,
+    });
+  }
   db.run('PRAGMA foreign_keys = ON');
-  const wrapped = _wrapDb(db, filePath);
+  const wrapped = _wrapDb(db, filePath, {
+    isDocument,
+    flushDelay: isDocument ? DOCUMENT_FLUSH_DELAY : DB_FLUSH_DELAY,
+  });
   migrateProject(wrapped);
   projectConnections.set(filePath, wrapped);
   if (projectConnections.size > MAX_OPEN_PROJECTS) {
@@ -448,6 +685,21 @@ function closeProjectDb(filePath) {
   if (projectConnections.has(filePath)) {
     projectConnections.get(filePath).close();
     projectConnections.delete(filePath);
+  }
+}
+
+/**
+ * Write a copy of an open project database as a user document, stamping the
+ * copy with its new project name. The copy is built in memory so neither the
+ * source file nor its open connection is touched.
+ */
+function writeProjectDocumentCopy(sourceDb, filePath, name) {
+  const copy = new SQL.Database(sourceDb._db.export());
+  try {
+    copy.run("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('name', ?)", [name]);
+    _flushDb(copy, filePath, { durable: true });
+  } finally {
+    copy.close();
   }
 }
 
@@ -512,6 +764,7 @@ const projectMigrations = [
         world_texture     TEXT DEFAULT '',
         concrete_mystery  TEXT DEFAULT '',
         interpersonal_tension TEXT DEFAULT '',
+        genre_beat        TEXT DEFAULT '',
         created_at  TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
         UNIQUE(volume_id, num)
@@ -777,6 +1030,42 @@ const projectMigrations = [
     }
     db.prepare("DELETE FROM project_styles WHERE style IN ('comedy','fast-paced','mystery-suspense')").run();
   },
+  // v9 → v10: characters are not always human (AI, aliens, robots, deities,
+  // spirits, animals, collectives…). An explicit species/type keeps the
+  // writing context from assuming every character behaves like a person.
+  (db) => {
+    try {
+      db.exec("ALTER TABLE characters ADD COLUMN species TEXT DEFAULT ''");
+    } catch (e) {
+      // column already exists — ignore
+    }
+  },
+  // v10 → v11: the five narrative dimensions describe texture, not the genre
+  // engine. `genre_beat` records what the chapter advances in its own genre
+  // (mystery clues, cultivation realm, romance relationship stage…).
+  (db) => {
+    try {
+      db.exec("ALTER TABLE chapters ADD COLUMN genre_beat TEXT DEFAULT ''");
+    } catch (e) {
+      // column already exists — ignore
+    }
+  },
+  // v11 → v12: project documents are self-contained SQLite files. `assets`
+  // carries binary resources (cover) inside the file; application_id marks the
+  // file as a Mythpen document without needing to parse its tables.
+  (db) => {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS assets (
+        key        TEXT PRIMARY KEY,
+        mime       TEXT NOT NULL,
+        data       BLOB NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    db.exec(`PRAGMA application_id = ${MYTHPEN_APP_ID}`);
+    db.prepare("INSERT OR IGNORE INTO project_meta (key, value) VALUES ('format', ?)").run(DOCUMENT_FORMAT);
+    db.prepare("INSERT OR IGNORE INTO project_meta (key, value) VALUES ('format_version', ?)").run(DOCUMENT_FORMAT_VERSION);
+  },
 ];
 
 const getProjectVersion = makeVersionGetter('project_meta');
@@ -929,6 +1218,67 @@ function registerRecentProject(name, filePath, wordCount = 0) {
   return id;
 }
 
+function findProjectByPath(filePath) {
+  return dbGet('SELECT * FROM recent_projects WHERE file_path = ?', [filePath]) || null;
+}
+
+/** Make a display name safe for the registry, falling back to a generic name. */
+function sanitizeProjectName(value) {
+  let name = String(value || '').trim();
+  name = name
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+    .replace(/^\.+/, '')
+    .trim()
+    .slice(0, 80);
+  if (!name || validateProjectName(name)) name = '未命名项目';
+  return name;
+}
+
+/**
+ * Pick a registry name that is not used by a different file. Existing rows are
+ * never repointed: opening two books with the same title yields "书名（2）".
+ */
+function allocateProjectName(preferred, filePath) {
+  const base = sanitizeProjectName(preferred);
+  const byName = dbGet('SELECT file_path FROM recent_projects WHERE name = ?', [base]);
+  if (!byName || byName.file_path === filePath) return base;
+  for (let i = 2; i <= 999; i++) {
+    const candidate = `${base.slice(0, 74)}（${i}）`;
+    const row = dbGet('SELECT file_path FROM recent_projects WHERE name = ?', [candidate]);
+    if (!row || row.file_path === filePath) return candidate;
+  }
+  return `${base.slice(0, 60)}（${Date.now()}）`;
+}
+
+/** Register (or refresh) a user-owned `.mythpen` file by path. Returns its name. */
+function registerDocumentProject(filePath, preferredName, wordCount = 0) {
+  const now = new Date().toISOString();
+  const existing = findProjectByPath(filePath);
+  if (existing) {
+    dbExecute('UPDATE recent_projects SET last_opened = ? WHERE id = ?', [now, existing.id]);
+    return existing.name;
+  }
+  const name = allocateProjectName(preferredName, filePath);
+  const id = randomUUID();
+  dbExecute(
+    'INSERT INTO recent_projects (id, name, file_path, last_opened, word_count) VALUES (?, ?, ?, ?, ?)',
+    [id, name, filePath, now, wordCount],
+  );
+  return name;
+}
+
+function unregisterProject(name) {
+  const row = dbGet('SELECT file_path FROM recent_projects WHERE name = ?', [name]);
+  if (!row) throw projectNotFound(name);
+  dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
+  return row.file_path;
+}
+
+function setProjectFilePath(name, filePath) {
+  const changes = dbExecute('UPDATE recent_projects SET file_path = ? WHERE name = ?', [filePath, name]);
+  if (!changes) throw projectNotFound(name);
+}
+
 /** The volume continuation chapters should land in (the last one). */
 function lastVolumeId(projectName) {
   return projectGet(projectName, 'SELECT id FROM volumes ORDER BY sort_order DESC, id DESC LIMIT 1')?.id ?? 1;
@@ -956,6 +1306,79 @@ function findCoverPath(projectName) {
 const MIME_TO_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
 const EXT_TO_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
 
+// ─── Cover assets ───
+// Documents keep the cover inside the file so sending one file carries it.
+// Legacy projects still have ~/.mythpen/projects/<name>/cover.*; reads prefer
+// the DB asset and fall back to disk, and writes keep both in sync.
+
+function getCoverAsset(projectName) {
+  try {
+    const row = projectGet(projectName, "SELECT mime, data FROM assets WHERE key = 'cover'");
+    if (!row?.data) return null;
+    return { mime: row.mime || 'image/png', data: Buffer.from(row.data) };
+  } catch {
+    return null;
+  }
+}
+
+function putCoverAsset(projectName, mime, data) {
+  projectExecute(
+    projectName,
+    "INSERT OR REPLACE INTO assets (key, mime, data, updated_at) VALUES ('cover', ?, ?, datetime('now'))",
+    [mime || 'image/png', data],
+  );
+}
+
+function deleteCoverAsset(projectName) {
+  try {
+    projectExecute(projectName, "DELETE FROM assets WHERE key = 'cover'");
+  } catch {
+    /* assets table only exists after migration v12 */
+  }
+}
+
+/** Cover bytes from the DB, or the legacy on-disk file for old projects. */
+function getProjectCover(projectName) {
+  const asset = getCoverAsset(projectName);
+  if (asset) return asset;
+  const legacyPath = findCoverPath(projectName);
+  if (!legacyPath) return null;
+  const ext = path.extname(legacyPath).slice(1).toLowerCase();
+  return { mime: EXT_TO_MIME[ext] || 'image/png', data: fs.readFileSync(legacyPath) };
+}
+
+/** Copy an old external cover into the project DB (used by Save As). */
+function importLegacyCover(projectName) {
+  if (getCoverAsset(projectName)) return false;
+  const legacyPath = findCoverPath(projectName);
+  if (!legacyPath) return false;
+  const ext = path.extname(legacyPath).slice(1).toLowerCase();
+  putCoverAsset(projectName, EXT_TO_MIME[ext] || 'image/png', fs.readFileSync(legacyPath));
+  return true;
+}
+
+/** Store a newly uploaded cover in the DB and mirror it to the legacy path. */
+function writeProjectCover(projectName, mime, data) {
+  const normalizedMime = mime || 'image/png';
+  const ext = MIME_TO_EXT[normalizedMime] || 'png';
+  putCoverAsset(projectName, normalizedMime, data);
+  const coverDir = getCoverDir(projectName);
+  fs.mkdirSync(coverDir, { recursive: true });
+  fs.writeFileSync(path.join(coverDir, `cover.${ext}`), data);
+  projectExecute(projectName, "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('cover_mime', ?)", [normalizedMime]);
+  projectExecute(projectName, "INSERT OR REPLACE INTO project_meta (key, value) VALUES ('cover_ext', ?)", [ext]);
+  return { ext, mime: normalizedMime };
+}
+
+function deleteProjectCover(projectName) {
+  deleteCoverAsset(projectName);
+  const legacyPath = findCoverPath(projectName);
+  if (legacyPath) {
+    try { fs.unlinkSync(legacyPath); } catch { /* ignore */ }
+  }
+  projectExecute(projectName, "DELETE FROM project_meta WHERE key IN ('cover_mime', 'cover_ext')");
+}
+
 module.exports = {
   initDatabase,
   getConfigDb,
@@ -963,8 +1386,12 @@ module.exports = {
   getProjectDbPath,
   newProjectFilePath,
   isProjectOpen,
+  isManagedProjectPath,
+  isDocumentPath,
+  isDocumentModeEnabled,
   openProjectDb,
   closeProjectDb,
+  writeProjectDocumentCopy,
   closeAllDatabases,
   dbQuery,
   dbGet,
@@ -980,14 +1407,39 @@ module.exports = {
   initProjectGenres,
   initProjectStyles,
   validateProjectName,
+  sanitizeProjectName,
   registerRecentProject,
+  findProjectByPath,
+  allocateProjectName,
+  registerDocumentProject,
+  unregisterProject,
+  setProjectFilePath,
   lastVolumeId,
   nextChapterNumber,
   getCoverDir,
   findCoverPath,
+  getCoverAsset,
+  putCoverAsset,
+  deleteCoverAsset,
+  getProjectCover,
+  importLegacyCover,
+  writeProjectCover,
+  deleteProjectCover,
   MIME_TO_EXT,
   EXT_TO_MIME,
+  DATA_DIR,
+  PROJECTS_DIR,
+  EXPORTS_DIR,
+  DOCUMENT_EXT,
+  DOCUMENT_FORMAT,
+  DOCUMENT_FORMAT_VERSION,
+  MYTHPEN_APP_ID,
+  PROJECT_SCHEMA_VERSION,
+  schemaTooNewError,
+  peekProjectSchemaVersion,
+  inspectProjectFile,
   DEFAULT_APP_SETTINGS,
   SETTING_SCHEMA,
   normalizeSetting,
+  resolveMaxOutputTokens,
 };

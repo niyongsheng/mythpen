@@ -43,6 +43,20 @@
     ],
     "externalBin": [
       "binaries/mythpen-server"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["mythpen"],
+        "name": "Mythpen Project",
+        "description": "Mythpen 项目文件",
+        "mimeType": "application/x-mythpen",
+        "role": "Editor",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "com.mythpen.desktop.project",
+          "conformsTo": ["public.data"]
+        }
+      }
     ]
   },
   "plugins": {
