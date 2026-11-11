@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { isUiLanguage, resolveUiLanguage, setLanguage } from '@/i18n'
+import { syncAnonymousStatsToShell } from '@/lib/anonymousStats'
 import { settingsApi } from '@/lib/api'
+import { setErrorReportingEnabled } from '@/lib/sentry'
 import type { AppSettings, UiLanguage } from '@/types'
 
 interface SettingsState {
@@ -25,6 +27,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoSaveInterval: 30,
   soundEffect: 'chime',
   backupEnabled: true,
+  anonymousStats: true,
+  experimentalDocumentMode: false,
   accentColor: '#c9a96e',
   maxOutputTokens: 8192,
   httpTimeout: 300,
@@ -92,6 +96,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       merged.accentColor = get().settings.accentColor
       // Sound is a per-device preference; never overwrite it with server defaults.
       merged.soundEffect = get().settings.soundEffect
+      // Anonymous statistics is also a per-device choice; local state wins.
+      merged.anonymousStats = get().settings.anonymousStats
+      // Experimental document mode is server-authoritative (the server also
+      // gates the file endpoints); default off.
+      merged.experimentalDocumentMode = serverSettings.experimental_document_mode === 'true'
+      // Push the local choice to the server so backend crash reporting agrees.
+      if (serverSettings.anonymous_stats !== String(merged.anonymousStats)) {
+        settingsApi.update('anonymous_stats', String(merged.anonymousStats)).catch(() => {})
+      }
       // Auto-save can be disabled (0); prefer the persisted server value.
       const serverAutoSave = Number(serverSettings.auto_save_interval)
       merged.autoSaveInterval = Number.isFinite(serverAutoSave) ? serverAutoSave : get().settings.autoSaveInterval
@@ -132,6 +145,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         autoSaveInterval: 'auto_save_interval',
         backupEnabled: 'backup_enabled',
         accentColor: 'accent_color',
+        anonymousStats: 'anonymous_stats',
+        experimentalDocumentMode: 'experimental_document_mode',
       }
       const dbKey = keyMap[key]
       if (dbKey) {
@@ -145,6 +160,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         extra.langVersion = s.langVersion + 1
       }
       if (key === 'theme') applyTheme(value as AppSettings['theme'])
+      if (key === 'anonymousStats') {
+        // Frontend reporting stops immediately; the Rust shell mirrors the
+        // choice for native lifecycle events and desktop crash reports.
+        setErrorReportingEnabled(Boolean(value))
+        syncAnonymousStatsToShell(Boolean(value))
+      }
       return { settings: newSettings, ...extra }
     }),
 }))

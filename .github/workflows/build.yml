@@ -5,6 +5,9 @@ on:
     tags: ['v*']
 
 env:
+  # Aptabase tier baked into every release: minimal | basic | standard | full.
+  # Read by the frontend at build time.
+  VITE_ANALYTICS_LEVEL: basic
   # Used by createUpdaterArtifacts to sign the updater bundles. The matching
   # public key is stored in src-tauri/tauri.conf.json.
   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}

@@ -3,11 +3,13 @@ import {
   Download,
   Eye,
   EyeOff,
+  FlaskConical,
   Globe,
   Palette,
   Pen,
   Play,
   RotateCw,
+  Shield,
   SwatchBook,
   Volume2,
   X,
@@ -16,6 +18,7 @@ import {
 import { useState } from 'react'
 import { LanguageSelect } from '@/components/LanguageSelect'
 import { Select } from '@/components/Select'
+import { useMountTransition } from '@/hooks/useMountTransition'
 import { useT } from '@/hooks/useT'
 import { apiUrl } from '@/lib/api'
 import { refreshAllData } from '@/lib/dataEvents'
@@ -56,6 +59,9 @@ export function SettingsDrawer() {
   const checkForUpdates = useUpdateStore((s) => s.check)
   const installUpdate = useUpdateStore((s) => s.install)
   const restartApp = useUpdateStore((s) => s.restart)
+  // Keep the drawer mounted while the closing transition plays, then unmount.
+  // Mirrors the 300ms ease-out used by the sidebar's writing-statistics fold.
+  const { mounted, entered } = useMountTransition(settingsOpen)
 
   const handleTestConnection = async () => {
     setTestStatus('testing')
@@ -93,7 +99,7 @@ export function SettingsDrawer() {
     }
   }
 
-  if (!settingsOpen) return null
+  if (!mounted) return null
 
   const handleAccentChange = (color: string) => {
     updateSetting('accentColor', color)
@@ -114,8 +120,17 @@ export function SettingsDrawer() {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-[200]" onClick={closeSettings} />
-      <div className="fixed top-0 right-0 bottom-0 w-[380px] bg-[var(--canvas-card)] border-l border-[var(--hairline-light)] z-[210] flex flex-col shadow-2xl">
+      <div
+        className={`fixed inset-0 bg-black/50 z-[200] transition-opacity duration-300 ease-out ${
+          entered ? 'opacity-100' : 'opacity-0'
+        }`}
+        onClick={closeSettings}
+      />
+      <div
+        className={`fixed top-0 right-0 bottom-0 w-[380px] bg-[var(--canvas-card)] border-l border-[var(--hairline-light)] z-[210] flex flex-col shadow-2xl transition-[translate,opacity] duration-300 ease-out ${
+          entered ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+        }`}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--hairline)] shrink-0">
           <h2 className="font-display text-[22px] font-medium text-[var(--ink)]">{t('settings.title')}</h2>
@@ -380,6 +395,42 @@ export function SettingsDrawer() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── Experimental ── */}
+          <div className="mb-7">
+            <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3 flex items-center">
+              <span
+                className="group/experiment relative inline-flex items-center cursor-help focus-visible:outline-none"
+                tabIndex={0}
+                aria-label={t('settings.documentModeWarning')}
+              >
+                <FlaskConical className="w-3.5 h-3.5 mr-1" />
+                <span className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-[280px] rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] px-3 py-2 text-[11px] font-normal normal-case tracking-normal leading-relaxed text-[var(--warning)] opacity-0 shadow-xl transition-opacity duration-150 group-hover/experiment:opacity-100 group-focus/experiment:opacity-100">
+                  {t('settings.documentModeWarning')}
+                </span>
+              </span>
+              {t('settings.experimental')}
+            </div>
+            <SettingRow label={t('settings.documentMode')} desc={t('settings.documentModeDesc')}>
+              <Toggle
+                checked={settings.experimentalDocumentMode}
+                onChange={() => updateSetting('experimentalDocumentMode', !settings.experimentalDocumentMode)}
+              />
+            </SettingRow>
+          </div>
+
+          {/* ── Privacy ── */}
+          <div className="mb-7">
+            <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3">
+              <Shield className="w-3.5 h-3.5 inline-block mr-1" /> {t('settings.privacy')}
+            </div>
+            <SettingRow label={t('settings.anonymousStats')} desc={t('settings.anonymousStatsDesc')}>
+              <Toggle
+                checked={settings.anonymousStats}
+                onChange={() => updateSetting('anonymousStats', !settings.anonymousStats)}
+              />
+            </SettingRow>
           </div>
 
           {/* ── Check for Updates ── */}

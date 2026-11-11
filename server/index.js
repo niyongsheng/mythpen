@@ -1,3 +1,4 @@
+const Sentry = require('./instrument');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -11,7 +12,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ─── Middleware ───
-app.use(cors());
+// The sidecar can open and write user files, so only the app itself may call
+// it. Requests without an Origin (curl, the Tauri shell) stay allowed.
+const ALLOWED_ORIGINS = new Set([
+  'tauri://localhost',
+  'http://tauri.localhost',
+  'https://tauri.localhost',
+]);
+// Vite may fall back to another port when 5173 is busy; local dev origins are
+// safe to allow. Remote websites are rejected.
+const LOCAL_DEV_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.has(origin) || LOCAL_DEV_ORIGIN.test(origin)) {
+        return callback(null, true);
+      }
+      callback(null, false);
+    },
+  }),
+);
 // Imports can carry a whole book (~60MB for 20M CJK chars + JSON overhead);
 // every other endpoint keeps the original 10mb limit. Express path matching
 // uses segment boundaries, so `/import` does not cover `/import-ai` — both
@@ -35,6 +55,9 @@ app.use((req, res, next) => {
 app.use('/api', importRoutes);
 app.use('/api', apiRoutes);
 app.use('/api', aiRoutes);
+
+// Must be registered after routes and before the app's own error responder.
+Sentry.setupExpressErrorHandler(app);
 
 // ═══════════════════════════════════════════
 // AI CONFIG — read from config.db
@@ -127,7 +150,16 @@ console.log('[Server] Mythpen API Server starting...');
 console.log('[Server] Port:', PORT);
 initDatabase()
   .then(() => {
-    serverInstance = app.listen(PORT, () => {
+    // Privacy: restore the anonymous-statistics opt-out before serving errors.
+    try {
+      const row = db.dbQuery("SELECT value FROM app_settings WHERE key = 'anonymous_stats'")[0];
+      Sentry.setAnonymousStats(!row || row.value !== 'false');
+    } catch (e) {
+      console.warn('[Server] Failed to load anonymous_stats setting:', e.message);
+    }
+    // Bind loopback only: the API can read/write project files and must never
+    // be reachable from the LAN.
+    serverInstance = app.listen(PORT, '127.0.0.1', () => {
       const cfg = getAiConfig();
       const elapsed = Date.now() - serverStartTime;
       console.log(`\n  🖋️  Mythpen API Server`);
@@ -141,5 +173,6 @@ initDatabase()
   })
   .catch(err => {
     console.error('❌ Failed to initialise database:', err);
-    process.exit(1);
+    Sentry.captureException(err);
+    Sentry.flush(2000).finally(() => process.exit(1));
   });
