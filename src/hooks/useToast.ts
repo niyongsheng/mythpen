@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { create } from 'zustand'
 
 export interface Toast {
   id: number
@@ -19,59 +19,49 @@ const DEFAULT_DURATION: Record<Toast['type'], number> = {
   error: 6000,
 }
 
-export function useToast() {
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const nextId = useRef(0)
-  // Auto-dismiss timers are keyed by toast id; exit timers use -id.
-  const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
-
-  const schedule = useCallback((key: number, fn: () => void, ms: number) => {
-    const timer = setTimeout(() => {
-      timers.current.delete(key)
-      fn()
-    }, ms)
-    timers.current.set(key, timer)
-  }, [])
-
-  const dismiss = useCallback(
-    (id: number) => {
-      const pending = timers.current.get(id)
-      if (pending) {
-        clearTimeout(pending)
-        timers.current.delete(id)
-      }
-      setToasts((prev) => {
-        const toast = prev.find((t) => t.id === id)
-        if (!toast || toast.leaving) return prev
-        return prev.map((t) => (t.id === id ? { ...t, leaving: true } : t))
-      })
-      if (!timers.current.has(-id)) {
-        schedule(-id, () => setToasts((prev) => prev.filter((t) => t.id !== id)), EXIT_MS)
-      }
-    },
-    [schedule],
-  )
-
-  const show = useCallback(
-    (message: string, type: Toast['type'] = 'info', duration = DEFAULT_DURATION[type]) => {
-      const id = ++nextId.current
-      setToasts((prev) => {
-        const next = [...prev, { id, message, type, duration }]
-        // Drop the oldest instead of flooding the viewport.
-        return next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next
-      })
-      schedule(id, () => dismiss(id), duration)
-    },
-    [dismiss, schedule],
-  )
-
-  useEffect(() => {
-    const pending = timers.current
-    return () => {
-      for (const timer of pending.values()) clearTimeout(timer)
-      pending.clear()
-    }
-  }, [])
-
-  return { toasts, show, dismiss }
+interface ToastState {
+  toasts: Toast[]
+  show: (message: string, type?: Toast['type'], duration?: number) => void
+  dismiss: (id: number) => void
 }
+
+let nextId = 0
+// Timers live at module scope: toasts are app-wide, not owned by one component.
+const timers = new Map<number, ReturnType<typeof setTimeout>>()
+
+function schedule(key: number, fn: () => void, ms: number) {
+  const timer = setTimeout(() => {
+    timers.delete(key)
+    fn()
+  }, ms)
+  timers.set(key, timer)
+}
+
+export const useToast = create<ToastState>((set) => ({
+  toasts: [],
+
+  dismiss: (id) => {
+    const pending = timers.get(id)
+    if (pending) {
+      clearTimeout(pending)
+      timers.delete(id)
+    }
+    const { toasts } = useToast.getState()
+    const toast = toasts.find((t) => t.id === id)
+    if (!toast || toast.leaving) return
+    set({ toasts: toasts.map((t) => (t.id === id ? { ...t, leaving: true } : t)) })
+    if (!timers.has(-id)) {
+      schedule(-id, () => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), EXIT_MS)
+    }
+  },
+
+  show: (message, type = 'info', duration = DEFAULT_DURATION[type]) => {
+    const id = ++nextId
+    set((s) => {
+      const next = [...s.toasts, { id, message, type, duration }]
+      // Drop the oldest instead of flooding the viewport.
+      return { toasts: next.length > MAX_TOASTS ? next.slice(next.length - MAX_TOASTS) : next }
+    })
+    schedule(id, () => useToast.getState().dismiss(id), duration)
+  },
+}))

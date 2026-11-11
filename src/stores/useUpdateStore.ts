@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { isTauri } from '@/lib/runtime'
+import { captureError } from '@/lib/sentry'
 import { checkForUpdate, downloadAndInstall, restartApp, type Update } from '@/lib/updater'
 
 export type UpdateStatus = 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'ready' | 'error'
@@ -109,6 +110,7 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
       track('update_installed', { version: update.version })
       set({ status: 'ready', progress: 100, dismissed: false })
     } catch (err) {
+      captureError(err, { area: 'update_install', version: update.version })
       track('update_install_failed', {
         version: update.version,
         error_code: err instanceof Error && err.name !== 'Error' ? err.name : 'install_error',

@@ -1,10 +1,23 @@
-import { Book, Download, File, FileEdit, FileText, type LucideIcon, Trash2, Upload } from 'lucide-react'
+import {
+  Book,
+  BookDown,
+  Download,
+  File,
+  FileEdit,
+  FileText,
+  Loader2,
+  type LucideIcon,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
+import { useToast } from '@/hooks/useToast'
 import { track } from '@/lib/analytics'
 import { apiUrl, projectsApi } from '@/lib/api'
 import { trackMilestone } from '@/lib/milestones'
 import { projectKey, projectProps } from '@/lib/projectIdentity'
+import { captureError } from '@/lib/sentry'
 import { useProjectName } from '@/lib/useProjectData'
 
 interface Format {
@@ -24,12 +37,12 @@ export function ExportPage() {
   const [activeFormat, setActiveFormat] = useState('epub')
   const [exporting, setExporting] = useState(false)
   const [exportMsg, setExportMsg] = useState('')
-  const [exportStatus, setExportStatus] = useState<'success' | 'error' | ''>('')
   const [coverUrl, setCoverUrl] = useState('')
   const [coverMime, setCoverMime] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const project = useProjectName()
   const { t } = useT()
+  const showToast = useToast((s) => s.show)
 
   // Check if cover exists on mount and when project changes
   useEffect(() => {
@@ -58,7 +71,6 @@ export function ExportPage() {
         setCoverMime(file.type)
       } catch (err: any) {
         setExportMsg(t('export.coverUploadError', { msg: err.message }))
-        setExportStatus('error')
       }
     }
     reader.readAsDataURL(file)
@@ -73,7 +85,6 @@ export function ExportPage() {
       if (fileInputRef.current) fileInputRef.current.value = ''
     } catch (err: any) {
       setExportMsg(t('export.coverDeleteError', { msg: err.message }))
-      setExportStatus('error')
     }
   }
 
@@ -108,10 +119,9 @@ export function ExportPage() {
         ...projectProps(project),
       })
       trackMilestone('first_export', projectKey(project))
-      setExportMsg(t('export.downloadingFile', { fmt: fmt.toUpperCase() }))
-      setExportStatus('success')
-      setTimeout(() => setExportMsg(''), 3000)
+      showToast(t('export.exportSuccess', { name: project, fmt: fmt.toUpperCase() }), 'success')
     } catch (err: any) {
+      captureError(err, { area: 'export', format: activeFormat })
       track('export_failed', {
         format: activeFormat,
         duration_ms: Date.now() - startedAt,
@@ -119,7 +129,6 @@ export function ExportPage() {
         ...projectProps(project),
       })
       setExportMsg(t('export.exportError', { msg: err.message }))
-      setExportStatus('error')
     } finally {
       setExporting(false)
     }
@@ -133,20 +142,18 @@ export function ExportPage() {
         </h2>
         <div className="page-header-actions">
           <button
-            className="btn-primary"
+            className="btn-primary flex items-center gap-1.5"
             style={{ height: 30, padding: '0 14px' }}
             onClick={handleExport}
             disabled={exporting}
           >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <BookDown className="w-3.5 h-3.5" />}
             {exporting ? t('export.exporting') : t('pages.exportAll')}
           </button>
         </div>
       </div>
       {exportMsg && (
-        <div
-          className="px-6 py-2 text-[13px]"
-          style={{ color: exportStatus === 'success' ? 'var(--success)' : 'var(--error)' }}
-        >
+        <div className="px-6 py-2 text-[13px]" style={{ color: 'var(--error)' }}>
           {exportMsg}
         </div>
       )}

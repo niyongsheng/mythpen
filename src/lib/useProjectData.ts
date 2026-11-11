@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useProjectStore } from '@/stores/useProjectStore'
+import { useStatsStore } from '@/stores/useStatsStore'
 import type {
   Character,
   CharacterRelation,
@@ -7,7 +8,6 @@ import type {
   Foreshadow,
   Memory,
   PayoffPoint,
-  ProjectStats,
   ScienceEntry,
   TimelineEvent,
   WorldEntry,
@@ -20,7 +20,6 @@ import {
   payoffsApi,
   relationsApi,
   scienceApi,
-  statsApi,
   timelineApi,
   worldApi,
 } from './api'
@@ -33,8 +32,13 @@ function useApiData<T>(
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Ignore responses from older requests; a notification-triggered reload can
+  // overlap an in-flight fetch (or a project switch) and the late, stale
+  // response must not overwrite the newer one.
+  const requestId = useRef(0)
 
   const load = useCallback(async () => {
+    const id = ++requestId.current
     if (!fetcher) {
       setData(null)
       setLoading(false)
@@ -45,11 +49,13 @@ function useApiData<T>(
     setError(null)
     try {
       const result = await fetcher()
+      if (id !== requestId.current) return
       setData(result)
     } catch (e) {
+      if (id !== requestId.current) return
       setError((e as Error).message)
     } finally {
-      setLoading(false)
+      if (id === requestId.current) setLoading(false)
     }
   }, deps)
 
@@ -110,7 +116,31 @@ export function useTimelineEvents() {
   return useApiData<TimelineEvent[]>(project ? () => timelineApi.list(project) : null, [project])
 }
 
+/**
+ * Shared stats subscription. One fetch and one copy for every consumer; see
+ * `useStatsStore`. Callers get the same shape as the other data hooks.
+ */
 export function useStats() {
   const project = useProjectName()
-  return useApiData<ProjectStats>(project ? () => statsApi.get(project) : null, [project])
+  const loadedProject = useStatsStore((s) => s.project)
+  const data = useStatsStore((s) => s.data)
+  const loading = useStatsStore((s) => s.loading)
+  const error = useStatsStore((s) => s.error)
+  const load = useStatsStore((s) => s.load)
+
+  useEffect(() => {
+    if (project) void load(project)
+  }, [project, load])
+
+  const reload = useCallback(() => {
+    if (project) void load(project)
+  }, [project, load])
+
+  const current = loadedProject === project
+  return {
+    data: current ? data : null,
+    loading: project ? loading : false,
+    error: current ? error : null,
+    reload,
+  }
 }

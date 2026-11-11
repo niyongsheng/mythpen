@@ -24,6 +24,12 @@ export type EntityType =
   | 'chat'
   | 'all'
 
+/**
+ * Entities invalidated when chapters are removed: chapter_characters cascade,
+ * and chapter references in foreshadows, memories and the clue board are nulled.
+ */
+export const CHAPTER_DELETE_ENTITIES: EntityType[] = ['chapter', 'character', 'foreshadow', 'memory', 'clue']
+
 export type DataChangeEvent = { entity: EntityType }
 
 type Listener = (event: DataChangeEvent) => void

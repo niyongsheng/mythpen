@@ -8,7 +8,13 @@
     "projectMeta": "{words} 字 · {chapters} 章 · {genres}",
     "settings": "設定",
     "collapseAI": "收合 AI 面板",
-    "expandAI": "展開 AI 面板"
+    "expandAI": "展開 AI 面板",
+    "file": {
+      "save": "儲存",
+      "saveAs": "另存為…",
+      "reveal": "在資料夾中顯示",
+      "open": "開啟專案檔案…"
+    }
   },
   "sidebar": {
     "outline": "大綱",
@@ -69,7 +75,7 @@
     "pending": "待辦",
     "writing": "寫作中",
     "review": "審閱中",
-    "accepted": "已完成"
+    "accepted": "已定稿"
   },
   "ai": {
     "idle": "閒置",
@@ -115,7 +121,7 @@
     "errorPrefix": "錯誤：{msg}",
     "titleGenPrompt": "你是一個小說創作助手。請根據以下對話內容，用 2-6 個字概括這場對話的主題。直接回傳標題，不要任何額外文字、標點或引號。\n\n{context}",
     "collabPrompt": "專案：{project}\n目前章節：第{num}章「{title}」\n\n使用者提問：{userMsg}\n\n我們正在一起建構這部小說的世界。回答前，你可以先查詢目前的角色、世界觀、伏筆等既有設定。根據使用者的問題，展開有建設性的討論，提出創意建議。如果達成共識，使用對應工具將設定寫入資料庫。",
-    "writingPrompt": "專案：{project}\n目前章節：第{num}章「{title}」\n\n使用者指令：{userMsg}\n\n請依照六步驟的寫作工作流程執行：先閱讀目前章節的大綱和前文內容，再根據大綱使用 update_chapter 寫入正文，並依照系統指令中的工作流程推進章節狀態。完成後將章節狀態設為 review。所有創作內容都必須透過工具寫入資料庫。"
+    "writingPrompt": "專案：{project}\n目前章節：第{num}章「{title}」\n\n使用者指令：{userMsg}\n\n請依照六步驟的寫作工作流程執行：先閱讀目前章節的大綱和前文內容，再根據大綱使用 update_chapter 寫入正文，並依照系統指令中的工作流程推進章節狀態。所有創作內容都必須透過工具寫入資料庫。"
   },
   "project": {
     "list": "我的專案",
@@ -154,7 +160,8 @@
       "new": "剛起步",
       "inProgress": "進行中",
       "writing": "寫作中",
-      "unknown": "未知"
+      "unknown": "未知",
+      "incompatible": "需升級應用程式"
     },
     "subtitle": "選擇創作類型，Mythpen 會自動搭配寫作工具",
     "creating": "建立中…",
@@ -226,6 +233,21 @@
       "importFailed": "匯入失敗",
       "connectionInterrupted": "匯入連線中斷",
       "warnings": "提示"
+    },
+    "file": {
+      "open": "開啟專案檔案",
+      "saveHint": "將儲存為 .mythpen 專案檔案，可隨時雙擊開啟或傳送到其他裝置繼續創作。",
+      "browserHint": "瀏覽器模式使用應用內專案；桌面版會儲存為可攜帶的 .mythpen 檔案。",
+      "openFailed": "開啟專案檔案失敗",
+      "saveFailed": "儲存專案失敗",
+      "saved": "已儲存",
+      "saveAsDone": "已另存為新的專案檔案",
+      "saveAsFailed": "另存為失敗",
+      "revealFailed": "無法在資料夾中顯示",
+      "removeFromListMsg": "將「{name}」從最近專案列表中移除？專案檔案會保留在原位置。",
+      "deleteFileHint": "同時刪除專案檔案（無法復原）",
+      "incompatible": "該檔案由更新版本的 Mythpen 建立，請升級應用程式後再開啟。",
+      "featureOffHint": "實驗功能未開啟，專案將儲存在應用程式內。可在 設定 → 實驗功能 中開啟專案檔案。"
     }
   },
   "settings": {
@@ -246,6 +268,9 @@
     "accentColor": "強調色",
     "customColor": "自訂",
     "aiService": "AI 服務",
+    "privacy": "隱私",
+    "anonymousStats": "匿名使用統計",
+    "anonymousStatsDesc": "匿名統計與當機報告，協助改進應用程式。",
     "apiBaseUrl": "API 位址",
     "apiKey": "API Key",
     "model": "模型",
@@ -262,7 +287,7 @@
     "connectionFailed": "連線失敗",
     "getApiKey": "如何取得 API Key？",
     "autoSaveEnabled": "每 {seconds} 秒自動儲存目前章節",
-    "autoSaveDisabled": "自動儲存已關閉（用 ⌘S / Ctrl+S 或工具列儲存按鈕手動儲存）",
+    "autoSaveDisabled": "自動儲存已關閉",
     "forceRefreshDesc": "重新整理整個應用程式頁面，重新載入所有資料",
     "checkUpdates": "檢查更新",
     "checkForUpdates": "檢查更新",
@@ -280,7 +305,12 @@
     "soundPulse": "電子雙音",
     "previewSound": "試聽",
     "soundPiano": "鋼琴和弦",
-    "followSystem": "跟隨系統"
+    "followSystem": "跟隨系統",
+    "experimental": "實驗功能",
+    "documentMode": "專案檔案（.mythpen）",
+    "documentModeDesc": "將專案儲存為單一 .mythpen 檔案，可雙擊開啟、傳送到其他裝置繼續創作。",
+    "documentModeWarning": "實驗功能：專案檔案格式後續可能發生破壞性變更，請避免作為唯一備份。",
+    "documentModeDisabledHint": "專案檔案功能未啟用。請在 設定 → 實驗功能 中開啟。"
   },
   "pages": {
     "characters": "角色管理",
@@ -302,7 +332,7 @@
     "dashboard": "專案概覽",
     "continueWriting": "繼續寫作",
     "export": "匯出",
-    "exportAll": "匯出全部",
+    "exportAll": "整本匯出",
     "scienceSettings": "設定體系",
     "newSetting": "新增設定",
     "narrativeMemory": "敘事記憶",
@@ -336,7 +366,7 @@
     "clueBoard": "線索板",
     "cardNarrative": "敘事記錄",
     "cardAiUsage": "AI 用量",
-    "appearance": "外貌",
+    "appearance": "外觀/形態",
     "personality": "性格",
     "background": "背景",
     "motivation": "動機",
@@ -402,7 +432,12 @@
     "dismiss": "關閉",
     "saving": "儲存中...",
     "noData": "暫無資料",
-    "requiredField": "請填寫「{label}」"
+    "saveFailed": "儲存失敗",
+    "deleteFailed": "刪除失敗",
+    "crashTitle": "應用程式發生錯誤",
+    "crashDesc": "錯誤已自動回報，請重試。",
+    "requiredField": "請填寫「{label}」",
+    "retry": "重試"
   },
   "bottomBar": {
     "writingLanguage": "寫作：{lang}",
@@ -448,9 +483,11 @@
   },
   "characters": {
     "namePlaceholder": "為角色取個名字",
-    "agePlaceholder": "例如：28",
+    "agePlaceholder": "例如: 28；非人角色可寫 出廠3年 / 300 / 未知",
     "genderPlaceholder": "男/女/其他",
-    "appearancePlaceholder": "外貌描述",
+    "speciesLabel": "種族/類型",
+    "speciesPlaceholder": "人類 / AI / 外星人 / 機器人 / 神祇 / 妖魔 / 動物 / 群體 / 其他",
+    "appearancePlaceholder": "外觀/形態描述（非人角色可寫構造、能量形態等）",
     "personalityPlaceholder": "性格特徵",
     "backgroundPlaceholder": "背景故事",
     "motivationPlaceholder": "核心動機",
@@ -471,7 +508,7 @@
     "formatTxtDesc": "純文字格式",
     "coverUploadError": "封面上傳失敗：{msg}",
     "coverDeleteError": "封面刪除失敗：{msg}",
-    "downloadingFile": "正在下載 {fmt} 檔案...",
+    "exportSuccess": "《{name}》匯出成功（{fmt}）",
     "exportError": "匯出失敗：{msg}",
     "exporting": "匯出中...",
     "noCover": "無封面",
@@ -548,7 +585,17 @@
     "noResults": "找不到相符的記憶",
     "searchResultsCount": "找到 {n} 筆相符結果",
     "showAll": "顯示全部",
-    "sourceChapter": "來源：第{n}章"
+    "sourceChapter": "來源：第{n}章",
+    "tabMemories": "敘事記憶",
+    "tabNotes": "創作約定",
+    "notesHint": "在這裡記錄寫作規則：文風、人稱、章節格式、禁區、協作方式。角色、世界觀等設定請到對應頁面維護。",
+    "notesPlaceholder": "例如：\n- 每章 3000–4000 字，結尾留鉤子\n- 固定第三人稱限知視角\n- 不出現現代網路用語\n- 修改核心設定前先詢問我",
+    "notesCount": "{n}/{max} 字",
+    "notesSave": "儲存約定",
+    "notesUnsaved": "有未儲存的修改",
+    "notesTooLong": "超出 {n} 字",
+    "notesSaved": "已儲存",
+    "notesLoadFailed": "載入創作約定失敗"
   },
   "consistency": {
     "pass": "通過檢查",
@@ -575,7 +622,7 @@
   },
   "outline": {
     "noContent": "（暫無正文）",
-    "lock5D": "五維大綱鎖定",
+    "lockDimensions": "六維大綱鎖定",
     "optimizing": "最佳化中...",
     "chapterCount": "{n}章",
     "placeholderOutline": "輸入章節大綱...",
@@ -584,11 +631,26 @@
     "placeholderTexture": "世界質感",
     "placeholderMystery": "具體懸念",
     "placeholderTension": "人際張力",
+    "genreBeat": "類型推進",
+    "genreBeatHint": "本章在類型上的核心推進",
+    "genreBeatFocus": {
+      "sci-fi": "設定規則揭示 / 技術運用",
+      "fantasy": "力量體系 / 勢力變化",
+      "xianxia": "境界 / 戰力 / 資源變化",
+      "wuxia": "武功 / 江湖局勢變化",
+      "romance": "關係階段 / 心動或誤會",
+      "history": "史實錨點 / 時代細節",
+      "urban": "現實局勢 / 社會關係推進",
+      "mystery": "線索 / 疑點 / 誤導",
+      "game": "任務 / 數值 / 關卡推進",
+      "biography": "真實人生節點",
+      "other": "類型核心推進"
+    },
     "selectChapterHint": "選擇左側章節開始編輯大綱",
     "noChaptersHint": "暫無章節，請先建立章節",
     "outlineInfo": "大綱 · 共 {count} 章",
-    "generateSystemPrompt": "你是一個小說大綱產生器。根據使用者提供的章節資訊，產生 JSON 格式的輸出，包含：\n1. title: 章節標題建議（若目前標題為「新章節」或「第一章」之類的暫用名稱，則給出有吸引力的標題，否則保留原標題）\n2. outline: 章節大綱（150 字以內），包含核心事件、角色發展、關鍵衝突\n3. cognitive_frame: 角色認知框架的變化（30 字以內）\n4. emotional_anchor: 本章的情感錨點（30 字以內）\n5. world_texture: 世界質感／場景氛圍（30 字以內）\n6. concrete_mystery: 具體懸念（30 字以內）\n7. interpersonal_tension: 人際張力（30 字以內）\n直接回傳 JSON，不要前綴說明。",
-    "generateUserPrompt": "第{num}章「{title}」\n目前正文預覽：{preview}\n\n請為這一章產生完整的大綱和五維資訊。",
+    "generateSystemPrompt": "你是一個小說大綱產生器。根據使用者提供的章節資訊，產生 JSON 格式的輸出，包含：\n1. title: 章節標題建議（若目前標題為「新章節」或「第一章」之類的暫用名稱，則給出有吸引力的標題，否則保留原標題）\n2. outline: 章節大綱（150 字以內），包含核心事件、角色發展、關鍵衝突\n3. cognitive_frame: 角色認知框架的變化（30 字以內）\n4. emotional_anchor: 本章的情感錨點（30 字以內）\n5. world_texture: 世界質感／場景氛圍（30 字以內）\n6. concrete_mystery: 具體懸念（30 字以內）\n7. interpersonal_tension: 人際張力（30 字以內）\n8. genre_beat: 本章在類型上的核心推進（30 字以內，如懸疑的線索／誤導、仙俠的境界／戰力、言情的關係進展）\n直接回傳 JSON，不要前綴說明。",
+    "generateUserPrompt": "第{num}章「{title}」\n目前正文預覽：{preview}\n\n請為這一章產生完整的大綱、五維資訊和類型推進。",
     "optimizeSystemPrompt": "你是一個小說大綱最佳化助手。分析使用者提供的大綱，給出改進建議。直接回傳建議，200 字以內。",
     "optimizeUserPrompt": "第{num}章「{title}」目前大綱：\n{outline}\n\n請給出最佳化建議。"
   },
@@ -598,7 +660,7 @@
     "aiError": "分析發生錯誤",
     "createdCount": "已建立 {n} 筆新關係",
     "aiNoNewRelations": "未發現需要新增的關係",
-    "aiPrompt": "你是一個小說人物關係分析助手。根據目前小說中的角色列表和既有關係，推斷角色之間可能存在的其他重要關係。直接回傳 JSON 陣列。",
+    "aiPrompt": "你是一個小說人物關係分析助手。根據目前小說中的角色列表和既有關係，推斷角色之間可能存在的其他重要關係。直接回傳 JSON 陣列。 Return a JSON array in the format: [{\"character_a_name\":\"Character A\",\"character_b_name\":\"Character B\",\"relation_type\":\"friend/enemy/lover/etc.\",\"description\":\"relation description\",\"intensity\":3}], with no prefix explanation.",
     "noCharacters": "還沒有角色，先建立角色才能建構關係圖譜",
     "noRelations": "還沒有關係連線，點擊「新增關係」手動新增，或用「AI 整理圖譜」自動產生",
     "aiOrganize": "AI 整理圖譜",
@@ -628,6 +690,8 @@
     "hypothesisLabel": "🔴 假設",
     "coreHypothesis": "🔴 核心假設",
     "filterAll": "三色標籤：全部",
+    "filterAllCategories": "分類：全部",
+    "hardness": "科學硬度",
     "category": "分類",
     "name": "名稱",
     "description": "描述",
@@ -664,7 +728,20 @@
     "sortOrderHint": "數字越小越靠前",
     "uncategorized": "未分類",
     "empty": "暫無條目",
+    "customCategory": "自訂分類…",
+    "customCategoryName": "自訂分類名稱",
+    "customCategoryPlaceholder": "輸入分類名稱",
     "category": {
+      "tech": "科技",
+      "biology": "生物",
+      "physics": "物理法則",
+      "society": "社會制度",
+      "politics": "政治勢力",
+      "military": "軍事",
+      "ai": "人工智慧",
+      "alien": "外星文明",
+      "planet": "星球地理",
+      "history": "歷史",
       "realm": "境界",
       "technique": "功法",
       "artifact": "法寶",
@@ -695,6 +772,7 @@
     "categoryConcept": "概念",
     "categoryEvent": "事件",
     "categoryTechnology": "科技",
+    "categoryOther": "其他",
     "tabAll": "全部",
     "namePlaceholder": "條目標題",
     "descriptionPlaceholder": "詳細描述...",
@@ -708,7 +786,11 @@
     "sourceCode": "原始碼",
     "support": "贊助作者",
     "supportDesc": "如果 Mythpen 對你有幫助，歡迎透過愛發電請我喝杯咖啡",
-    "contact": "聯絡作者",
+    "community": "創作交流群",
+    "communityDesc": "開發者和其他創作者一起交流",
+    "contact": "聯絡開發者",
+    "easterEggTitle": "發現小彩蛋",
+    "easterEgg": "你連戳版本號七下，喚醒了藏在程式碼裡的寫作精靈。它說：別戳了，快去創作！",
     "techStack": "技術堆疊",
     "openLink": "開啟"
   },

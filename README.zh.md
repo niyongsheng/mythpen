@@ -49,7 +49,8 @@
 
 ```bash
 pnpm install        # 安装依赖
-pnpm dev:all        # 在浏览器中启动（前端 + 后端 + 种子数据）
+pnpm dev:all        # 在浏览器中启动（前端 + 后端）
+pnpm seed           # 初始化演示项目（已存在则跳过，不会覆盖）
 pnpm tauri dev      # 桌面开发模式
 pnpm tauri build    # 构建桌面安装包（.dmg/.msi/.AppImage）
 ```

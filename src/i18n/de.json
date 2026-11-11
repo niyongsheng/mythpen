@@ -8,7 +8,13 @@
     "projectMeta": "{words} Wörter · {chapters} Kap. · {genres}",
     "settings": "Einstellungen",
     "collapseAI": "KI-Bereich einklappen",
-    "expandAI": "KI-Bereich ausklappen"
+    "expandAI": "KI-Bereich ausklappen",
+    "file": {
+      "save": "Speichern",
+      "saveAs": "Speichern unter…",
+      "reveal": "Im Ordner anzeigen",
+      "open": "Projektdatei öffnen…"
+    }
   },
   "sidebar": {
     "outline": "Gliederung",
@@ -115,7 +121,7 @@
     "errorPrefix": "Fehler: {msg}",
     "titleGenPrompt": "Sie sind ein Romanschreibassistent. Fassen Sie anhand des folgenden Gesprächs das Thema in 2-6 Wörtern zusammen. Geben Sie nur den Titel zurück, ohne zusätzlichen Text, Satzzeichen oder Anführungszeichen.\n\n{context}",
     "collabPrompt": "Projekt: {project}\nAktuelles Kapitel: Kap. {num} „{title}“\n\nBenutzerfrage: {userMsg}\n\nWir bauen gemeinsam die Welt dieses Romans auf. Bevor Sie antworten, können Sie bestehende Figuren, Welteinstellungen, Vorausdeutungen usw. abfragen. Diskutieren Sie auf Basis der Benutzerfrage konstruktiv und schlagen Sie kreative Ideen vor. Wenn ein Konsens erreicht ist, schreiben Sie die Einstellungen mit dem passenden Tool in die Datenbank.",
-    "writingPrompt": "Projekt: {project}\nAktuelles Kapitel: Kap. {num} „{title}“\n\nBenutzeranweisung: {userMsg}\n\nBitte folgen Sie dem sechsstufigen Schreib-Workflow: Lesen Sie zuerst die Gliederung des aktuellen Kapitels und den bisherigen Inhalt, schreiben Sie dann mit update_chapter den Haupttext gemäß der Gliederung und bringen Sie den Kapitelstatus gemäß dem Workflow in den Systemanweisungen voran. Setzen Sie den Kapitelstatus nach Abschluss auf „Prüfung“. Alle kreativen Inhalte müssen über Tools in die Datenbank geschrieben werden."
+    "writingPrompt": "Projekt: {project}\nAktuelles Kapitel: Kap. {num} „{title}“\n\nBenutzeranweisung: {userMsg}\n\nBitte folgen Sie dem sechsstufigen Schreib-Workflow: Lesen Sie zuerst die Gliederung des aktuellen Kapitels und den bisherigen Inhalt, schreiben Sie dann mit update_chapter den Haupttext gemäß der Gliederung und bringen Sie den Kapitelstatus gemäß dem Workflow in den Systemanweisungen voran.  Alle kreativen Inhalte müssen über Tools in die Datenbank geschrieben werden."
   },
   "project": {
     "list": "Meine Projekte",
@@ -154,7 +160,8 @@
       "new": "Gerade begonnen",
       "inProgress": "In Bearbeitung",
       "writing": "In Arbeit",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "incompatible": "Aktualisierung nötig"
     },
     "subtitle": "Wählen Sie ein Genre, und Mythpen stellt die passenden Schreibwerkzeuge für Sie zusammen",
     "creating": "Wird erstellt…",
@@ -226,6 +233,21 @@
       "importFailed": "Import fehlgeschlagen",
       "connectionInterrupted": "Importverbindung unterbrochen",
       "warnings": "Hinweise"
+    },
+    "file": {
+      "open": "Projektdatei öffnen",
+      "saveHint": "Wird als .mythpen-Projektdatei gespeichert – zum Weiterarbeiten doppelklicken oder auf ein anderes Gerät senden.",
+      "browserHint": "Im Browser-Modus werden interne Projekte verwendet; die Desktop-App speichert eine portable .mythpen-Datei.",
+      "openFailed": "Projektdatei konnte nicht geöffnet werden",
+      "saveFailed": "Projekt konnte nicht gespeichert werden",
+      "saved": "Gespeichert",
+      "saveAsDone": "Als neue Projektdatei gespeichert",
+      "saveAsFailed": "Speichern unter fehlgeschlagen",
+      "revealFailed": "Datei konnte nicht im Ordner angezeigt werden",
+      "removeFromListMsg": "„{name}“ aus den letzten Projekten entfernen? Die Projektdatei bleibt am Speicherort.",
+      "deleteFileHint": "Projektdatei ebenfalls löschen (nicht rückgängig zu machen)",
+      "incompatible": "Diese Datei wurde von einer neueren Mythpen-Version erstellt. Bitte aktualisiere die App, um sie zu öffnen.",
+      "featureOffHint": "Experimentelle Projektdateien sind deaktiviert; dieses Projekt wird in der App gespeichert. Aktiviere sie unter Einstellungen → Experimentell."
     }
   },
   "settings": {
@@ -246,6 +268,9 @@
     "accentColor": "Akzentfarbe",
     "customColor": "Benutzerdefiniert",
     "aiService": "KI-Dienst",
+    "privacy": "Datenschutz",
+    "anonymousStats": "Anonyme Nutzungsstatistiken",
+    "anonymousStatsDesc": "Anonyme Statistiken und Absturzberichte helfen, die App zu verbessern.",
     "apiBaseUrl": "API-Basis-URL",
     "apiKey": "API Key",
     "model": "Modell",
@@ -262,7 +287,7 @@
     "connectionFailed": "Verbindung fehlgeschlagen",
     "getApiKey": "Wie erhalte ich einen API Key?",
     "autoSaveEnabled": "Alle {seconds} Sekunden automatisch speichern",
-    "autoSaveDisabled": "Automatisches Speichern ist deaktiviert (⌘S / Ctrl+S oder die Speichern-Schaltfläche in der Symbolleiste verwenden)",
+    "autoSaveDisabled": "Automatisches Speichern ist deaktiviert",
     "forceRefreshDesc": "Die gesamte App neu laden und alle Daten erneut abrufen",
     "checkUpdates": "Nach Updates suchen",
     "checkForUpdates": "Nach Updates suchen",
@@ -280,7 +305,12 @@
     "soundPulse": "Doppelter Piepton",
     "previewSound": "Vorschau",
     "soundPiano": "Klavierakkord",
-    "followSystem": "Systemsprache verwenden"
+    "followSystem": "Systemsprache verwenden",
+    "experimental": "Experimentelle Funktionen",
+    "documentMode": "Projektdateien (.mythpen)",
+    "documentModeDesc": "Speichere ein Projekt als einzelne .mythpen-Datei, die per Doppelklick geöffnet und auf ein anderes Gerät gesendet werden kann.",
+    "documentModeWarning": "Experimentell: Das Projektdateiformat kann sich inkompatibel ändern. Nutze es nicht als einzige Sicherung.",
+    "documentModeDisabledHint": "Projektdateien sind deaktiviert. Aktiviere sie unter Einstellungen → Experimentell."
   },
   "pages": {
     "characters": "Figuren",
@@ -302,7 +332,7 @@
     "dashboard": "Übersicht",
     "continueWriting": "Weiterschreiben",
     "export": "Exportieren",
-    "exportAll": "Alles exportieren",
+    "exportAll": "Buch exportieren",
     "scienceSettings": "Weltregeln",
     "newSetting": "Neuer Eintrag",
     "narrativeMemory": "Narrative Erinnerung",
@@ -336,7 +366,7 @@
     "clueBoard": "Hinweistafel",
     "cardNarrative": "Narrative Aufzeichnungen",
     "cardAiUsage": "KI-Nutzung",
-    "appearance": "Aussehen",
+    "appearance": "Aussehen / Form",
     "personality": "Persönlichkeit",
     "background": "Hintergrund",
     "motivation": "Motivation",
@@ -402,7 +432,12 @@
     "dismiss": "Verwerfen",
     "saving": "Speichern...",
     "noData": "Keine Daten",
-    "requiredField": "„{label}“ ist erforderlich"
+    "saveFailed": "Speichern fehlgeschlagen",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "crashTitle": "Ein Fehler ist aufgetreten",
+    "crashDesc": "Der Fehler wurde automatisch gemeldet. Bitte versuche es erneut.",
+    "requiredField": "„{label}“ ist erforderlich",
+    "retry": "Erneut versuchen"
   },
   "bottomBar": {
     "writingLanguage": "Schreiben: {lang}",
@@ -448,9 +483,11 @@
   },
   "characters": {
     "namePlaceholder": "Geben Sie der Figur einen Namen",
-    "agePlaceholder": "z. B. 28",
+    "agePlaceholder": "z. B. 28; nicht-menschlich: 3 Jahre seit Aktivierung / 300 / unbekannt",
     "genderPlaceholder": "Männlich/Weiblich/Divers",
-    "appearancePlaceholder": "Aussehen",
+    "speciesLabel": "Spezies / Typ",
+    "speciesPlaceholder": "Mensch / KI / Außerirdischer / Roboter / Gottheit / Geist / Tier / Kollektiv / Sonstiges",
+    "appearancePlaceholder": "Aussehen/Form (nicht-menschlich: Bauart, Energieform usw.)",
     "personalityPlaceholder": "Persönlichkeit",
     "backgroundPlaceholder": "Vorgeschichte",
     "motivationPlaceholder": "Motivation",
@@ -471,7 +508,7 @@
     "formatTxtDesc": "Reiner Text",
     "coverUploadError": "Cover-Upload fehlgeschlagen: {msg}",
     "coverDeleteError": "Cover-Löschen fehlgeschlagen: {msg}",
-    "downloadingFile": "{fmt}-Datei wird heruntergeladen...",
+    "exportSuccess": "„{name}“ erfolgreich als {fmt} exportiert.",
     "exportError": "Export fehlgeschlagen: {msg}",
     "exporting": "Wird exportiert...",
     "noCover": "Kein Cover",
@@ -482,7 +519,7 @@
     "noExportRecords": "Keine Exporteinträge"
   },
   "foreshadow": {
-    "aiPrompt": "Sie sind ein Assistent für die Gestaltung von Vorausdeutungen in Romanen. Entwerfen Sie auf Basis der Figuren, des Weltenbaus und der bestehenden Vorausdeutungen des Projekts 3-5 neue Vorschläge für Vorausdeutungen. Geben Sie ein JSON-Array zurück.",
+    "aiPrompt": "Sie sind ein Assistent für die Gestaltung von Vorausdeutungen in Romanen. Entwerfen Sie auf Basis der Figuren, des Weltenbaus und der bestehenden Vorausdeutungen des Projekts 3-5 neue Vorschläge für Vorausdeutungen. Geben Sie ein JSON-Array zurück. Return a JSON array in the format: [{\"title\":\"...\",\"description\":\"...\",\"priority\":\"high/normal/low\"}], with no prefix explanation.",
     "aiUserMessage": "Bitte entwerfen Sie neue Vorausdeutungen für den aktuellen Roman.",
     "statTotal": "Gesamt",
     "planted": "Angelegt",
@@ -533,7 +570,7 @@
     "statusField": "Status"
   },
   "memory": {
-    "aiPrompt": "Sie sind ein Assistent zur Extraktion narrativer Erinnerungen. Extrahieren Sie aus den Kapiteln des Romans wichtige narrative Erinnerungen, die künftige Handlungsentwicklungen beeinflussen. Geben Sie ein JSON-Array zurück.",
+    "aiPrompt": "Sie sind ein Assistent zur Extraktion narrativer Erinnerungen. Extrahieren Sie aus den Kapiteln des Romans wichtige narrative Erinnerungen, die künftige Handlungsentwicklungen beeinflussen. Geben Sie ein JSON-Array zurück. Return a JSON array in the format: [{\"category\":\"character|location|item|event|promise|other\",\"content\":\"...\"}], with no prefix explanation.",
     "aiUserMessage": "Extrahieren Sie alle wichtigen narrativen Erinnerungen aus dem aktuellen Roman.",
     "categoryCharacter": "Figur",
     "categoryLocation": "Ort",
@@ -548,7 +585,17 @@
     "noResults": "Keine passenden Erinnerungen gefunden",
     "searchResultsCount": "{n} Ergebnisse gefunden",
     "showAll": "Alle anzeigen",
-    "sourceChapter": "Quelle: Kap. {n}"
+    "sourceChapter": "Quelle: Kap. {n}",
+    "tabMemories": "Erinnerungen",
+    "tabNotes": "Schreibregeln",
+    "notesHint": "Hier legst du Schreibregeln fest: Stil, Erzählperspektive, Kapitelformat, Tabus und Zusammenarbeit. Figuren und Weltbau pflegst du auf den jeweiligen Seiten.",
+    "notesPlaceholder": "z. B.\n- 3.000–4.000 Wörter pro Kapitel, am Ende ein Cliffhanger\n- Durchgehend dritte Person, begrenzte Perspektive\n- Keine moderne Umgangssprache\n- Vor Änderungen am Kernsetting fragen",
+    "notesCount": "{n}/{max} Zeichen",
+    "notesSave": "Regeln speichern",
+    "notesUnsaved": "Nicht gespeicherte Änderungen",
+    "notesTooLong": "{n} Zeichen zu viel",
+    "notesSaved": "Gespeichert",
+    "notesLoadFailed": "Schreibregeln konnten nicht geladen werden"
   },
   "consistency": {
     "pass": "Bestanden",
@@ -575,7 +622,7 @@
   },
   "outline": {
     "noContent": "(Kein Inhalt)",
-    "lock5D": "5D-Gliederungssperre",
+    "lockDimensions": "6D-Gliederungssperre",
     "optimizing": "Wird optimiert...",
     "chapterCount": "{n} Kap.",
     "placeholderOutline": "Kapitelgliederung eingeben...",
@@ -584,11 +631,26 @@
     "placeholderTexture": "Welttextur",
     "placeholderMystery": "Konkretes Rätsel",
     "placeholderTension": "Zwischenmenschliche Spannung",
+    "genreBeat": "Genre-Fortschritt",
+    "genreBeatHint": "Was dieses Kapitel im Genre voranbringt",
+    "genreBeatFocus": {
+      "sci-fi": "Weltregeln enthüllen / Technik einsetzen",
+      "fantasy": "Machtsystem / Fraktionsverschiebungen",
+      "xianxia": "Kultivierungsstufe / Kampfkraft / Ressourcen",
+      "wuxia": "Kampfkunst / Jianghu-Lage",
+      "romance": "Beziehungsphase / Verliebtheit oder Missverständnis",
+      "history": "Historische Anker / Zeitkolorit",
+      "urban": "Realwelt-Konflikte / soziale Beziehungen",
+      "mystery": "Hinweise / Fragen / falsche Fährten",
+      "game": "Quests / Werte / Level-Fortschritt",
+      "biography": "Reale Lebensmeilensteine",
+      "other": "Zentraler Genre-Fortschritt"
+    },
     "selectChapterHint": "Wählen Sie links ein Kapitel aus, um mit der Bearbeitung zu beginnen",
     "noChaptersHint": "Noch keine Kapitel. Bitte erstellen Sie zuerst eines.",
     "outlineInfo": "Gliederung · {count} Kapitel",
-    "generateSystemPrompt": "Sie sind ein Generator für Romangliederungen. Erstellen Sie auf Basis der vom Benutzer angegebenen Kapitelinformationen eine JSON-Ausgabe mit:\n1. title: Vorschlag für den Kapiteltitel (wenn der aktuelle Titel ein Platzhalter wie „Neues Kapitel“ oder „Kapitel 1“ ist, geben Sie einen attraktiven Titel an; andernfalls behalten Sie den ursprünglichen Titel bei)\n2. outline: Kapitelgliederung (innerhalb von 150 Zeichen) mit zentralen Ereignissen, Figurenentwicklung und Schlüsselkonflikten\n3. cognitive_frame: Wandel des kognitiven Rahmens der Figur (innerhalb von 30 Zeichen)\n4. emotional_anchor: Emotionaler Anker dieses Kapitels (innerhalb von 30 Zeichen)\n5. world_texture: Welttextur / Szenenatmosphäre (innerhalb von 30 Zeichen)\n6. concrete_mystery: Konkretes Rätsel (innerhalb von 30 Zeichen)\n7. interpersonal_tension: Zwischenmenschliche Spannung (innerhalb von 30 Zeichen)\nGeben Sie das JSON direkt zurück, ohne erklärenden Vorlauf.",
-    "generateUserPrompt": "Kap. {num} „{title}“\nAktuelle Inhaltsvorschau: {preview}\n\nBitte generieren Sie eine vollständige Gliederung und 5D-Informationen für dieses Kapitel.",
+    "generateSystemPrompt": "Sie sind ein Generator für Romangliederungen. Erstellen Sie auf Basis der vom Benutzer angegebenen Kapitelinformationen eine JSON-Ausgabe mit:\n1. title: Vorschlag für den Kapiteltitel (wenn der aktuelle Titel ein Platzhalter wie „Neues Kapitel“ oder „Kapitel 1“ ist, geben Sie einen attraktiven Titel an; andernfalls behalten Sie den ursprünglichen Titel bei)\n2. outline: Kapitelgliederung (innerhalb von 150 Zeichen) mit zentralen Ereignissen, Figurenentwicklung und Schlüsselkonflikten\n3. cognitive_frame: Wandel des kognitiven Rahmens der Figur (innerhalb von 30 Zeichen)\n4. emotional_anchor: Emotionaler Anker dieses Kapitels (innerhalb von 30 Zeichen)\n5. world_texture: Welttextur / Szenenatmosphäre (innerhalb von 30 Zeichen)\n6. concrete_mystery: Konkretes Rätsel (innerhalb von 30 Zeichen)\n7. interpersonal_tension: Zwischenmenschliche Spannung (innerhalb von 30 Zeichen)\n8. genre_beat: Was dieses Kapitel im Genre voranbringt (innerhalb von 30 Zeichen, z. B. Hinweise/falsche Fährten im Mystery, Kultivierungsstufe/Macht im Xianxia, Beziehungsfortschritt in Romance)\nGeben Sie das JSON direkt zurück, ohne erklärenden Vorlauf.",
+    "generateUserPrompt": "Kap. {num} „{title}“\nAktuelle Inhaltsvorschau: {preview}\n\nBitte generieren Sie eine vollständige Gliederung, 5D-Informationen und den Genre-Fortschritt für dieses Kapitel.",
     "optimizeSystemPrompt": "Sie sind ein Assistent zur Optimierung von Romangliederungen. Analysieren Sie die Gliederung des Benutzers und schlagen Sie Verbesserungen vor. Geben Sie die Vorschläge direkt zurück, innerhalb von 200 Zeichen.",
     "optimizeUserPrompt": "Kap. {num} „{title}“ aktuelle Gliederung:\n{outline}\n\nBitte geben Sie Optimierungsvorschläge."
   },
@@ -598,7 +660,7 @@
     "aiError": "Analyse fehlgeschlagen",
     "createdCount": "{n} neue Beziehungen erstellt",
     "aiNoNewRelations": "Keine neuen Beziehungen erforderlich",
-    "aiPrompt": "Sie sind ein Assistent zur Analyse der Figurenbeziehungen in einem Roman. Leiten Sie anhand der Figurenliste und der bestehenden Beziehungen des aktuellen Romans weitere wichtige Beziehungen ab.",
+    "aiPrompt": "Sie sind ein Assistent zur Analyse der Figurenbeziehungen in einem Roman. Leiten Sie anhand der Figurenliste und der bestehenden Beziehungen des aktuellen Romans weitere wichtige Beziehungen ab. Return a JSON array in the format: [{\"character_a_name\":\"Character A\",\"character_b_name\":\"Character B\",\"relation_type\":\"friend/enemy/lover/etc.\",\"description\":\"relation description\",\"intensity\":3}], with no prefix explanation.",
     "noCharacters": "Noch keine Figuren. Legen Sie zuerst eine an.",
     "noRelations": "Noch keine Beziehungen. Klicken Sie auf „Neue Beziehung“, um manuell eine hinzuzufügen, oder auf „KI sortieren“, um sie automatisch zu erzeugen.",
     "aiOrganize": "KI sortieren",
@@ -628,6 +690,8 @@
     "hypothesisLabel": "🔴 Hypothese",
     "coreHypothesis": "🔴 Kernhypothese",
     "filterAll": "Alle Tags",
+    "filterAllCategories": "Kategorie: alle",
+    "hardness": "Wissenschaftliche Härte",
     "category": "Kategorie",
     "name": "Name",
     "description": "Beschreibung",
@@ -664,7 +728,20 @@
     "sortOrderHint": "Kleinere Zahlen erscheinen zuerst",
     "uncategorized": "Nicht kategorisiert",
     "empty": "Noch keine Einträge",
+    "customCategory": "Eigene Kategorie…",
+    "customCategoryName": "Eigener Kategoriename",
+    "customCategoryPlaceholder": "Kategorienamen eingeben",
     "category": {
+      "tech": "Technologie",
+      "biology": "Biologie",
+      "physics": "Physik",
+      "society": "Gesellschaft",
+      "politics": "Politik",
+      "military": "Militär",
+      "ai": "KI",
+      "alien": "Außerirdische Zivilisation",
+      "planet": "Planeten",
+      "history": "Geschichte",
       "realm": "Reich",
       "technique": "Technik",
       "artifact": "Artefakt",
@@ -695,6 +772,7 @@
     "categoryConcept": "Konzept",
     "categoryEvent": "Ereignis",
     "categoryTechnology": "Technologie",
+    "categoryOther": "Sonstiges",
     "tabAll": "Alle",
     "namePlaceholder": "Titel des Eintrags",
     "descriptionPlaceholder": "Ausführliche Beschreibung...",
@@ -708,7 +786,11 @@
     "sourceCode": "Quellcode",
     "support": "Autor unterstützen",
     "supportDesc": "Wenn Ihnen Mythpen hilft, können Sie mir über 爱发电 einen Kaffee spendieren",
-    "contact": "Kontakt",
+    "community": "Der Community beitreten",
+    "communityDesc": "Mit dem Entwickler und anderen Autoren austauschen",
+    "contact": "Entwickler kontaktieren",
+    "easterEggTitle": "Easter Egg freigeschaltet!",
+    "easterEgg": "Sieben Tipps auf die Versionsnummer haben den Schreibgeist geweckt, der sich im Code versteckt. Er sagt: Nicht weiter tippen — schreiben!",
     "techStack": "Technologie-Stack",
     "openLink": "Öffnen"
   },

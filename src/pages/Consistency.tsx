@@ -1,8 +1,20 @@
 import { CheckCircle2, Loader, SearchCheck, ShieldCheck } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
-import { aiApi, chaptersApi, extractAIJsonArray, foreshadowsApi, getAIResponseText } from '@/lib/api'
+import {
+  aiApi,
+  chaptersApi,
+  charactersApi,
+  extractAIJsonArray,
+  foreshadowsApi,
+  getAIResponseText,
+  scienceApi,
+  worldApi,
+} from '@/lib/api'
+import { buildRecentChapterDigest } from '@/lib/chapterDigest'
 import { useProjectName } from '@/lib/useProjectData'
+import { useSidebarStore } from '@/stores/useSidebarStore'
 
 export function Consistency() {
   const project = useProjectName()
@@ -11,6 +23,7 @@ export function Consistency() {
   const [loading, setLoading] = useState(true)
   const [deepChecking, setDeepChecking] = useState(false)
   const { t } = useT()
+  const active = useSidebarStore((s) => s.activePage === 'page-consistency')
 
   const runCheck = useCallback(async () => {
     if (!project) return
@@ -54,15 +67,31 @@ export function Consistency() {
 
       setIssues(found)
       setStats({ passed: Math.max(0, chapters?.length - found.length), conflicts, warnings, sciErrors: 0 })
-    } catch (e) {}
+    } catch {}
     setLoading(false)
   }, [project, t])
+
+  // Re-run the local check when the AI changes chapters or foreshadows. The
+  // page stays mounted after the first visit, so skip the work while hidden
+  // and catch up when it becomes visible again.
+  useDataRefresh(
+    ['chapter', 'foreshadow'],
+    useCallback(() => {
+      if (active) runCheck()
+    }, [active, runCheck]),
+  )
 
   const handleDeepCheck = async () => {
     if (!project) return
     setDeepChecking(true)
     try {
-      const [chapters, foreshadows] = await Promise.all([chaptersApi.list(project, true), foreshadowsApi.list(project)])
+      const [chapters, foreshadows, characters, world, science] = await Promise.all([
+        chaptersApi.list(project, true),
+        foreshadowsApi.list(project),
+        charactersApi.list(project).catch(() => []),
+        worldApi.list(project).catch(() => []),
+        scienceApi.list(project).catch(() => []),
+      ])
 
       const chSummary = (chapters || [])
         .map((c: any) =>
@@ -73,6 +102,21 @@ export function Consistency() {
         .map((f: any) => t('consistency.foreshadowSummary', { title: f.title, status: f.status, priority: f.priority }))
         .join('\n')
 
+      // A "deep" check that only sees titles/statuses cannot detect plot
+      // contradictions. Send bounded previews of the most recent chapters plus
+      // the character/world/setting facts the AI should compare against.
+      const contentDigest = await buildRecentChapterDigest(project, chapters || [], {
+        count: 8,
+        previewChars: 1200,
+      })
+      const settingsDigest = [
+        ...(characters || [])
+          .slice(0, 20)
+          .map((c: any) => `角色 ${c.name}：${c.personality || ''} ${c.background || ''}`.trim()),
+        ...(world || []).slice(0, 15).map((w: any) => `世界观 ${w.name}：${w.description || ''}`.trim()),
+        ...(science || []).slice(0, 15).map((s: any) => `设定 ${s.name}：${s.description || ''}`.trim()),
+      ].join('\n')
+
       const res = await aiApi.chat(
         [
           {
@@ -81,7 +125,7 @@ export function Consistency() {
           },
           {
             role: 'user',
-            content: t('consistency.userPrompt', { chSummary, fSummary }),
+            content: `${t('consistency.userPrompt', { chSummary, fSummary })}\n\n## 最近章节正文片段\n${contentDigest || '（暂无正文）'}\n\n## 角色与设定\n${settingsDigest || '（暂无）'}`,
           },
         ],
         project,
@@ -104,8 +148,8 @@ export function Consistency() {
   }
 
   useEffect(() => {
-    runCheck()
-  }, [runCheck])
+    if (active) runCheck()
+  }, [active, runCheck])
 
   return (
     <>

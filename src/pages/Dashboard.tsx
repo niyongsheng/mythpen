@@ -73,6 +73,11 @@ export function Dashboard() {
   const workflowPhase = useProjectStore((s) => s.workflowPhase)
   const setPhase = useProjectStore((s) => s.setPhase)
   const loadPhase = useProjectStore((s) => s.loadPhase)
+  const reloadPhase = useCallback(() => {
+    if (project) loadPhase(project)
+  }, [project, loadPhase])
+  // AI tool `update_project_phase` broadcasts 'project'; keep the stepper live.
+  useDataRefresh('project', reloadPhase)
   const [advancing, setAdvancing] = useState(false)
   const [confirmPhase, setConfirmPhase] = useState<string | null>(null)
 

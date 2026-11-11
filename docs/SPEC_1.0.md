@@ -315,15 +315,17 @@ event: task_error\ndata: {"error":"..."}          # 任务异常结束
 │   ├── recent_projects  — 最近项目列表
 │   └── editor_snapshots — 编辑器快照（崩溃恢复）
 │
-├── projects/                            # 项目数据库目录
-│   ├── {project_name}.mythpen.db        # 每个项目独立 SQLite 文件
-│   └── ...
+├── projects/                            # 应用内项目目录
+│   ├── {uuid}.mythpen.db                # 每个项目独立 SQLite 文件（内部托管）
+│   └── {project_name}/cover.{ext}       # 旧版封面文件（兼容保留）
 │
 ├── exports/                             # 导出缓存
 │   └── {project_name}/                  # 导出文件（TXT/MD/EPUB/HTML）
 │
 └── backups/                             # 自动备份目录（功能预留）
 ```
+
+**用户项目文件（v0.0.22+，实验功能，默认关闭）**：在设置 → 实验功能中开启后，新项目在桌面端保存为单个 `.mythpen` 文件（用户选定路径），文件本身就是完整 SQLite 项目库（含 `assets` 封面）。项目文件可双击打开、原地保存、跨设备发送；格式规范见 `docs/PROJECT_FILE.md`。开关键为 `experimental_document_mode`；关闭时新项目仍保存为应用内项目，文件入口隐藏，服务端文件端点返回 `FEATURE_DISABLED`，已有 `.mythpen` 项目仍可打开保存。应用内旧项目继续兼容，可通过“另存为项目文件”转换。`config.db.recent_projects.file_path` 同时登记内部路径与用户文件路径。
 
 ### 4.2 配置数据库 Schema (config.db)
 
@@ -455,7 +457,7 @@ CREATE TABLE chapters (
 pending(待办) → writing(写作中) → review(审阅中) → accepted(已完成)
 ```
 
-**五维叙事维度**（每章独立字段）：
+**六维叙事维度**（每章独立字段，前五维描述章节质感，`genre_beat` 描述类型推进）：
 
 | 字段 | 含义 |
 |---|---|
@@ -464,6 +466,7 @@ pending(待办) → writing(写作中) → review(审阅中) → accepted(已完
 | `world_texture` | 世界质感 — 场景氛围与细节 |
 | `concrete_mystery` | 具体悬念 — 本章埋下或推进的谜团 |
 | `interpersonal_tension` | 人际张力 — 角色间的冲突与张力 |
+| `genre_beat` | 类型推进 — 本章在作品类型上的核心推进（悬疑线索、境界战力、关系进展等） |
 
 **角色 (Characters)**
 
@@ -779,7 +782,7 @@ CREATE INDEX idx_chat_messages_session ON chat_messages(session_id);
 | **写作** | `Writing` | 核心编辑页：章节选择、富文本编辑器、大纲编辑、续写功能 |
 | **角色管理** | `Characters` | 角色 CRUD、角色卡编辑、角色列表 |
 | **世界观** | `World` | 按类别（地点/组织/概念/事件）分组的世界观条目 CRUD |
-| **大纲** | `Outline` | 章节概要编辑器，五维维度编辑 |
+| **大纲** | `Outline` | 章节概要编辑器，五维维度 + 类型推进编辑 |
 | **伏笔管理** | `Foreshadows` | 按状态筛选的伏笔看板，CRUD |
 | **爽点板** | `Payoffs` | 爽文项目的爽点看板：状态分栏、强度、铺垫/释放章节，支持 AI 设计 |
 | **人物关系** | `Relations` | 力导向关系图谱，节点拖拽，关系 CRUD |
@@ -937,7 +940,7 @@ POST /api/ai/chat/stream
 - tool_result 消息格式适配
 - role 映射（system/history/tool）
 
-**请求参数**：不发送 `temperature` —— Claude Opus 5、Kimi K3 等新模型会以 400 拒绝该参数（#4），统一使用提供商默认值；输出长度由 `max_tokens`（配置项 `max_output_tokens`）控制。
+**请求参数**：不发送 `temperature` —— Claude Opus 5、Kimi K3 等新模型会以 400 拒绝该参数（#4），统一使用提供商默认值；输出长度由 `max_tokens`（配置项 `max_output_tokens`）控制。未显式配置时按模型取默认值：DeepSeek Flash/V4 为 65536（其思考 token 计入 `max_tokens`），其他模型沿用 8192。OpenAI-compatible 适配器在工具参数因输出上限被截断时，会以双倍预算重试一次，而不是直接中断会话。
 
 #### 6.4.4 AI 配置
 
@@ -1223,10 +1226,11 @@ type WorkflowPhase = 'idea'|'setting'|'outline'|'writing'|'review'|'consistency'
 
 ```bash
 pnpm install              # 安装依赖
-pnpm dev:all              # 启动前端(5173) + 后端(3001) + 初始化种子数据
+pnpm dev:all              # 启动前端(5173) + 后端(3001)，不改动项目数据
 pnpm dev                  # 仅启动前端 Vite dev server
 pnpm dev:server           # 仅启动后端 (nodemon 热重载)
-pnpm seed                 # 初始化种子数据
+pnpm seed                 # 初始化演示项目（已存在则跳过，不会覆盖）
+pnpm seed:reset           # 重建演示项目（旧文件自动备份为 .bak）
 pnpm build                # Vite 构建前端产物
 pnpm typecheck            # TypeScript 类型检查
 pnpm lint                 # Biome 代码检查
@@ -1299,7 +1303,7 @@ POST /api/projects/import-ai (SSE)
   1. 前端提取 TXT/EPUB 文本与元数据，POST 到服务端（不预先切章）
   2. structure：模型识别真实卷/章标题（全文或候选行）
   3. metadata：模型提取书名、作者、简介、语言、类型、篇幅
-  4. chapters：分批生成章节大纲、摘要与五维叙事字段
+  4. chapters：分批生成章节大纲、摘要、五维叙事字段与类型推进
   5. archive：分块提取角色、世界观、关系、事件、伏笔、记忆、科幻设定
   6. persist：全部成功后一次性创建数据库并原子写入；失败/取消不留半成品
   7. SSE 事件：stage / progress / warning / done / error

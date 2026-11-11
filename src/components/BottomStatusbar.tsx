@@ -1,5 +1,6 @@
 import { BookOpen, Database, Pen } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
 import { isLang, LANGUAGES } from '@/i18n'
 import { apiUrl, projectsApi } from '@/lib/api'
@@ -11,6 +12,7 @@ import type { WritingLanguage } from '@/types'
 export function BottomStatusbar() {
   const { currentProject } = useProjectStore()
   const { data: stats, reload: reloadStats } = useStats()
+  useDataRefresh('stats', reloadStats)
   const settings = useSettingsStore((s) => s.settings)
   const totalTokens = (stats?.tokenInput || 0) + (stats?.tokenOutput || 0)
 

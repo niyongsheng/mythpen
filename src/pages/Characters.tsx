@@ -34,6 +34,12 @@ export function Characters() {
     }
   }, [characters])
 
+  const formatAge = (age: string) => {
+    const value = (age || '').trim()
+    if (!value) return '?'
+    return /^\d+$/.test(value) ? `${value}${t('characters.ageUnit')}` : value
+  }
+
   const roleLabel = (role?: Character['role']) => {
     if (role === 'major') return t('pages.roleMajor')
     if (role === 'minor') return t('pages.roleMinor')
@@ -84,6 +90,7 @@ export function Characters() {
         name: draft.name.trim(),
         age: draft.age,
         gender: draft.gender,
+        species: draft.species,
         appearance: draft.appearance,
         personality: draft.personality,
         background: draft.background,
@@ -158,6 +165,11 @@ export function Characters() {
                 { value: 'extra', label: t('pages.roleExtra') },
               ],
             },
+            {
+              key: 'species',
+              label: t('characters.speciesLabel'),
+              placeholder: t('characters.speciesPlaceholder'),
+            },
             { key: 'age', label: t('pages.age'), placeholder: t('characters.agePlaceholder') },
             { key: 'gender', label: t('pages.gender'), placeholder: t('characters.genderPlaceholder') },
             {
@@ -219,8 +231,8 @@ export function Characters() {
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] text-[var(--ink)] truncate">{c.name}</div>
                 <div className="text-[11px] text-[var(--ink-tertiary)]">
-                  {c.age || '?'}
-                  {t('characters.ageUnit')} · {roleLabel(c.role)}
+                  {c.species ? `${c.species} · ` : ''}
+                  {formatAge(c.age)} · {roleLabel(c.role)}
                   {(c.chapterCount ?? 0) > 0 && ` · ${c.chapterCount}${t('characters.chapterAppearances')}`}
                 </div>
               </div>
@@ -340,6 +352,17 @@ export function Characters() {
                   <input type="text" value={roleLabel(view.role)} className="form-input" readOnly />
                 )}
               </FormField>
+              <FormField label={t('characters.speciesLabel')} full>
+                <input
+                  type="text"
+                  value={view.species || ''}
+                  className="form-input"
+                  readOnly={!editing}
+                  onChange={(e) => updateDraft('species', e.target.value)}
+                />
+              </FormField>
+            </div>
+            <div className="flex gap-3 mb-4">
               <FormField label={t('pages.age')} full>
                 <input
                   type="text"

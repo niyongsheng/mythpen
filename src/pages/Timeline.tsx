@@ -9,6 +9,8 @@ import { projectProps } from '@/lib/projectIdentity'
 import { useProjectName, useTimelineEvents } from '@/lib/useProjectData'
 import type { TimelineEvent } from '@/types'
 
+const IMPORTANCE_RANGE = { type: 'range', min: 1, max: 5, step: 1 } as const
+
 export function Timeline() {
   const { data: events, loading, reload } = useTimelineEvents()
   useDataRefresh('timeline', reload)
@@ -58,10 +60,10 @@ export function Timeline() {
             {
               key: 'importance',
               label: t('timeline.importanceLabel'),
-              type: 'number',
-              placeholder: t('timeline.importancePlaceholder'),
+              ...IMPORTANCE_RANGE,
             },
           ]}
+          initialValues={{ importance: '3' }}
           onSubmit={async (vals) => {
             await timelineApi.create(project, {
               year: vals.year,
@@ -101,8 +103,7 @@ export function Timeline() {
             {
               key: 'importance',
               label: t('timeline.importanceLabel'),
-              type: 'number',
-              placeholder: t('timeline.importancePlaceholder'),
+              ...IMPORTANCE_RANGE,
             },
           ]}
           initialValues={{
@@ -145,7 +146,7 @@ export function Timeline() {
                 ${ev.importance < 3 ? 'bg-[var(--canvas-pop)] shadow-none' : 'bg-[var(--accent-gold)] border-2 border-[var(--canvas)] shadow-[0_0_0_2px_var(--accent-gold-soft-bg)]'}`}
               />
               <div
-                className="font-display text-lg text-[var(--accent-gold)] w-[112px] shrink-0 text-right whitespace-nowrap leading-tight"
+                className="font-display text-lg text-[var(--accent-gold)] w-[112px] shrink-0 text-left whitespace-nowrap leading-tight mr-3"
                 title={ev.year}
               >
                 {ev.year}

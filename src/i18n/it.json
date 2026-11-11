@@ -8,7 +8,13 @@
     "projectMeta": "{words} parole · {chapters} cap. · {genres}",
     "settings": "Impostazioni",
     "collapseAI": "Riduci pannello IA",
-    "expandAI": "Espandi pannello IA"
+    "expandAI": "Espandi pannello IA",
+    "file": {
+      "save": "Salva",
+      "saveAs": "Salva con nome…",
+      "reveal": "Mostra nella cartella",
+      "open": "Apri file di progetto…"
+    }
   },
   "sidebar": {
     "outline": "Scaletta",
@@ -115,7 +121,7 @@
     "errorPrefix": "Errore: {msg}",
     "titleGenPrompt": "Sei un assistente per la scrittura di romanzi. In base alla conversazione seguente, riassumi l'argomento in 2-6 parole. Restituisci solo il titolo, senza testo aggiuntivo, punteggiatura o virgolette.\n\n{context}",
     "collabPrompt": "Progetto: {project}\nCapitolo attuale: cap. {num} «{title}»\n\nDomanda dell'utente: {userMsg}\n\nStiamo costruendo insieme il mondo di questo romanzo. Prima di rispondere, puoi consultare i personaggi, l'ambientazione, i presagi e gli altri elementi già esistenti. In base alla domanda dell'utente, avvia una discussione costruttiva e proponi idee creative. Se raggiungete un'intesa, usa lo strumento appropriato per scrivere l'ambientazione nel database.",
-    "writingPrompt": "Progetto: {project}\nCapitolo attuale: cap. {num} «{title}»\n\nIstruzione dell'utente: {userMsg}\n\nSegui il flusso di lavoro di scrittura in sei fasi: prima leggi la scaletta del capitolo attuale e il contenuto precedente, poi usa update_chapter per scrivere il testo seguendo la scaletta e aggiorna lo stato del capitolo secondo il flusso indicato nelle istruzioni di sistema. Al termine, imposta lo stato del capitolo su review. Tutti i contenuti creativi devono essere scritti nel database tramite gli strumenti."
+    "writingPrompt": "Progetto: {project}\nCapitolo attuale: cap. {num} «{title}»\n\nIstruzione dell'utente: {userMsg}\n\nSegui il flusso di lavoro di scrittura in sei fasi: prima leggi la scaletta del capitolo attuale e il contenuto precedente, poi usa update_chapter per scrivere il testo seguendo la scaletta e aggiorna lo stato del capitolo secondo il flusso indicato nelle istruzioni di sistema.  Tutti i contenuti creativi devono essere scritti nel database tramite gli strumenti."
   },
   "project": {
     "list": "I miei progetti",
@@ -154,7 +160,8 @@
       "new": "Appena iniziato",
       "inProgress": "In corso",
       "writing": "In scrittura",
-      "unknown": "Sconosciuto"
+      "unknown": "Sconosciuto",
+      "incompatible": "Aggiornamento necessario"
     },
     "subtitle": "Scegli un genere e Mythpen ti proporrà gli strumenti di scrittura adatti",
     "creating": "Creazione…",
@@ -226,6 +233,21 @@
       "importFailed": "Importazione non riuscita",
       "connectionInterrupted": "Connessione di importazione interrotta",
       "warnings": "Note"
+    },
+    "file": {
+      "open": "Apri file di progetto",
+      "saveHint": "Salvato come file di progetto .mythpen: fai doppio clic o invialo a un altro dispositivo per continuare a scrivere.",
+      "browserHint": "La modalità browser usa progetti interni; l’app desktop salva un file .mythpen portatile.",
+      "openFailed": "Impossibile aprire il file di progetto",
+      "saveFailed": "Impossibile salvare il progetto",
+      "saved": "Salvato",
+      "saveAsDone": "Salvato come nuovo file di progetto",
+      "saveAsFailed": "Salvataggio con nome non riuscito",
+      "revealFailed": "Impossibile mostrare nella cartella",
+      "removeFromListMsg": "Rimuovere «{name}» dai progetti recenti? Il file di progetto resta nella sua posizione.",
+      "deleteFileHint": "Elimina anche il file di progetto (irreversibile)",
+      "incompatible": "Questo file è stato creato da una versione più recente di Mythpen. Aggiorna l’app per aprirlo.",
+      "featureOffHint": "I file di progetto sperimentali sono disattivati; questo progetto sarà salvato nell’app. Attivali in Impostazioni → Sperimentale."
     }
   },
   "settings": {
@@ -246,6 +268,9 @@
     "accentColor": "Colore d'accento",
     "customColor": "Personalizzato",
     "aiService": "Servizio IA",
+    "privacy": "Privacy",
+    "anonymousStats": "Statistiche d'uso anonime",
+    "anonymousStatsDesc": "Statistiche anonime e segnalazioni di crash aiutano a migliorare l'app.",
     "apiBaseUrl": "URL base API",
     "apiKey": "API Key",
     "model": "Modello",
@@ -262,7 +287,7 @@
     "connectionFailed": "Connessione non riuscita",
     "getApiKey": "Come ottenere una API Key?",
     "autoSaveEnabled": "Salvataggio automatico ogni {seconds} secondi",
-    "autoSaveDisabled": "Salvataggio automatico disattivato (usa ⌘S / Ctrl+S o il pulsante di salvataggio nella barra degli strumenti)",
+    "autoSaveDisabled": "Salvataggio automatico disattivato",
     "forceRefreshDesc": "Ricarica l'intera app e recupera di nuovo tutti i dati",
     "checkUpdates": "Verifica aggiornamenti",
     "checkForUpdates": "Verifica aggiornamenti",
@@ -280,7 +305,12 @@
     "soundPulse": "Doppio bip",
     "previewSound": "Anteprima",
     "soundPiano": "Accordo di pianoforte",
-    "followSystem": "Segui il sistema"
+    "followSystem": "Segui il sistema",
+    "experimental": "Funzioni sperimentali",
+    "documentMode": "File di progetto (.mythpen)",
+    "documentModeDesc": "Salva un progetto come singolo file .mythpen, apribile con doppio clic e inviabile a un altro dispositivo.",
+    "documentModeWarning": "Sperimentale: il formato dei file di progetto può cambiare in modo incompatibile. Non usarlo come unico backup.",
+    "documentModeDisabledHint": "I file di progetto sono disattivati. Attivali in Impostazioni → Sperimentale."
   },
   "pages": {
     "characters": "Personaggi",
@@ -302,7 +332,7 @@
     "dashboard": "Panoramica",
     "continueWriting": "Continua a scrivere",
     "export": "Esporta",
-    "exportAll": "Esporta tutto",
+    "exportAll": "Esporta libro",
     "scienceSettings": "Sistema di ambientazione",
     "newSetting": "Nuovo elemento",
     "narrativeMemory": "Memoria narrativa",
@@ -336,7 +366,7 @@
     "clueBoard": "Tabellone degli indizi",
     "cardNarrative": "Registri narrativi",
     "cardAiUsage": "Utilizzo IA",
-    "appearance": "Aspetto",
+    "appearance": "Aspetto / Forma",
     "personality": "Personalità",
     "background": "Passato",
     "motivation": "Motivazione",
@@ -402,7 +432,12 @@
     "dismiss": "Chiudi",
     "saving": "Salvataggio...",
     "noData": "Nessun dato",
-    "requiredField": "Il campo «{label}» è obbligatorio"
+    "saveFailed": "Salvataggio non riuscito",
+    "deleteFailed": "Eliminazione non riuscita",
+    "crashTitle": "Si è verificato un errore",
+    "crashDesc": "L'errore è stato segnalato automaticamente. Riprova.",
+    "requiredField": "Il campo «{label}» è obbligatorio",
+    "retry": "Riprova"
   },
   "bottomBar": {
     "writingLanguage": "Scrittura: {lang}",
@@ -448,9 +483,11 @@
   },
   "characters": {
     "namePlaceholder": "Dai un nome al personaggio",
-    "agePlaceholder": "es. 28",
+    "agePlaceholder": "es.: 28; non umano: 3 anni dall'attivazione / 300 / sconosciuto",
     "genderPlaceholder": "Maschile/Femminile/Altro",
-    "appearancePlaceholder": "Aspetto",
+    "speciesLabel": "Specie / Tipo",
+    "speciesPlaceholder": "Umano / IA / Aliena / Robot / Divinità / Spirito / Animale / Collettivo / Altro",
+    "appearancePlaceholder": "Aspetto/forma (non umano: struttura, forma di energia, ecc.)",
     "personalityPlaceholder": "Personalità",
     "backgroundPlaceholder": "Passato",
     "motivationPlaceholder": "Motivazione",
@@ -471,7 +508,7 @@
     "formatTxtDesc": "Testo semplice",
     "coverUploadError": "Caricamento copertina non riuscito: {msg}",
     "coverDeleteError": "Eliminazione copertina non riuscita: {msg}",
-    "downloadingFile": "Download del file {fmt} in corso...",
+    "exportSuccess": "«{name}» esportato con successo ({fmt}).",
     "exportError": "Esportazione non riuscita: {msg}",
     "exporting": "Esportazione...",
     "noCover": "Nessuna copertina",
@@ -482,7 +519,7 @@
     "noExportRecords": "Nessuna esportazione registrata"
   },
   "foreshadow": {
-    "aiPrompt": "Sei un assistente per la progettazione di presagi narrativi. In base ai personaggi, all'ambientazione e ai presagi già presenti nel progetto, progetta 3-5 nuovi presagi. Restituisci un array JSON.",
+    "aiPrompt": "Sei un assistente per la progettazione di presagi narrativi. In base ai personaggi, all'ambientazione e ai presagi già presenti nel progetto, progetta 3-5 nuovi presagi. Restituisci un array JSON. Return a JSON array in the format: [{\"title\":\"...\",\"description\":\"...\",\"priority\":\"high/normal/low\"}], with no prefix explanation.",
     "aiUserMessage": "Progetta nuovi presagi per il romanzo attuale.",
     "statTotal": "Totale",
     "planted": "Introdotti",
@@ -533,7 +570,7 @@
     "statusField": "Stato"
   },
   "memory": {
-    "aiPrompt": "Sei un assistente per l'estrazione di memorie narrative. Estrai dai capitoli del romanzo le memorie narrative importanti che influenzano gli sviluppi futuri della trama. Restituisci un array JSON.",
+    "aiPrompt": "Sei un assistente per l'estrazione di memorie narrative. Estrai dai capitoli del romanzo le memorie narrative importanti che influenzano gli sviluppi futuri della trama. Restituisci un array JSON. Return a JSON array in the format: [{\"category\":\"character|location|item|event|promise|other\",\"content\":\"...\"}], with no prefix explanation.",
     "aiUserMessage": "Estrai tutte le memorie narrative importanti dal romanzo attuale.",
     "categoryCharacter": "Personaggio",
     "categoryLocation": "Luogo",
@@ -548,7 +585,17 @@
     "noResults": "Nessuna memoria corrispondente",
     "searchResultsCount": "Trovati {n} risultati",
     "showAll": "Mostra tutto",
-    "sourceChapter": "Origine: cap. {n}"
+    "sourceChapter": "Origine: cap. {n}",
+    "tabMemories": "Memorie narrative",
+    "tabNotes": "Regole di scrittura",
+    "notesHint": "Qui annota le regole di scrittura: stile, punto di vista, formato dei capitoli, divieti e modalità di collaborazione. Personaggi e ambientazione si gestiscono nelle rispettive pagine.",
+    "notesPlaceholder": "es.\n- 3000–4000 parole per capitolo, chiudere con un gancio\n- Terza persona limitata e punto di vista fisso\n- Niente gergo moderno\n- Chiedermi prima di modificare l'ambientazione centrale",
+    "notesCount": "{n}/{max} caratteri",
+    "notesSave": "Salva regole",
+    "notesUnsaved": "Modifiche non salvate",
+    "notesTooLong": "{n} caratteri in eccesso",
+    "notesSaved": "Salvato",
+    "notesLoadFailed": "Impossibile caricare le regole di scrittura"
   },
   "consistency": {
     "pass": "Superato",
@@ -575,7 +622,7 @@
   },
   "outline": {
     "noContent": "(Nessun contenuto)",
-    "lock5D": "Blocco scaletta 5D",
+    "lockDimensions": "Blocco scaletta 6D",
     "optimizing": "Ottimizzazione...",
     "chapterCount": "{n} cap.",
     "placeholderOutline": "Inserisci la scaletta del capitolo...",
@@ -584,11 +631,26 @@
     "placeholderTexture": "Tessitura del mondo",
     "placeholderMystery": "Mistero concreto",
     "placeholderTension": "Tensione interpersonale",
+    "genreBeat": "Avanzamento di genere",
+    "genreBeatHint": "Ciò che questo capitolo fa progredire nel suo genere",
+    "genreBeatFocus": {
+      "sci-fi": "Rivelazione delle regole / uso della tecnologia",
+      "fantasy": "Sistema di potere / cambi di fazione",
+      "xianxia": "Stadio di coltivazione / potenza / risorse",
+      "wuxia": "Arti marziali / situazione dello jianghu",
+      "romance": "Fase della relazione / attrazione o malinteso",
+      "history": "Agganci storici / dettagli d'epoca",
+      "urban": "Questioni reali / relazioni sociali",
+      "mystery": "Indizi / domande / piste false",
+      "game": "Missioni / statistiche / progressione di livello",
+      "biography": "Traguardi reali di vita",
+      "other": "Avanzamento centrale del genere"
+    },
     "selectChapterHint": "Seleziona un capitolo a sinistra per iniziare a modificarlo",
     "noChaptersHint": "Nessun capitolo. Creane prima uno.",
     "outlineInfo": "Scaletta · {count} capitoli",
-    "generateSystemPrompt": "Sei un generatore di scalette per romanzi. In base alle informazioni sul capitolo fornite dall'utente, genera un output JSON contenente:\n1. title: Titolo proposto per il capitolo (se il titolo attuale è un segnaposto come \"Nuovo capitolo\" o \"Capitolo 1\", proponi un titolo accattivante; altrimenti mantieni il titolo originale)\n2. outline: Scaletta del capitolo (entro 150 caratteri), con eventi principali, sviluppo dei personaggi e conflitti chiave\n3. cognitive_frame: Cambiamento della cornice cognitiva del personaggio (entro 30 caratteri)\n4. emotional_anchor: Ancora emotiva del capitolo (entro 30 caratteri)\n5. world_texture: Tessitura del mondo / atmosfera della scena (entro 30 caratteri)\n6. concrete_mystery: Mistero concreto (entro 30 caratteri)\n7. interpersonal_tension: Tensione interpersonale (entro 30 caratteri)\nRestituisci direttamente il JSON, senza spiegazioni introduttive.",
-    "generateUserPrompt": "Cap. {num} \"{title}\"\nAnteprima del contenuto attuale: {preview}\n\nGenera una scaletta completa e le informazioni 5D per questo capitolo.",
+    "generateSystemPrompt": "Sei un generatore di scalette per romanzi. In base alle informazioni sul capitolo fornite dall'utente, genera un output JSON contenente:\n1. title: Titolo proposto per il capitolo (se il titolo attuale è un segnaposto come \"Nuovo capitolo\" o \"Capitolo 1\", proponi un titolo accattivante; altrimenti mantieni il titolo originale)\n2. outline: Scaletta del capitolo (entro 150 caratteri), con eventi principali, sviluppo dei personaggi e conflitti chiave\n3. cognitive_frame: Cambiamento della cornice cognitiva del personaggio (entro 30 caratteri)\n4. emotional_anchor: Ancora emotiva del capitolo (entro 30 caratteri)\n5. world_texture: Tessitura del mondo / atmosfera della scena (entro 30 caratteri)\n6. concrete_mystery: Mistero concreto (entro 30 caratteri)\n7. interpersonal_tension: Tensione interpersonale (entro 30 caratteri)\n8. genre_beat: ciò che questo capitolo fa progredire nel suo genere (entro 30 caratteri, ad es. indizi/piste false nel mistero, stadio di coltivazione/potenza nello xianxia, progresso della relazione nel romance)\nRestituisci direttamente il JSON, senza spiegazioni introduttive.",
+    "generateUserPrompt": "Cap. {num} \"{title}\"\nAnteprima del contenuto attuale: {preview}\n\nGenera una scaletta completa, le informazioni 5D e l'avanzamento di genere per questo capitolo.",
     "optimizeSystemPrompt": "Sei un assistente per l'ottimizzazione delle scalette dei romanzi. Analizza la scaletta dell'utente e proponi miglioramenti. Restituisci i suggerimenti direttamente, entro 200 caratteri.",
     "optimizeUserPrompt": "Cap. {num} \"{title}\" scaletta attuale:\n{outline}\n\nProponi suggerimenti di ottimizzazione."
   },
@@ -598,7 +660,7 @@
     "aiError": "Analisi non riuscita",
     "createdCount": "Create {n} nuove relazioni",
     "aiNoNewRelations": "Nessuna nuova relazione necessaria",
-    "aiPrompt": "Sei un assistente per l'analisi delle relazioni tra i personaggi di un romanzo. In base all'elenco dei personaggi e alle relazioni esistenti del romanzo attuale, deduci altre relazioni importanti.",
+    "aiPrompt": "Sei un assistente per l'analisi delle relazioni tra i personaggi di un romanzo. In base all'elenco dei personaggi e alle relazioni esistenti del romanzo attuale, deduci altre relazioni importanti. Return a JSON array in the format: [{\"character_a_name\":\"Character A\",\"character_b_name\":\"Character B\",\"relation_type\":\"friend/enemy/lover/etc.\",\"description\":\"relation description\",\"intensity\":3}], with no prefix explanation.",
     "noCharacters": "Nessun personaggio. Crea prima dei personaggi.",
     "noRelations": "Nessuna relazione. Clicca su «Nuova relazione» per aggiungerne una manualmente o su «Organizza con IA» per generarle automaticamente.",
     "aiOrganize": "Organizza con IA",
@@ -628,6 +690,8 @@
     "hypothesisLabel": "🔴 Ipotesi",
     "coreHypothesis": "🔴 Ipotesi centrale",
     "filterAll": "Tutti i tag",
+    "filterAllCategories": "Categoria: tutte",
+    "hardness": "Rigore scientifico",
     "category": "Categoria",
     "name": "Nome",
     "description": "Descrizione",
@@ -664,7 +728,20 @@
     "sortOrderHint": "I numeri più bassi compaiono per primi",
     "uncategorized": "Senza categoria",
     "empty": "Nessuna voce",
+    "customCategory": "Categoria personalizzata…",
+    "customCategoryName": "Nome della categoria personalizzata",
+    "customCategoryPlaceholder": "Inserisci il nome della categoria",
     "category": {
+      "tech": "Tecnologia",
+      "biology": "Biologia",
+      "physics": "Fisica",
+      "society": "Società",
+      "politics": "Politica",
+      "military": "Militare",
+      "ai": "IA",
+      "alien": "Civiltà aliene",
+      "planet": "Pianeti",
+      "history": "Storia",
       "realm": "Reame",
       "technique": "Tecnica",
       "artifact": "Artefatto",
@@ -695,6 +772,7 @@
     "categoryConcept": "Concetto",
     "categoryEvent": "Evento",
     "categoryTechnology": "Tecnologia",
+    "categoryOther": "Altro",
     "tabAll": "Tutti",
     "namePlaceholder": "Titolo della voce",
     "descriptionPlaceholder": "Descrizione dettagliata...",
@@ -708,7 +786,11 @@
     "sourceCode": "Codice sorgente",
     "support": "Sostieni l'autore",
     "supportDesc": "Se Mythpen ti è utile, offrimi un caffè tramite 爱发电",
-    "contact": "Contatti",
+    "community": "Unisciti alla comunità",
+    "communityDesc": "Chatta con lo sviluppatore e altri scrittori",
+    "contact": "Contatta lo sviluppatore",
+    "easterEggTitle": "Easter egg sbloccato!",
+    "easterEgg": "Sette tap sul numero di versione hanno risvegliato lo spirito della scrittura nascosto nel codice. Dice: smetti di toccare e vai a scrivere!",
     "techStack": "Stack tecnologico",
     "openLink": "Apri"
   },

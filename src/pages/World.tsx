@@ -1,4 +1,4 @@
-import { Building2, Calendar, Cog, Globe, Lightbulb, MapPin } from 'lucide-react'
+import { Building2, Calendar, Cog, Globe, Lightbulb, MapPin, MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
@@ -9,13 +9,14 @@ import { projectProps } from '@/lib/projectIdentity'
 import { useProjectName, useWorldEntries } from '@/lib/useProjectData'
 import type { WorldEntry } from '@/types'
 
-const TABS = ['all', 'location', 'organization', 'concept', 'event']
+const TABS = ['all', 'location', 'organization', 'concept', 'event', 'other']
 const TAB_ICONS: Record<string, React.ReactNode> = {
   all: null,
   location: <MapPin className="w-3.5 h-3.5" />,
   organization: <Building2 className="w-3.5 h-3.5" />,
   concept: <Lightbulb className="w-3.5 h-3.5" />,
   event: <Calendar className="w-3.5 h-3.5" />,
+  other: <MoreHorizontal className="w-3.5 h-3.5" />,
 }
 const CAT_ICONS: Record<string, React.ReactNode> = {
   location: <MapPin className="w-3.5 h-3.5" />,
@@ -23,6 +24,7 @@ const CAT_ICONS: Record<string, React.ReactNode> = {
   concept: <Lightbulb className="w-3.5 h-3.5" />,
   event: <Calendar className="w-3.5 h-3.5" />,
   technology: <Cog className="w-3.5 h-3.5" />,
+  other: <MoreHorizontal className="w-3.5 h-3.5" />,
 }
 
 export function World() {
@@ -39,6 +41,7 @@ export function World() {
     organization: t('world.categoryOrganization'),
     concept: t('world.categoryConcept'),
     event: t('world.categoryEvent'),
+    other: t('world.categoryOther'),
   }
   const catLabels: Record<string, string> = {
     location: t('world.categoryLocation'),
@@ -46,6 +49,7 @@ export function World() {
     concept: t('world.categoryConcept'),
     event: t('world.categoryEvent'),
     technology: t('world.categoryTechnology'),
+    other: t('world.categoryOther'),
   }
 
   const filtered = activeTab === 'all' ? entries || [] : (entries || []).filter((e) => e.category === activeTab)
@@ -85,6 +89,7 @@ export function World() {
                 { value: 'organization', label: t('world.categoryOrganization') },
                 { value: 'concept', label: t('world.categoryConcept') },
                 { value: 'event', label: t('world.categoryEvent') },
+                { value: 'other', label: t('world.categoryOther') },
               ],
             },
             { key: 'name', label: t('world.name'), required: true, placeholder: t('world.namePlaceholder') },
@@ -118,6 +123,7 @@ export function World() {
                 { value: 'organization', label: t('world.categoryOrganization') },
                 { value: 'concept', label: t('world.categoryConcept') },
                 { value: 'event', label: t('world.categoryEvent') },
+                { value: 'other', label: t('world.categoryOther') },
               ],
             },
             { key: 'name', label: t('world.name'), required: true, placeholder: t('world.namePlaceholder') },

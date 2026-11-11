@@ -49,7 +49,8 @@
 
 ```bash
 pnpm install        # Install dependencies
-pnpm dev:all        # Start in browser (frontend + backend + seed data)
+pnpm dev:all        # Start in browser (frontend + backend)
+pnpm seed           # Create the demo project (skipped if it already exists)
 pnpm tauri dev      # Desktop development mode
 pnpm tauri build    # Build desktop installer (.dmg/.msi/.AppImage)
 ```

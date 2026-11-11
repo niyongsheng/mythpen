@@ -8,7 +8,13 @@
     "projectMeta": "{words} palavras · {chapters} cap. · {genres}",
     "settings": "Configurações",
     "collapseAI": "Recolher painel de IA",
-    "expandAI": "Expandir painel de IA"
+    "expandAI": "Expandir painel de IA",
+    "file": {
+      "save": "Salvar",
+      "saveAs": "Salvar como…",
+      "reveal": "Mostrar na pasta",
+      "open": "Abrir arquivo de projeto…"
+    }
   },
   "sidebar": {
     "outline": "Esboço",
@@ -115,7 +121,7 @@
     "errorPrefix": "Erro: {msg}",
     "titleGenPrompt": "Você é um assistente de escrita de romances. Com base na conversa a seguir, resuma o tema em 2 a 6 palavras. Retorne apenas o título, sem texto extra, pontuação ou aspas.\n\n{context}",
     "collabPrompt": "Projeto: {project}\nCapítulo atual: Cap. {num} \"{title}\"\n\nPergunta do usuário: {userMsg}\n\nEstamos construindo juntos o mundo deste romance. Antes de responder, você pode consultar personagens, ambientações, prenúncios etc. já existentes. Com base na pergunta do usuário, participe de uma discussão construtiva e proponha sugestões criativas. Se houver consenso, use a ferramenta adequada para gravar as configurações no banco de dados.",
-    "writingPrompt": "Projeto: {project}\nCapítulo atual: Cap. {num} \"{title}\"\n\nInstrução do usuário: {userMsg}\n\nSiga o fluxo de escrita em seis etapas: primeiro leia o esboço do capítulo atual e o conteúdo anterior; depois, use update_chapter para escrever o texto principal de acordo com o esboço e avance o status do capítulo conforme o fluxo indicado nas instruções do sistema. Ao concluir, defina o status do capítulo como review. Todo o conteúdo criativo deve ser gravado no banco de dados por meio de ferramentas."
+    "writingPrompt": "Projeto: {project}\nCapítulo atual: Cap. {num} \"{title}\"\n\nInstrução do usuário: {userMsg}\n\nSiga o fluxo de escrita em seis etapas: primeiro leia o esboço do capítulo atual e o conteúdo anterior; depois, use update_chapter para escrever o texto principal de acordo com o esboço e avance o status do capítulo conforme o fluxo indicado nas instruções do sistema.  Todo o conteúdo criativo deve ser gravado no banco de dados por meio de ferramentas."
   },
   "project": {
     "list": "Meus projetos",
@@ -154,7 +160,8 @@
       "new": "Recém-criado",
       "inProgress": "Em andamento",
       "writing": "Em escrita",
-      "unknown": "Desconhecido"
+      "unknown": "Desconhecido",
+      "incompatible": "Atualização necessária"
     },
     "subtitle": "Escolha um gênero e o Mythpen ajusta as ferramentas de escrita para você",
     "creating": "Criando…",
@@ -226,6 +233,21 @@
       "importFailed": "Falha na importação",
       "connectionInterrupted": "Conexão da importação interrompida",
       "warnings": "Observações"
+    },
+    "file": {
+      "open": "Abrir arquivo de projeto",
+      "saveHint": "Salvo como arquivo de projeto .mythpen — clique duas vezes ou envie para outro dispositivo para continuar escrevendo.",
+      "browserHint": "O modo navegador usa projetos internos; o app desktop salva um arquivo .mythpen portátil.",
+      "openFailed": "Não foi possível abrir o arquivo de projeto",
+      "saveFailed": "Falha ao salvar o projeto",
+      "saved": "Salvo",
+      "saveAsDone": "Salvo como novo arquivo de projeto",
+      "saveAsFailed": "Falha em Salvar como",
+      "revealFailed": "Não foi possível mostrar na pasta",
+      "removeFromListMsg": "Remover “{name}” dos projetos recentes? O arquivo do projeto permanece no local.",
+      "deleteFileHint": "Excluir também o arquivo do projeto (não pode ser desfeito)",
+      "incompatible": "Este arquivo foi criado por uma versão mais recente do Mythpen. Atualize o app para abri-lo.",
+      "featureOffHint": "Os arquivos de projeto experimentais estão desativados; este projeto será salvo dentro do app. Ative-os em Configurações → Experimental."
     }
   },
   "settings": {
@@ -246,6 +268,9 @@
     "accentColor": "Cor de destaque",
     "customColor": "Personalizada",
     "aiService": "Serviço de IA",
+    "privacy": "Privacidade",
+    "anonymousStats": "Estatísticas de uso anônimas",
+    "anonymousStatsDesc": "Estatísticas anônimas e relatórios de falhas ajudam a melhorar o aplicativo.",
     "apiBaseUrl": "URL base da API",
     "apiKey": "API Key",
     "model": "Modelo",
@@ -262,7 +287,7 @@
     "connectionFailed": "Falha na conexão",
     "getApiKey": "Como obter uma API Key?",
     "autoSaveEnabled": "Salvamento automático a cada {seconds} segundos",
-    "autoSaveDisabled": "O salvamento automático está desativado (use ⌘S / Ctrl+S ou o botão de salvar na barra de ferramentas)",
+    "autoSaveDisabled": "O salvamento automático está desativado",
     "forceRefreshDesc": "Recarregar todo o aplicativo e buscar todos os dados novamente",
     "checkUpdates": "Verificar atualizações",
     "checkForUpdates": "Verificar atualizações",
@@ -280,7 +305,12 @@
     "soundPulse": "Bip duplo",
     "previewSound": "Prévia",
     "soundPiano": "Acorde de piano",
-    "followSystem": "Seguir o sistema"
+    "followSystem": "Seguir o sistema",
+    "experimental": "Recursos experimentais",
+    "documentMode": "Arquivos de projeto (.mythpen)",
+    "documentModeDesc": "Salve um projeto como um único arquivo .mythpen, que pode ser aberto com duplo clique e enviado para outro dispositivo.",
+    "documentModeWarning": "Experimental: o formato do arquivo de projeto pode mudar de forma incompatível. Não o use como único backup.",
+    "documentModeDisabledHint": "Os arquivos de projeto estão desativados. Ative-os em Configurações → Experimental."
   },
   "pages": {
     "characters": "Personagens",
@@ -302,7 +332,7 @@
     "dashboard": "Painel",
     "continueWriting": "Continuar escrevendo",
     "export": "Exportar",
-    "exportAll": "Exportar tudo",
+    "exportAll": "Exportar livro",
     "scienceSettings": "Sistema de ambientação",
     "newSetting": "Novo elemento",
     "narrativeMemory": "Memória narrativa",
@@ -336,7 +366,7 @@
     "clueBoard": "Quadro de pistas",
     "cardNarrative": "Registros narrativos",
     "cardAiUsage": "Uso de IA",
-    "appearance": "Aparência",
+    "appearance": "Aparência / Forma",
     "personality": "Personalidade",
     "background": "Antecedentes",
     "motivation": "Motivação",
@@ -402,7 +432,12 @@
     "dismiss": "Fechar",
     "saving": "Salvando...",
     "noData": "Sem dados",
-    "requiredField": "O campo 「{label}」 é obrigatório"
+    "saveFailed": "Falha ao salvar",
+    "deleteFailed": "Falha ao excluir",
+    "crashTitle": "Ocorreu um erro",
+    "crashDesc": "O erro foi relatado automaticamente. Tente novamente.",
+    "requiredField": "O campo 「{label}」 é obrigatório",
+    "retry": "Tentar novamente"
   },
   "bottomBar": {
     "writingLanguage": "Escrita: {lang}",
@@ -448,9 +483,11 @@
   },
   "characters": {
     "namePlaceholder": "Dê um nome ao personagem",
-    "agePlaceholder": "ex.: 28",
+    "agePlaceholder": "ex.: 28; não humano: 3 anos desde a ativação / 300 / desconhecido",
     "genderPlaceholder": "Masculino/Feminino/Outro",
-    "appearancePlaceholder": "Aparência",
+    "speciesLabel": "Espécie / Tipo",
+    "speciesPlaceholder": "Humano / IA / Alienígena / Robô / Divindade / Espírito / Animal / Coletivo / Outro",
+    "appearancePlaceholder": "Aparência/forma (não humano: construção, forma de energia etc.)",
     "personalityPlaceholder": "Personalidade",
     "backgroundPlaceholder": "Antecedentes",
     "motivationPlaceholder": "Motivação",
@@ -471,7 +508,7 @@
     "formatTxtDesc": "Texto simples",
     "coverUploadError": "Falha ao enviar a capa: {msg}",
     "coverDeleteError": "Falha ao excluir a capa: {msg}",
-    "downloadingFile": "Baixando arquivo {fmt}...",
+    "exportSuccess": "«{name}» exportado com sucesso ({fmt}).",
     "exportError": "Falha na exportação: {msg}",
     "exporting": "Exportando...",
     "noCover": "Sem capa",
@@ -482,7 +519,7 @@
     "noExportRecords": "Nenhum histórico de exportação"
   },
   "foreshadow": {
-    "aiPrompt": "Você é um assistente de design de prenúncios para romances. Com base nos personagens, na construção de mundo e nos prenúncios existentes do projeto, crie de 3 a 5 novas sugestões de prenúncio. Retorne um array JSON.",
+    "aiPrompt": "Você é um assistente de design de prenúncios para romances. Com base nos personagens, na construção de mundo e nos prenúncios existentes do projeto, crie de 3 a 5 novas sugestões de prenúncio. Retorne um array JSON. Return a JSON array in the format: [{\"title\":\"...\",\"description\":\"...\",\"priority\":\"high/normal/low\"}], with no prefix explanation.",
     "aiUserMessage": "Crie novos prenúncios para o romance atual.",
     "statTotal": "Total",
     "planted": "Plantado",
@@ -533,7 +570,7 @@
     "statusField": "Status"
   },
   "memory": {
-    "aiPrompt": "Você é um assistente de extração de memória narrativa. Extraia dos capítulos do romance as memórias narrativas importantes que afetam o desenvolvimento futuro do enredo. Retorne um array JSON.",
+    "aiPrompt": "Você é um assistente de extração de memória narrativa. Extraia dos capítulos do romance as memórias narrativas importantes que afetam o desenvolvimento futuro do enredo. Retorne um array JSON. Return a JSON array in the format: [{\"category\":\"character|location|item|event|promise|other\",\"content\":\"...\"}], with no prefix explanation.",
     "aiUserMessage": "Extraia todas as memórias narrativas importantes do romance atual.",
     "categoryCharacter": "Personagem",
     "categoryLocation": "Local",
@@ -548,7 +585,17 @@
     "noResults": "Nenhuma memória correspondente encontrada",
     "searchResultsCount": "Encontrados {n} resultados",
     "showAll": "Mostrar todas",
-    "sourceChapter": "Origem: Cap. {n}"
+    "sourceChapter": "Origem: Cap. {n}",
+    "tabMemories": "Memória narrativa",
+    "tabNotes": "Regras de escrita",
+    "notesHint": "Registre aqui as regras de escrita: estilo, ponto de vista, formato dos capítulos, proibições e modo de colaboração. Personagens e ambientação ficam nas páginas próprias.",
+    "notesPlaceholder": "ex.\n- 3000–4000 palavras por capítulo, terminar com um gancho\n- Terceira pessoa limitada e ponto de vista fixo\n- Sem gírias modernas\n- Perguntar antes de mudar a ambientação central",
+    "notesCount": "{n}/{max} caracteres",
+    "notesSave": "Salvar regras",
+    "notesUnsaved": "Alterações não salvas",
+    "notesTooLong": "{n} caracteres acima do limite",
+    "notesSaved": "Salvo",
+    "notesLoadFailed": "Falha ao carregar as regras de escrita"
   },
   "consistency": {
     "pass": "Aprovado",
@@ -575,7 +622,7 @@
   },
   "outline": {
     "noContent": "(Sem conteúdo)",
-    "lock5D": "Trava de esboço 5D",
+    "lockDimensions": "Trava de esboço 6D",
     "optimizing": "Otimizando...",
     "chapterCount": "{n} cap.",
     "placeholderOutline": "Digite o esboço do capítulo...",
@@ -584,11 +631,26 @@
     "placeholderTexture": "Textura do mundo",
     "placeholderMystery": "Mistério concreto",
     "placeholderTension": "Tensão interpessoal",
+    "genreBeat": "Progressão de gênero",
+    "genreBeatHint": "O que este capítulo avança no gênero",
+    "genreBeatFocus": {
+      "sci-fi": "Revelação de regras / uso de tecnologia",
+      "fantasy": "Sistema de poder / mudanças de facção",
+      "xianxia": "Estágio de cultivo / força de combate / recursos",
+      "wuxia": "Artes marciais / situação do jianghu",
+      "romance": "Estágio da relação / atração ou mal-entendido",
+      "history": "Âncoras históricas / detalhes de época",
+      "urban": "Tensões reais / relações sociais",
+      "mystery": "Pistas / perguntas / pistas falsas",
+      "game": "Missões / atributos / progressão de nível",
+      "biography": "Marcos reais de vida",
+      "other": "Progressão central do gênero"
+    },
     "selectChapterHint": "Selecione um capítulo à esquerda para começar a editar",
     "noChaptersHint": "Ainda não há capítulos. Crie um primeiro capítulo.",
     "outlineInfo": "Esboço · {count} capítulos",
-    "generateSystemPrompt": "Você é um gerador de esboços de romance. Com base nas informações do capítulo fornecidas pelo usuário, gere uma saída JSON contendo:\n1. title: sugestão de título do capítulo (se o título atual for um marcador como \"Novo capítulo\" ou \"Capítulo 1\", proponha um título atraente; caso contrário, mantenha o título original)\n2. outline: esboço do capítulo (até 150 caracteres), incluindo eventos centrais, desenvolvimento dos personagens e conflitos principais\n3. cognitive_frame: mudança da estrutura cognitiva do personagem (até 30 caracteres)\n4. emotional_anchor: âncora emocional deste capítulo (até 30 caracteres)\n5. world_texture: textura do mundo / atmosfera da cena (até 30 caracteres)\n6. concrete_mystery: mistério concreto (até 30 caracteres)\n7. interpersonal_tension: tensão interpessoal (até 30 caracteres)\nRetorne o JSON diretamente, sem explicação introdutória.",
-    "generateUserPrompt": "Cap.{num} \"{title}\"\nPrévia do conteúdo atual: {preview}\n\nGere um esboço completo e as informações 5D deste capítulo.",
+    "generateSystemPrompt": "Você é um gerador de esboços de romance. Com base nas informações do capítulo fornecidas pelo usuário, gere uma saída JSON contendo:\n1. title: sugestão de título do capítulo (se o título atual for um marcador como \"Novo capítulo\" ou \"Capítulo 1\", proponha um título atraente; caso contrário, mantenha o título original)\n2. outline: esboço do capítulo (até 150 caracteres), incluindo eventos centrais, desenvolvimento dos personagens e conflitos principais\n3. cognitive_frame: mudança da estrutura cognitiva do personagem (até 30 caracteres)\n4. emotional_anchor: âncora emocional deste capítulo (até 30 caracteres)\n5. world_texture: textura do mundo / atmosfera da cena (até 30 caracteres)\n6. concrete_mystery: mistério concreto (até 30 caracteres)\n7. interpersonal_tension: tensão interpessoal (até 30 caracteres)\n8. genre_beat: o que este capítulo avança no gênero (até 30 caracteres, por exemplo pistas/pistas falsas no mistério, estágio de cultivo/poder no xianxia, progresso do relacionamento no romance)\nRetorne o JSON diretamente, sem explicação introdutória.",
+    "generateUserPrompt": "Cap.{num} \"{title}\"\nPrévia do conteúdo atual: {preview}\n\nGere um esboço completo, as informações 5D e a progressão de gênero deste capítulo.",
     "optimizeSystemPrompt": "Você é um assistente de otimização de esboços de romance. Analise o esboço do usuário e sugira melhorias. Retorne as sugestões diretamente, em até 200 caracteres.",
     "optimizeUserPrompt": "Cap.{num} \"{title}\" esboço atual:\n{outline}\n\nForneça sugestões de otimização."
   },
@@ -598,7 +660,7 @@
     "aiError": "Falha na análise",
     "createdCount": "{n} novas relações criadas",
     "aiNoNewRelations": "Nenhuma nova relação necessária",
-    "aiPrompt": "Você é um assistente de análise de relações entre personagens de romance. Com base na lista de personagens do romance atual e nas relações existentes, deduza outras relações importantes.",
+    "aiPrompt": "Você é um assistente de análise de relações entre personagens de romance. Com base na lista de personagens do romance atual e nas relações existentes, deduza outras relações importantes. Return a JSON array in the format: [{\"character_a_name\":\"Character A\",\"character_b_name\":\"Character B\",\"relation_type\":\"friend/enemy/lover/etc.\",\"description\":\"relation description\",\"intensity\":3}], with no prefix explanation.",
     "noCharacters": "Ainda não há personagens. Crie personagens primeiro.",
     "noRelations": "Ainda não há relações. Clique em \"Nova relação\" para adicionar manualmente ou em \"Organizar com IA\" para gerar automaticamente.",
     "aiOrganize": "Organizar com IA",
@@ -628,6 +690,8 @@
     "hypothesisLabel": "🔴 Hipótese",
     "coreHypothesis": "🔴 Hipótese central",
     "filterAll": "Todas as tags",
+    "filterAllCategories": "Categoria: todas",
+    "hardness": "Rigor científico",
     "category": "Categoria",
     "name": "Nome",
     "description": "Descrição",
@@ -664,7 +728,20 @@
     "sortOrderHint": "Números menores aparecem primeiro",
     "uncategorized": "Sem categoria",
     "empty": "Nenhuma entrada ainda",
+    "customCategory": "Categoria personalizada…",
+    "customCategoryName": "Nome da categoria personalizada",
+    "customCategoryPlaceholder": "Digite o nome da categoria",
     "category": {
+      "tech": "Tecnologia",
+      "biology": "Biologia",
+      "physics": "Física",
+      "society": "Sociedade",
+      "politics": "Política",
+      "military": "Militar",
+      "ai": "IA",
+      "alien": "Civilização alienígena",
+      "planet": "Planetas",
+      "history": "História",
       "realm": "Reino",
       "technique": "Técnica",
       "artifact": "Artefato",
@@ -695,6 +772,7 @@
     "categoryConcept": "Conceito",
     "categoryEvent": "Evento",
     "categoryTechnology": "Tecnologia",
+    "categoryOther": "Outro",
     "tabAll": "Todos",
     "namePlaceholder": "Título da entrada",
     "descriptionPlaceholder": "Descrição detalhada...",
@@ -708,7 +786,11 @@
     "sourceCode": "Código-fonte",
     "support": "Apoie o autor",
     "supportDesc": "Se o Mythpen é útil para você, considere me pagar um café via 爱发电",
-    "contact": "Contato",
+    "community": "Entrar na comunidade",
+    "communityDesc": "Converse com o desenvolvedor e outros escritores",
+    "contact": "Contato com o desenvolvedor",
+    "easterEggTitle": "Ovo de Páscoa desbloqueado!",
+    "easterEgg": "Sete toques no número da versão acordaram o espírito da escrita escondido no código. Ele diz: pare de clicar e vá escrever!",
     "techStack": "Tecnologias",
     "openLink": "Abrir"
   },

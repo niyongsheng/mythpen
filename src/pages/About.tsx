@@ -1,6 +1,6 @@
 import { open } from '@tauri-apps/plugin-shell'
-import { Coffee, Globe, Info, Mail } from 'lucide-react'
-import { useCallback } from 'react'
+import { Coffee, Globe, Info, Users, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 
 declare const __APP_VERSION__: string
@@ -22,6 +22,13 @@ function GithubIcon({ className }: { className?: string }) {
 const WEBSITE_URL = 'https://mythpen.looplooptech.com'
 const GITHUB_URL = 'https://github.com/niyongsheng/mythpen'
 const SPONSOR_URL = 'https://ifdian.net/a/nico2026'
+const QQ_GROUP_URL = 'https://qm.qq.com/q/eQ0DouN9t0'
+
+// Hidden version-cell easter egg: seven quick clicks celebrate with confetti.
+const EASTER_EGG_CLICKS = 7
+const CLICK_STREAK_MS = 1500
+const EASTER_EGG_DURATION_MS = 6000
+const CONFETTI_COLORS = ['var(--accent-gold)', '#e8c98a', 'var(--success)', 'var(--info)', 'var(--warning)']
 
 function openExternal(url: string) {
   open(url).catch(() => {
@@ -54,11 +61,158 @@ function LinkCard({ icon, title, subtitle, onOpen }: LinkCardProps) {
   )
 }
 
+function EasterEgg({ onClose }: { onClose: () => void }) {
+  const { t } = useT()
+
+  useEffect(() => {
+    const timer = window.setTimeout(onClose, EASTER_EGG_DURATION_MS)
+    return () => window.clearTimeout(timer)
+  }, [onClose])
+
+  const pieces = useMemo(
+    () =>
+      Array.from({ length: 44 }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        size: 4 + Math.random() * 6,
+        delay: Math.random() * 0.6,
+        duration: 2.2 + Math.random() * 1.8,
+        drift: (Math.random() - 0.5) * 32,
+        spin: (Math.random() - 0.5) * 1080,
+        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        round: i % 3 === 0,
+      })),
+    [],
+  )
+
+  return (
+    <div className="fixed inset-0 z-[400] pointer-events-none overflow-hidden">
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label={t('common.dismiss')}
+        className="egg-backdrop pointer-events-auto"
+        onClick={onClose}
+      />
+      <div className="absolute inset-0" aria-hidden="true">
+        {pieces.map((p) => (
+          <span
+            key={p.id}
+            className="egg-confetti"
+            style={
+              {
+                left: `${p.left}%`,
+                width: p.size,
+                height: p.round ? p.size : p.size * 1.8,
+                background: p.color,
+                borderRadius: p.round ? '9999px' : '1px',
+                '--dur': `${p.duration}s`,
+                '--delay': `${p.delay}s`,
+                '--drift': `${p.drift}vw`,
+                '--spin': `${p.spin}deg`,
+              } as React.CSSProperties
+            }
+          />
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center px-4 pb-24">
+        <div className="egg-card pointer-events-auto relative w-full max-w-[380px] overflow-hidden rounded-2xl border border-[var(--accent-gold)] bg-[var(--canvas-elevated)] px-6 pb-5 pt-7 text-center shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 -top-20 h-40 bg-[radial-gradient(closest-side,rgba(201,169,110,0.35),transparent)]"
+          />
+          <button
+            type="button"
+            className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-[var(--ink-mute)] transition-colors hover:bg-[var(--canvas-mid)] hover:text-[var(--ink)]"
+            onClick={onClose}
+            title={t('common.dismiss')}
+            aria-label={t('common.dismiss')}
+          >
+            <svg
+              className="pointer-events-none absolute inset-0 -rotate-90"
+              viewBox="0 0 28 28"
+              fill="none"
+              aria-hidden="true"
+            >
+              <circle cx="14" cy="14" r="12.5" stroke="var(--hairline)" strokeWidth="1.5" />
+              <circle
+                className="egg-countdown-ring"
+                cx="14"
+                cy="14"
+                r="12.5"
+                stroke="var(--accent-gold)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                style={{ '--egg-duration': `${EASTER_EGG_DURATION_MS}ms` } as React.CSSProperties}
+              />
+            </svg>
+            <X className="relative w-3.5 h-3.5" />
+          </button>
+          <div
+            aria-hidden="true"
+            className="egg-emoji relative mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-[rgba(201,169,110,0.35)] bg-[var(--accent-gold-soft-bg)] text-[30px]"
+          >
+            🎉
+          </div>
+          <h3 className="relative font-display text-[20px] font-semibold text-[var(--ink)]">
+            {t('about.easterEggTitle')}
+          </h3>
+          <p className="relative mx-auto mt-1.5 max-w-[300px] text-[13px] leading-6 text-[var(--ink-secondary)]">
+            {t('about.easterEgg')}
+          </p>
+          <div className="relative mt-4 rounded-xl border border-[var(--hairline)] bg-[var(--canvas-card)] px-3 py-2.5">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-[var(--ink-mute)]">{t('about.contact')}</div>
+            <button
+              type="button"
+              className="mt-1 border-none bg-transparent p-0 font-mono text-[12px] text-[var(--accent-gold)] cursor-pointer hover:underline"
+              onClick={() => openExternal('mailto:niyongsheng@outlook.com')}
+            >
+              niyongsheng@outlook.com
+            </button>
+          </div>
+          <div className="relative mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--ink-mute)]">
+            Mythpen · v{__APP_VERSION__}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function About() {
   const { t } = useT()
   const handleOpenWebsite = useCallback(() => openExternal(WEBSITE_URL), [])
   const handleOpenGithub = useCallback(() => openExternal(GITHUB_URL), [])
   const handleOpenSponsor = useCallback(() => openExternal(SPONSOR_URL), [])
+  const handleOpenQqGroup = useCallback(() => openExternal(QQ_GROUP_URL), [])
+  const [versionPop, setVersionPop] = useState(0)
+  const [eggBurst, setEggBurst] = useState(0)
+  const versionClicksRef = useRef(0)
+  const versionResetTimerRef = useRef<number | null>(null)
+
+  // Bumping the burst id mounts a fresh confetti batch; the egg counts itself down.
+  const handleCloseEgg = useCallback(() => setEggBurst(0), [])
+
+  useEffect(
+    () => () => {
+      if (versionResetTimerRef.current) window.clearTimeout(versionResetTimerRef.current)
+    },
+    [],
+  )
+
+  const handleVersionClick = useCallback(() => {
+    setVersionPop((n) => n + 1)
+    versionClicksRef.current += 1
+    if (versionResetTimerRef.current) window.clearTimeout(versionResetTimerRef.current)
+    if (versionClicksRef.current >= EASTER_EGG_CLICKS) {
+      versionClicksRef.current = 0
+      setEggBurst((n) => n + 1)
+      return
+    }
+    versionResetTimerRef.current = window.setTimeout(() => {
+      versionClicksRef.current = 0
+    }, CLICK_STREAK_MS)
+  }, [])
 
   return (
     <>
@@ -77,11 +231,20 @@ export function About() {
 
           {/* Info Cards */}
           <div className="space-y-3">
-            {/* Version */}
-            <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 flex items-center justify-between">
+            {/* Version — each click pops the number; seven quick clicks are rewarded. */}
+            <button
+              type="button"
+              className="w-full bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 flex items-center justify-between cursor-pointer text-left transition-colors hover:bg-[var(--canvas-mid)]"
+              onClick={handleVersionClick}
+            >
               <span className="text-[14px] text-[var(--ink)]">{t('about.version')}</span>
-              <span className="font-mono text-[13px] text-[var(--ink-mute)]">v{__APP_VERSION__}</span>
-            </div>
+              <span
+                key={versionPop}
+                className={`font-mono text-[13px] text-[var(--ink-mute)] ${versionPop > 0 ? 'version-pop' : ''}`}
+              >
+                v{__APP_VERSION__}
+              </span>
+            </button>
 
             {/* Official website */}
             <LinkCard
@@ -107,14 +270,13 @@ export function About() {
               onOpen={handleOpenSponsor}
             />
 
-            {/* Contact */}
-            <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 flex items-center gap-3">
-              <Mail className="w-5 h-5 text-[var(--ink-secondary)] shrink-0" />
-              <div>
-                <div className="text-[14px] text-[var(--ink)]">{t('about.contact')}</div>
-                <div className="text-[12px] text-[var(--ink-tertiary)]">niyongsheng@outlook.com</div>
-              </div>
-            </div>
+            {/* Community — developer contact now lives inside the easter egg. */}
+            <LinkCard
+              icon={<Users className="w-5 h-5 text-[var(--ink-secondary)] shrink-0" />}
+              title={t('about.community')}
+              subtitle={t('about.communityDesc')}
+              onOpen={handleOpenQqGroup}
+            />
 
             {/* Tech Stack */}
             <div className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4">
@@ -138,6 +300,7 @@ export function About() {
           </div>
         </div>
       </div>
+      {eggBurst > 0 && <EasterEgg key={eggBurst} onClose={handleCloseEgg} />}
     </>
   )
 }

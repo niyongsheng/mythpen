@@ -11,11 +11,31 @@ import type { ScienceEntry } from '@/types'
 type SettingMode = 'label' | 'category'
 
 const CATEGORY_PRESETS: Record<string, string[]> = {
+  'sci-fi': [
+    'tech',
+    'biology',
+    'physics',
+    'society',
+    'politics',
+    'military',
+    'ai',
+    'alien',
+    'planet',
+    'history',
+    'other',
+  ],
   fantasy: ['realm', 'technique', 'artifact', 'sect', 'other'],
   xianxia: ['realm', 'technique', 'artifact', 'sect', 'other'],
   wuxia: ['martial-art', 'school', 'weapon', 'other'],
   game: ['system', 'skill', 'equipment', 'dungeon', 'other'],
 }
+
+// Every built-in key gets a localized label; anything else is a user-defined
+// category and is displayed as-is.
+const ALL_PRESET_KEYS = new Set(Object.values(CATEGORY_PRESETS).flat())
+
+// Sentinel select value that reveals the free-text category input.
+const CUSTOM_CATEGORY = '__custom__'
 
 const LABELS: ScienceEntry['label'][] = ['known', 'extrapolation', 'hypothesis']
 
@@ -24,21 +44,38 @@ export function Science() {
   useDataRefresh('science', reload)
   const { data: stats } = useStats()
   const [filter, setFilter] = useState('all')
+  const [labelFilter, setLabelFilter] = useState('all')
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<ScienceEntry | null>(null)
   const { t } = useT()
   const project = useProjectName()
 
-  // Sci-fi keeps its hardness labels; 仙侠/武侠/游戏 use ordered categories
-  // (境界/功法/门派/系统…), so the same element serves every setting-heavy genre.
+  // Every setting-heavy genre groups entries by category; multi-genre projects
+  // see the union of their presets. Sci-fi also keeps its hardness label
+  // (known / extrapolation / hypothesis) as a second axis.
   const genres = stats?.genres ?? []
-  const settingGenre = ['fantasy', 'xianxia', 'wuxia', 'game'].find((genre) => genres.includes(genre))
-  const mode: SettingMode = settingGenre ? 'category' : 'label'
-  const categories = settingGenre ? CATEGORY_PRESETS[settingGenre] : []
+  const settingGenres = Object.keys(CATEGORY_PRESETS).filter((genre) => genres.includes(genre))
+  const mode: SettingMode = settingGenres.length > 0 ? 'category' : 'label'
+  const showLabels = genres.includes('sci-fi')
+
+  const presetCategories = [...new Set(settingGenres.flatMap((genre) => CATEGORY_PRESETS[genre]))]
+
+  // Categories typed by the user (or keys left over from another genre) are
+  // discovered from existing entries, so they survive re-renders and can be
+  // reused by later entries.
+  const list = entries || []
+  const knownCategories = new Set(presetCategories)
+  const customCategories = [
+    ...new Set(
+      list.map((entry) => entry.category || '').filter((category) => category && !knownCategories.has(category)),
+    ),
+  ]
+  const allCategories = [...presetCategories, ...customCategories]
 
   // The filter options differ per mode; reset when the project switches genre.
   useEffect(() => {
     setFilter('all')
+    setLabelFilter('all')
   }, [mode])
 
   const labelMap: Record<string, { text: string; color: string; bg: string }> = {
@@ -47,46 +84,54 @@ export function Science() {
     hypothesis: { text: t('science.hypothesis'), color: 'var(--error)', bg: 'var(--error-soft)' },
   }
 
-  const categoryLabel = (key: string) => (key ? t(`setting.category.${key}`) : t('setting.uncategorized'))
+  const categoryLabel = (key: string) =>
+    !key ? t('setting.uncategorized') : ALL_PRESET_KEYS.has(key) ? t(`setting.category.${key}`) : key
   const entryCategory = (entry: ScienceEntry) => entry.category || 'other'
   const entryLabel = (entry: ScienceEntry) => entry.label || 'known'
 
-  const filterOptions =
-    mode === 'category'
-      ? [
-          { value: 'all', label: t('science.filterAll') },
-          ...categories.map((key) => ({ value: key, label: categoryLabel(key) })),
-        ]
-      : [
-          { value: 'all', label: t('science.filterAll') },
-          ...LABELS.map((key) => ({ value: key, label: t(`science.${key}Label`) })),
-        ]
+  const categoryOptions = allCategories.map((key) => ({ value: key, label: categoryLabel(key) }))
+  const categoryFilterOptions = [{ value: 'all', label: t('science.filterAllCategories') }, ...categoryOptions]
+  const labelFilterOptions = [
+    { value: 'all', label: t('science.filterAll') },
+    ...LABELS.map((key) => ({ value: key, label: t(`science.${key}Label`) })),
+  ]
 
-  const list = entries || []
-  const filtered =
-    filter === 'all'
-      ? list
-      : mode === 'category'
-        ? list.filter((entry) => entryCategory(entry) === filter)
-        : list.filter((entry) => entryLabel(entry) === filter)
+  const filtered = list.filter((entry) => {
+    if (mode === 'category' && filter !== 'all' && entryCategory(entry) !== filter) return false
+    if ((showLabels || mode === 'label') && labelFilter !== 'all' && entryLabel(entry) !== labelFilter) return false
+    return true
+  })
 
   const formFields = (): Field[] => {
-    const base: Field[] = [
-      mode === 'category'
-        ? {
-            key: 'category',
-            label: t('setting.categoryLabel'),
-            type: 'select',
-            required: true,
-            options: categories.map((key) => ({ value: key, label: categoryLabel(key) })),
-          }
-        : {
-            key: 'label',
-            label: t('science.category'),
-            type: 'select',
-            required: true,
-            options: LABELS.map((key) => ({ value: key, label: t(`science.${key}Label`) })),
-          },
+    const base: Field[] = []
+    if (mode === 'category') {
+      base.push(
+        {
+          key: 'category',
+          label: t('setting.categoryLabel'),
+          type: 'select',
+          required: true,
+          options: [...categoryOptions, { value: CUSTOM_CATEGORY, label: t('setting.customCategory') }],
+        },
+        {
+          key: 'custom_category',
+          label: t('setting.customCategoryName'),
+          required: true,
+          placeholder: t('setting.customCategoryPlaceholder'),
+          showWhen: (vals) => vals.category === CUSTOM_CATEGORY,
+        },
+      )
+    }
+    if (mode === 'label' || showLabels) {
+      base.push({
+        key: 'label',
+        label: t('science.hardness'),
+        type: 'select',
+        required: true,
+        options: LABELS.map((key) => ({ value: key, label: t(`science.${key}Label`) })),
+      })
+    }
+    base.push(
       { key: 'name', label: t('science.name'), required: true, placeholder: t('science.namePlaceholder') },
       {
         key: 'description',
@@ -94,7 +139,7 @@ export function Science() {
         type: 'textarea',
         placeholder: t('science.descriptionPlaceholder'),
       },
-    ]
+    )
     if (mode === 'category') {
       base.push({
         key: 'sort_order',
@@ -105,6 +150,9 @@ export function Science() {
     }
     return base
   }
+
+  const submitCategory = (vals: Record<string, string>) =>
+    vals.category === CUSTOM_CATEGORY ? (vals.custom_category || '').trim() : vals.category || ''
 
   if (loading)
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
@@ -127,7 +175,7 @@ export function Science() {
           ) : null}
         </div>
         <div className="text-[15px] text-[var(--ink)] mb-1">{entry.name}</div>
-        {mode === 'label' ? (
+        {mode === 'label' || showLabels ? (
           <span
             className="text-[10px] px-[6px] py-[1px] rounded-full mr-1 inline-block"
             style={{ background: lm.bg, color: lm.color }}
@@ -140,9 +188,12 @@ export function Science() {
     )
   }
 
+  // Hide empty preset groups so real (including custom) categories stay visible.
   const grouped =
     mode === 'category' && filter === 'all'
-      ? categories.map((key) => ({ key, items: filtered.filter((entry) => entryCategory(entry) === key) }))
+      ? allCategories
+          .map((key) => ({ key, items: filtered.filter((entry) => entryCategory(entry) === key) }))
+          .filter((group) => group.items.length > 0)
       : null
 
   return (
@@ -160,13 +211,24 @@ export function Science() {
           >
             + {t('pages.newSetting')}
           </button>
-          <Select
-            ariaLabel={t('science.category')}
-            className="w-[150px]"
-            value={filter}
-            options={filterOptions}
-            onChange={setFilter}
-          />
+          {mode === 'category' && (
+            <Select
+              ariaLabel={t('setting.categoryLabel')}
+              className="w-[150px]"
+              value={filter}
+              options={categoryFilterOptions}
+              onChange={setFilter}
+            />
+          )}
+          {(showLabels || mode === 'label') && (
+            <Select
+              ariaLabel={t('science.hardness')}
+              className="w-[150px]"
+              value={labelFilter}
+              options={labelFilterOptions}
+              onChange={setLabelFilter}
+            />
+          )}
         </div>
       </div>
 
@@ -175,7 +237,13 @@ export function Science() {
           title={`+ ${t('pages.newSetting')}`}
           fields={formFields()}
           onSubmit={async (vals) => {
-            await scienceApi.create(project, vals)
+            await scienceApi.create(project, {
+              label: vals.label,
+              category: submitCategory(vals),
+              name: vals.name,
+              description: vals.description,
+              sort_order: vals.sort_order,
+            })
             reload()
           }}
           onClose={() => setShowCreate(false)}
@@ -188,7 +256,11 @@ export function Science() {
           fields={formFields()}
           initialValues={{
             label: editing.label || 'known',
-            category: editing.category || 'other',
+            category:
+              editing.category && !ALL_PRESET_KEYS.has(editing.category)
+                ? CUSTOM_CATEGORY
+                : editing.category || 'other',
+            custom_category: editing.category && !ALL_PRESET_KEYS.has(editing.category) ? editing.category : '',
             sort_order: String(editing.sortOrder || 0),
             name: editing.name || '',
             description: editing.description || '',
@@ -200,7 +272,13 @@ export function Science() {
           }}
           deleteName={editing.name}
           onSubmit={async (vals) => {
-            await scienceApi.update(project, editing.id, vals)
+            await scienceApi.update(project, editing.id, {
+              label: vals.label,
+              category: submitCategory(vals),
+              name: vals.name,
+              description: vals.description,
+              sort_order: vals.sort_order,
+            })
             reload()
           }}
           onClose={() => setEditing(null)}
@@ -215,15 +293,12 @@ export function Science() {
                 <h3 className="text-[12px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2">
                   {categoryLabel(group.key)} ({group.items.length})
                 </h3>
-                {group.items.length > 0 ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-                    {group.items.map(renderCard)}
-                  </div>
-                ) : (
-                  <div className="text-[13px] text-[var(--ink-tertiary)]">{t('setting.empty')}</div>
-                )}
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
+                  {group.items.map(renderCard)}
+                </div>
               </section>
             ))}
+            {grouped.length === 0 && <div className="text-[13px] text-[var(--ink-tertiary)]">{t('setting.empty')}</div>}
           </div>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-6">

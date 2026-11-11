@@ -32,7 +32,7 @@ interface PositionedLink {
   label: string
 }
 
-const INTENSITY_OPTIONS = [1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: String(n) }))
+const INTENSITY_RANGE = { type: 'range', min: 1, max: 5, step: 1 } as const
 
 const ROLE_ORDER: Record<string, number> = { major: 0, minor: 1, extra: 2 }
 
@@ -212,18 +212,25 @@ export function Relations() {
       const existingPairs = new Set(rels.map((r: any) => [r.characterAId, r.characterBId].sort().join(':')))
       const createOps = []
       for (const s of suggestions) {
-        const a = charMap.get(s.character_a_name)
-        const b = charMap.get(s.character_b_name)
-        if (!a || !b) continue
+        // Accept the documented schema plus common model variants. The task
+        // prompt can be localized, so relying on one field spelling made the
+        // feature silently create nothing when the model answered differently.
+        const aName = s.character_a_name ?? s.character_a ?? s.characterA ?? s.a
+        const bName = s.character_b_name ?? s.character_b ?? s.characterB ?? s.b
+        const relationType = s.relation_type ?? s.relationType ?? s.type
+        const a = charMap.get(aName)
+        const b = charMap.get(bName)
+        if (!a || !b || !relationType) continue
         const pairKey = [a.id, b.id].sort().join(':')
         if (existingPairs.has(pairKey)) continue
+        existingPairs.add(pairKey)
         createOps.push(
           relationsApi.create(project, {
             character_a_id: a.id,
             character_b_id: b.id,
-            relation_type: s.relation_type,
+            relation_type: String(relationType),
             description: s.description || '',
-            intensity: s.intensity || 3,
+            intensity: Math.max(1, Math.min(5, parseInt(s.intensity, 10) || 3)),
           }),
         )
       }
@@ -326,8 +333,7 @@ export function Relations() {
             {
               key: 'intensity',
               label: t('relations.intensityField'),
-              type: 'select',
-              options: INTENSITY_OPTIONS,
+              ...INTENSITY_RANGE,
             },
           ]}
           initialValues={{ intensity: '3' }}
@@ -367,8 +373,7 @@ export function Relations() {
             {
               key: 'intensity',
               label: t('relations.intensityField'),
-              type: 'select',
-              options: INTENSITY_OPTIONS,
+              ...INTENSITY_RANGE,
             },
           ]}
           initialValues={{

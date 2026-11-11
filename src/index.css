@@ -226,6 +226,31 @@ pre::-webkit-scrollbar-thumb { background: var(--canvas-mid); border-radius: 999
 textarea::-webkit-scrollbar-track,
 pre::-webkit-scrollbar-track { background: transparent; }
 
+/* ─── Range slider ─── */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--canvas-mid);
+  outline: none;
+  cursor: pointer;
+}
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+  border: 2px solid var(--canvas-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.range-slider:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-gold-soft-bg);
+}
+
 /* ─── Toasts ─── */
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(-10px) scale(0.97); }
@@ -305,6 +330,77 @@ pre::-webkit-scrollbar-track { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) {
   .ai-stop-streak { animation: none; }
+}
+
+/* ─── Version easter egg ─── */
+@keyframes version-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); color: var(--accent-gold); }
+  100% { transform: scale(1); }
+}
+.version-pop {
+  display: inline-block;
+  animation: version-pop 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Frosted-glass scrim: blurs the app behind the Easter egg card. */
+@keyframes egg-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.egg-backdrop {
+  position: absolute;
+  inset: 0;
+  appearance: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.16); /* fallback when color-mix is unsupported */
+  background: color-mix(in srgb, var(--canvas) 30%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(125%);
+  backdrop-filter: blur(12px) saturate(125%);
+  animation: egg-backdrop-in 0.3s ease-out both;
+}
+
+@keyframes egg-fall {
+  0% { opacity: 0; transform: translate3d(0, -12vh, 0) rotate(0deg); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--drift, 0px), 108vh, 0) rotate(var(--spin, 540deg)); }
+}
+.egg-confetti {
+  position: absolute;
+  top: 0;
+  animation: egg-fall var(--dur, 2.8s) var(--delay, 0s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes egg-card-in {
+  0% { opacity: 0; transform: scale(0.82); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.egg-card { animation: egg-card-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@keyframes egg-emoji-pop {
+  0% { opacity: 0; transform: scale(0.4) rotate(-12deg); }
+  55% { opacity: 1; transform: scale(1.12) rotate(4deg); }
+  75% { transform: scale(0.96) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.egg-emoji { animation: egg-emoji-pop 0.6s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes egg-ring {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 78.54; }
+}
+/* The ring's circumference is 2π × 12.5 (r in the close-button SVG). */
+.egg-countdown-ring {
+  stroke-dasharray: 78.54;
+  animation: egg-ring var(--egg-duration, 6000ms) linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .version-pop, .egg-card, .egg-emoji, .egg-countdown-ring, .egg-backdrop { animation: none; }
+  .egg-confetti { display: none; }
 }
 
 /* ─── Tailwind-style utility layers ─── */

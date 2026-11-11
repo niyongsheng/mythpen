@@ -5,6 +5,7 @@ import {
   Brain,
   CalendarDays,
   Check,
+  ChevronDown,
   Download,
   FileText,
   FlaskConical,
@@ -14,7 +15,6 @@ import {
   LayoutDashboard,
   Link2,
   PenSquare,
-  Plus,
   RefreshCw,
   ScrollText,
   Search,
@@ -56,7 +56,7 @@ function isItemVisible(item: NavItem, genres: string[], styles: string[]): boole
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', labelKey: 'sidebar.dashboard', icon: 'LayoutDashboard', route: 'page-dashboard' },
-  { id: 'characters', labelKey: 'sidebar.characters', icon: 'Users', route: 'page-characters' },
+  { id: 'outline_page', labelKey: 'sidebar.outline_page', icon: 'ScrollText', route: 'page-outline' },
   { id: 'world', labelKey: 'sidebar.world', icon: 'Globe', route: 'page-world' },
   {
     id: 'science',
@@ -65,12 +65,12 @@ const NAV_ITEMS: NavItem[] = [
     route: 'page-science',
     genres: ['sci-fi', 'fantasy', 'xianxia', 'wuxia', 'game'],
   },
-  { id: 'outline_page', labelKey: 'sidebar.outline_page', icon: 'ScrollText', route: 'page-outline' },
+  { id: 'characters', labelKey: 'sidebar.characters', icon: 'Users', route: 'page-characters' },
+  { id: 'relations', labelKey: 'sidebar.relations', icon: 'HeartHandshake', route: 'page-relations' },
   { id: 'foreshadow', labelKey: 'sidebar.foreshadow', icon: 'Link2', route: 'page-foreshadow' },
   { id: 'clue', labelKey: 'sidebar.clue', icon: 'Search', route: 'page-clue', genres: ['mystery'] },
   { id: 'payoff', labelKey: 'sidebar.payoff', icon: 'Sparkles', route: 'page-payoff', styles: ['power-fantasy'] },
   { id: 'memory', labelKey: 'sidebar.memory', icon: 'Brain', route: 'page-memory' },
-  { id: 'relations', labelKey: 'sidebar.relations', icon: 'HeartHandshake', route: 'page-relations' },
   { id: 'timeline', labelKey: 'sidebar.timeline', icon: 'CalendarDays', route: 'page-timeline' },
   { id: 'consistency', labelKey: 'sidebar.consistency', icon: 'ShieldCheck', route: 'page-consistency' },
   { id: 'export', labelKey: 'sidebar.export', icon: 'Download', route: 'page-export' },
@@ -99,7 +99,6 @@ export function Sidebar() {
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const setCurrentChapter = useChapterStore((s) => s.setCurrentChapter)
   const loadChapterContent = useChapterStore((s) => s.loadChapterContent)
-  const createChapter = useChapterStore((s) => s.createChapter)
   const { activePage, setActivePage } = useSidebarStore()
   const currentProject = useProjectStore((s) => s.currentProject)
   const { data: stats, reload: reloadStats } = useStats()
@@ -108,6 +107,7 @@ export function Sidebar() {
   const { t } = useT()
   const [spinKey, setSpinKey] = useState(0)
   const [collapsedVols, setCollapsedVols] = useState<Set<number>>(new Set())
+  const [statsCollapsed, setStatsCollapsed] = useState(() => localStorage.getItem('mythpen-stats-collapsed') === '1')
   const {
     editing: editingTarget,
     setEditing: setEditingTarget,
@@ -159,17 +159,10 @@ export function Sidebar() {
   useEffect(() => {
     if (!stats) return
     const hidden = NAV_ITEMS.some(
-      (item) =>
-        item.route === activePage && !isItemVisible(item, stats.genres ?? [], stats.styles ?? []),
+      (item) => item.route === activePage && !isItemVisible(item, stats.genres ?? [], stats.styles ?? []),
     )
     if (hidden) setActivePage('page-dashboard')
   }, [stats, activePage, setActivePage])
-
-  const handleNewChapter = async (volumeId: number) => {
-    if (!currentProject) return
-    await createChapter(currentProject, t('chapter.defaultTitle'), '', volumeId)
-    setActivePage('page-writing')
-  }
 
   const handleRefresh = () => {
     setSpinKey((k) => k + 1)
@@ -210,7 +203,7 @@ export function Sidebar() {
                   ▼
                 </span>
                 <span
-                  className="flex-1"
+                  className="flex-1 truncate"
                   onClick={(e) => {
                     e.stopPropagation()
                     setActivePage('page-writing')
@@ -250,14 +243,6 @@ export function Sidebar() {
                     />
                   </div>
                 ))}
-              {/* Per-volume new chapter button */}
-              <div
-                className="flex items-center gap-1.5 px-4 pl-5 py-1 text-[13px] text-[var(--accent-gold)] cursor-pointer transition-colors hover:bg-[var(--canvas-card)]"
-                onClick={() => handleNewChapter(vol.id)}
-              >
-                <Plus className="w-3.5 h-3.5 shrink-0" />
-                <span className="flex-1">{t('editor.newChapter')}</span>
-              </div>
             </div>
           ))}
         </div>
@@ -312,131 +297,154 @@ export function Sidebar() {
 
       {/* Writing Stats — fixed at bottom, compact */}
       <div className="py-2 px-4 border-t border-[var(--hairline)] bg-[var(--canvas-soft)] shrink-0 text-[12px]">
-        <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase">
+        <button
+          type="button"
+          className="flex items-center gap-1.5 mb-1.5 text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase cursor-pointer border-none bg-transparent p-0 w-full hover:text-[var(--ink-secondary)] transition-colors"
+          onClick={() => {
+            setStatsCollapsed((prev) => {
+              const next = !prev
+              localStorage.setItem('mythpen-stats-collapsed', next ? '1' : '0')
+              return next
+            })
+          }}
+          aria-expanded={!statsCollapsed}
+        >
           <BarChart3 className="w-3 h-3" />
           {t('sidebar.stats')}
-        </div>
+          <ChevronDown className={`w-3 h-3 ml-auto transition-transform ${statsCollapsed ? '-rotate-90' : ''}`} />
+        </button>
 
-        {/* Compact completion bar */}
-        {stats?.targetWords &&
-          stats.targetWords > 0 &&
-          (() => {
-            const pct = Math.min((stats.totalWords / stats.targetWords) * 100, 100)
-            const remaining = Math.max(stats.targetWords - stats.totalWords, 0)
-            return (
-              <div className="mb-2">
-                <div className="flex justify-between text-[11px] leading-none mb-1">
-                  <span className="text-[var(--ink-tertiary)]">{t('sidebar.completion')}</span>
-                  <span className="font-mono text-[var(--ink-mute)]">
-                    {stats.totalWords.toLocaleString()} /{' '}
-                    {editingTarget ? (
-                      <input
-                        ref={targetInputRef}
-                        type="number"
-                        min={1000}
-                        className="inline w-[80px] bg-[var(--canvas-card)] border border-[var(--accent-gold)] rounded px-1 py-[1px] text-[11px] font-mono text-[var(--accent-gold)] outline-none"
-                        value={targetInput}
-                        onChange={(e) => setTargetInput(e.target.value)}
-                        onBlur={handleSaveTargetWords}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveTargetWords()
-                          if (e.key === 'Escape') {
-                            setEditingTarget(false)
-                            setTargetInput('')
-                          }
+        {/* Collapsible body — animating grid-template-rows keeps the natural
+            content height, so the panel slides instead of jumping. */}
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+            statsCollapsed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+          }`}
+        >
+          <div className="overflow-hidden" inert={statsCollapsed}>
+            {/* Compact completion bar */}
+            {stats?.targetWords &&
+              stats.targetWords > 0 &&
+              (() => {
+                const pct = Math.min((stats.totalWords / stats.targetWords) * 100, 100)
+                const remaining = Math.max(stats.targetWords - stats.totalWords, 0)
+                return (
+                  <div className="mb-2">
+                    <div className="flex justify-between text-[11px] leading-none mb-1">
+                      <span className="text-[var(--ink-tertiary)]">{t('sidebar.completion')}</span>
+                      <span className="font-mono text-[var(--ink-mute)]">
+                        {stats.totalWords.toLocaleString()} /{' '}
+                        {editingTarget ? (
+                          <input
+                            ref={targetInputRef}
+                            type="number"
+                            min={1000}
+                            className="inline w-[80px] bg-[var(--canvas-card)] border border-[var(--accent-gold)] rounded px-1 py-[1px] text-[11px] font-mono text-[var(--accent-gold)] outline-none"
+                            value={targetInput}
+                            onChange={(e) => setTargetInput(e.target.value)}
+                            onBlur={handleSaveTargetWords}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveTargetWords()
+                              if (e.key === 'Escape') {
+                                setEditingTarget(false)
+                                setTargetInput('')
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="cursor-pointer hover:text-[var(--accent-gold)] transition-colors"
+                            onClick={() => {
+                              setTargetInput(String(stats.targetWords))
+                              setEditingTarget(true)
+                            }}
+                            title={t('sidebar.clickToEditTarget')}
+                          >
+                            {stats.targetWords.toLocaleString()}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="h-[5px] bg-[var(--canvas-mid)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${pct}%`,
+                          background:
+                            pct >= 75 ? 'var(--success)' : pct >= 40 ? 'var(--accent-gold)' : 'var(--ink-mute)',
                         }}
                       />
-                    ) : (
-                      <span
-                        className="cursor-pointer hover:text-[var(--accent-gold)] transition-colors"
-                        onClick={() => {
-                          setTargetInput(String(stats.targetWords))
-                          setEditingTarget(true)
-                        }}
-                        title={t('sidebar.clickToEditTarget')}
-                      >
-                        {stats.targetWords.toLocaleString()}
-                      </span>
+                    </div>
+                    {remaining > 0 && (
+                      <div className="text-[10px] text-[var(--ink-mute)] mt-[1px]">
+                        {t('sidebar.remaining', { n: remaining.toLocaleString() })}
+                      </div>
                     )}
-                  </span>
-                </div>
-                <div className="h-[5px] bg-[var(--canvas-mid)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${pct}%`,
-                      background: pct >= 75 ? 'var(--success)' : pct >= 40 ? 'var(--accent-gold)' : 'var(--ink-mute)',
-                    }}
-                  />
-                </div>
-                {remaining > 0 && (
-                  <div className="text-[10px] text-[var(--ink-mute)] mt-[1px]">
-                    {t('sidebar.remaining', { n: remaining.toLocaleString() })}
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-
-        {/* Sparkline — last 7 days */}
-        <div className="mb-1.5">
-          <div className="flex items-end gap-[1.5px] h-[24px]">
-            {(() => {
-              const dw = stats?.dailyWords || []
-              const mx = Math.max(...dw, 1)
-              return dw.map((v: number, i: number) => (
-                <div
-                  key={i}
-                  className="flex-1 rounded-[1px] relative group"
-                  style={{
-                    height: `${Math.max((v / mx) * 22, v > 0 ? 2 : 0)}px`,
-                    background: v > 0 ? 'var(--accent-gold)' : 'var(--canvas-mid)',
-                    opacity: v > 0 ? 0.55 : 0.25,
-                  }}
-                >
-                  <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-[var(--ink-mute)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    {v.toLocaleString()}
-                  </span>
-                </div>
-              ))
-            })()}
-          </div>
-          <div className="flex gap-[1.5px] mt-[2px]">
-            {(() => {
-              const dw = stats?.dailyWords || []
-              const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-              const today = new Date()
-              return dw.map((_, i) => {
-                const d = new Date(today)
-                d.setDate(d.getDate() - (6 - i))
-                return (
-                  <div key={i} className="flex-1 text-center text-[7px] text-[var(--ink-mute)] leading-none">
-                    {days[d.getDay()].slice(0, 2)}
                   </div>
                 )
-              })
-            })()}
-          </div>
-        </div>
+              })()}
 
-        {/* Stats rows — compact */}
-        <div className="flex justify-between py-[2px]">
-          <span className="text-[var(--ink-mute)]">{t('sidebar.currentChapter')}</span>
-          <span className="font-mono text-[var(--ink-tertiary)]">
-            {currentChapter?.wordCount?.toLocaleString() || '0'} {t('editor.words')}
-          </span>
-        </div>
-        <div className="flex justify-between py-[2px]">
-          <span className="text-[var(--ink-mute)]">{t('sidebar.totalWords')}</span>
-          <span className="font-mono text-[var(--ink-tertiary)]">
-            {(stats?.totalWords || 0).toLocaleString()} {t('editor.words')}
-          </span>
-        </div>
-        <div className="flex justify-between py-[2px]">
-          <span className="text-[var(--ink-mute)]">{t('sidebar.today')}</span>
-          <span className="font-mono text-[var(--ink-tertiary)]">
-            {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} {t('editor.words')}
-          </span>
+            {/* Sparkline — last 7 days */}
+            <div className="mb-1.5">
+              <div className="flex items-end gap-[1.5px] h-[24px]">
+                {(() => {
+                  const dw = stats?.dailyWords || []
+                  const mx = Math.max(...dw, 1)
+                  return dw.map((v: number, i: number) => (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-[1px] relative group"
+                      style={{
+                        height: `${Math.max((v / mx) * 22, v > 0 ? 2 : 0)}px`,
+                        background: v > 0 ? 'var(--accent-gold)' : 'var(--canvas-mid)',
+                        opacity: v > 0 ? 0.55 : 0.25,
+                      }}
+                    >
+                      <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-[var(--ink-mute)] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        {v.toLocaleString()}
+                      </span>
+                    </div>
+                  ))
+                })()}
+              </div>
+              <div className="flex gap-[1.5px] mt-[2px]">
+                {(() => {
+                  const dw = stats?.dailyWords || []
+                  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                  const today = new Date()
+                  return dw.map((_, i) => {
+                    const d = new Date(today)
+                    d.setDate(d.getDate() - (6 - i))
+                    return (
+                      <div key={i} className="flex-1 text-center text-[7px] text-[var(--ink-mute)] leading-none">
+                        {days[d.getDay()].slice(0, 2)}
+                      </div>
+                    )
+                  })
+                })()}
+              </div>
+            </div>
+
+            {/* Stats rows — compact */}
+            <div className="flex justify-between py-[2px]">
+              <span className="text-[var(--ink-mute)]">{t('sidebar.currentChapter')}</span>
+              <span className="font-mono text-[var(--ink-tertiary)]">
+                {currentChapter?.wordCount?.toLocaleString() || '0'} {t('editor.words')}
+              </span>
+            </div>
+            <div className="flex justify-between py-[2px]">
+              <span className="text-[var(--ink-mute)]">{t('sidebar.totalWords')}</span>
+              <span className="font-mono text-[var(--ink-tertiary)]">
+                {(stats?.totalWords || 0).toLocaleString()} {t('editor.words')}
+              </span>
+            </div>
+            <div className="flex justify-between py-[2px]">
+              <span className="text-[var(--ink-mute)]">{t('sidebar.today')}</span>
+              <span className="font-mono text-[var(--ink-tertiary)]">
+                {(stats?.dailyWords?.[stats.dailyWords.length - 1] || 0).toLocaleString()} {t('editor.words')}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
