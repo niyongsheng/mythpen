@@ -2,8 +2,10 @@ import { Pen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { track } from '@/lib/analytics'
+import { createChapter } from '@/lib/chapterActions'
 import { formatChapterTitle, stripLeadingChapterHeading } from '@/lib/chapterTitle'
 import { performHistory } from '@/lib/editorHistory'
+import { registerEditorSave } from '@/lib/editorSave'
 import { bucketWords, projectProps } from '@/lib/projectIdentity'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useEditorHistoryStore } from '@/stores/useEditorHistoryStore'
@@ -17,7 +19,6 @@ export function EditorContent() {
   const currentChapter = useChapterStore((s) => s.currentChapter)
   const volumes = useChapterStore((s) => s.volumes)
   const updateChapter = useChapterStore((s) => s.updateChapter)
-  const createChapter = useChapterStore((s) => s.createChapter)
   const setSaveStatus = useChapterStore((s) => s.setSaveStatus)
   const currentProject = useProjectStore((s) => s.currentProject)
   const setActivePage = useSidebarStore((s) => s.setActivePage)
@@ -34,6 +35,7 @@ export function EditorContent() {
   const lastTrackedWordsRef = useRef(0)
   const lastTrackedAtRef = useRef(0)
   const saveTriggerRef = useRef<'auto' | 'manual'>('auto')
+  const isDirtyRef = useRef(false)
   const [isDirty, setIsDirty] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -149,12 +151,15 @@ export function EditorContent() {
     const html = editorRef.current.innerHTML
     const textContent = editorRef.current.textContent?.trim() || ''
 
-    // Skip if empty
+    // An empty editor is only a real "clear the chapter" when the user edited
+    // it. During the first render/body load the editor can be empty before
+    // syncContent runs; saving that would wipe an existing chapter on exit.
     if (textContent === '') {
-      if (ch.content) {
+      if (ch.content && isDirtyRef.current) {
         await updateChapter(pn, chNum, { content: '' })
       }
       lastSavedContentRef.current = ''
+      isDirtyRef.current = false
       setIsDirty(false)
       return
     }
@@ -185,18 +190,20 @@ export function EditorContent() {
         lastTrackedAtRef.current = now
       }
     }
+    isDirtyRef.current = false
     setIsDirty(false)
   }, [updateChapter, setSaveStatus]) // no longer depends on chapter/currentProject
 
-  // Manual save from the toolbar or Cmd/Ctrl+S.
-  useEffect(() => {
-    const handleSaveRequest = () => {
-      saveTriggerRef.current = 'manual'
-      void doSave()
-    }
-    window.addEventListener('mythpen:save-chapter', handleSaveRequest)
-    return () => window.removeEventListener('mythpen:save-chapter', handleSaveRequest)
-  }, [doSave])
+  // Expose the save routine so manual saves, chapter deletion and status
+  // changes can flush pending edits before proceeding.
+  useEffect(
+    () =>
+      registerEditorSave(async () => {
+        saveTriggerRef.current = 'manual'
+        await doSave()
+      }),
+    [doSave],
+  )
 
   // Debounced auto-save — reads autoSaveInterval from settings
   const doSaveRef = useRef(doSave)
@@ -234,6 +241,7 @@ export function EditorContent() {
         editorRef.current.setAttribute('data-placeholder', t('editor.startWriting'))
       }
       lastSavedContentRef.current = chapter.content || ''
+      isDirtyRef.current = false
     },
     [chapter, t],
   )
@@ -253,6 +261,7 @@ export function EditorContent() {
       lastSyncedChapterIdRef.current = chapterId
       lastSyncedProjectRef.current = currentProject
     }
+    isDirtyRef.current = false
     setIsDirty(false)
     // Only show 'saved' if content exists and we've actually persisted it
     if (chapter?.content && hasSavedRef.current) {
@@ -285,6 +294,7 @@ export function EditorContent() {
   // Schedule auto-save on each keystroke
   const handleInput = useCallback(() => {
     isEditingRef.current = true
+    isDirtyRef.current = true
     setIsDirty(true)
     const editor = editorRef.current
     if (editor) {

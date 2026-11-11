@@ -5,8 +5,10 @@ import { aiErrorCode, aiRuntimeProps } from '@/lib/aiAnalytics'
 import { track } from '@/lib/analytics'
 import { aiApi } from '@/lib/api'
 import { performHistory } from '@/lib/editorHistory'
+import { flushEditorSave } from '@/lib/editorSave'
 import { trackMilestone } from '@/lib/milestones'
 import { bucketWords, projectKey, projectProps } from '@/lib/projectIdentity'
+import { captureError } from '@/lib/sentry'
 import { playAiCompletionSound, primeCompletionSound } from '@/lib/sound'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -92,7 +94,7 @@ export function EditorToolbar() {
 
   // Manual save — useful when auto-save is disabled in Settings.
   const requestSave = useCallback(() => {
-    window.dispatchEvent(new Event('mythpen:save-chapter'))
+    void flushEditorSave()
   }, [])
   const saveShortcut = typeof navigator !== 'undefined' && /Mac/.test(navigator.userAgent) ? '⌘S' : 'Ctrl+S'
 
@@ -221,6 +223,7 @@ export function EditorToolbar() {
       },
       (err: any) => {
         setLoading(null)
+        captureError(err, { area: 'ai_continue' })
         track('ai_generation_finished', {
           kind: 'continue',
           ok: 0,
@@ -287,6 +290,7 @@ export function EditorToolbar() {
       },
       (err: any) => {
         setLoading(null)
+        captureError(err, { area: 'ai_polish' })
         track('ai_generation_finished', {
           kind: 'polish',
           ok: 0,
