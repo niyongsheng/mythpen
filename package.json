@@ -18,8 +18,9 @@
   "scripts": {
     "dev": "vite",
     "seed": "node server/seed.js",
+    "seed:reset": "node server/seed.js --force",
     "dev:server": "nodemon --watch server server/index.js",
-    "dev:all": "node server/seed.js && concurrently -k \"npm run dev\" \"npm run dev:server\"",
+    "dev:all": "concurrently -k \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
@@ -40,6 +41,10 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
     "@aptabase/tauri": "^0.7.0",
+    "@sentry/node": "^11.12.0",
+    "@sentry/react": "^11.12.0",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
     "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-updater": "^2.14.0",
