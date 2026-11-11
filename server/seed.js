@@ -5,11 +5,28 @@ const { initDatabase, openProjectDb, newProjectFilePath, registerRecentProject, 
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 
-function seedProject(name) {
+function seedProject(name, { force = false } = {}) {
   const existing = dbGet('SELECT file_path FROM recent_projects WHERE name = ?', [name]);
-  // Remove existing for clean seed (also wipe WAL/SHM to avoid SQLITE_IOERR_SHORT_READ)
+
+  // Seeding must never destroy an existing project. This used to delete the
+  // project file unconditionally, and because `tauri dev` ran the seed on every
+  // start, a real project that shared the demo's name was wiped each restart.
   if (existing?.file_path) {
-    for (const suffix of ['', '-wal', '-shm']) {
+    if (!force) {
+      console.log(
+        `ℹ️  Project "${name}" already exists at ${existing.file_path}; skipping seed. ` +
+        'Run `pnpm seed:reset` to replace it (the old file is backed up).',
+      );
+      return { skipped: true, filePath: existing.file_path };
+    }
+    // Explicit reset: keep a backup instead of deleting the author's work.
+    if (fs.existsSync(existing.file_path)) {
+      const backup = `${existing.file_path}.bak-${Date.now()}`;
+      fs.renameSync(existing.file_path, backup);
+      console.log(`⚠️  Existing project backed up to ${backup}`);
+    }
+    // WAL/SHM belong to the old database; wipe them to avoid SQLITE_IOERR_SHORT_READ.
+    for (const suffix of ['-wal', '-shm']) {
       const f = existing.file_path + suffix;
       if (fs.existsSync(f)) fs.unlinkSync(f);
     }
@@ -37,17 +54,18 @@ function seedProject(name) {
 
   // ─── Chapters ───
   const chapters = [
-    { id: 1, volume_id: 1, num: 1, title: '开端', outline: '林晨在实验室发现导师的异常笔记', content: '# 第一章 开端\n\n林晨像往常一样刷卡进入研究所地下三层的实验室。走廊的灯管闪了两下才亮起来，发出嗡嗡的电流声。\n\n他已经记不清这是第几个通宵了。自从导师失踪后，他几乎住在了这里。\n\n办公桌上堆满了实验报告，最上面那本黑色笔记本引起了他的注意——这不是他的。\n\n他翻开第一页，瞳孔骤然收缩。\n\n那是导师的笔迹。', word_count: 4523, status: 'accepted', cognitive_frame: '理性世界观被动摇', emotional_anchor: '对导师失踪的担忧', world_texture: '深夜实验室的氛围', concrete_mystery: '笔记本中的异常公式', interpersonal_tension: '林晨与研究所的矛盾' },
-    { id: 2, volume_id: 1, num: 2, title: '冲突', outline: '研究所封锁消息，林晨与领导发生争执', content: '# 第二章 冲突\n\n林晨被叫到了所长办公室。\n\n白发苍苍的老所长坐在办公桌后面，面色凝重。桌上放着那本黑色笔记本。\n\n"林晨，这件事你不要再查了。"\n\n"为什么？"林晨的声音比预想中更平静。\n\n"这是命令。"', word_count: 5100, status: 'accepted', cognitive_frame: '体制与个人的对抗', emotional_anchor: '对真相的执着', world_texture: '冰冷的行政大楼', concrete_mystery: '为什么要封锁消息？', interpersonal_tension: '林晨与所长的冲突' },
-    { id: 3, volume_id: 1, num: 3, title: '转机', outline: '李薇带来了意想不到的线索', content: '# 第三章 转机\n\n她推开门的时候，雨已经停了。\n\n屋檐还在滴水，一滴一滴落在青石板上，像是某种没有节奏的钟声。空气里弥漫着雨后泥土的气息，混着一点若有若无的铁锈味——来自实验室方向。\n\n"你来了。"\n\n林晨没有回头。他办公桌上摊开的笔记本被台灯照得泛黄。\n\n李薇走到他身后，屏幕上的波形图还在跳动。三十二组实验，三十二组完全一致的结果。\n\n"你知道这意味着什么。"', word_count: 3240, status: 'review', cognitive_frame: '科学突破的震撼', emotional_anchor: '对李薇的微妙信任', world_texture: '雨后的研究所', concrete_mystery: '实验数据的一致性意味着什么？', interpersonal_tension: '林晨与李薇的合作' },
-    { id: 4, volume_id: 1, num: 4, title: '深入', outline: '林晨决定秘密调查导师的踪迹', content: '# 第四章 深入\n\n深夜，林晨独自一人回到了地下实验室。\n\n他已经决定无视所长的警告。', word_count: 1200, status: 'writing', cognitive_frame: '', emotional_anchor: '', world_texture: '', concrete_mystery: '', interpersonal_tension: '' },
-    { id: 5, volume_id: 2, num: 5, title: '新世界', outline: '', content: '', word_count: 0, status: 'pending', cognitive_frame: '', emotional_anchor: '', world_texture: '', concrete_mystery: '', interpersonal_tension: '' },
+    { id: 1, volume_id: 1, num: 1, title: '开端', outline: '林晨在实验室发现导师的异常笔记', content: '# 第一章 开端\n\n林晨像往常一样刷卡进入研究所地下三层的实验室。走廊的灯管闪了两下才亮起来，发出嗡嗡的电流声。\n\n他已经记不清这是第几个通宵了。自从导师失踪后，他几乎住在了这里。\n\n办公桌上堆满了实验报告，最上面那本黑色笔记本引起了他的注意——这不是他的。\n\n他翻开第一页，瞳孔骤然收缩。\n\n那是导师的笔迹。', word_count: 4523, status: 'accepted', cognitive_frame: '理性世界观被动摇', emotional_anchor: '对导师失踪的担忧', world_texture: '深夜实验室的氛围', concrete_mystery: '笔记本中的异常公式', interpersonal_tension: '林晨与研究所的矛盾', genre_beat: '发现导师笔记，核心谜团落地' },
+    { id: 2, volume_id: 1, num: 2, title: '冲突', outline: '研究所封锁消息，林晨与领导发生争执', content: '# 第二章 冲突\n\n林晨被叫到了所长办公室。\n\n白发苍苍的老所长坐在办公桌后面，面色凝重。桌上放着那本黑色笔记本。\n\n"林晨，这件事你不要再查了。"\n\n"为什么？"林晨的声音比预想中更平静。\n\n"这是命令。"', word_count: 5100, status: 'accepted', cognitive_frame: '体制与个人的对抗', emotional_anchor: '对真相的执着', world_texture: '冰冷的行政大楼', concrete_mystery: '为什么要封锁消息？', interpersonal_tension: '林晨与所长的冲突', genre_beat: '封锁升级，体制阻力加深' },
+    { id: 3, volume_id: 1, num: 3, title: '转机', outline: '李薇带来了意想不到的线索', content: '# 第三章 转机\n\n她推开门的时候，雨已经停了。\n\n屋檐还在滴水，一滴一滴落在青石板上，像是某种没有节奏的钟声。空气里弥漫着雨后泥土的气息，混着一点若有若无的铁锈味——来自实验室方向。\n\n"你来了。"\n\n林晨没有回头。他办公桌上摊开的笔记本被台灯照得泛黄。\n\n李薇走到他身后，屏幕上的波形图还在跳动。三十二组实验，三十二组完全一致的结果。\n\n"你知道这意味着什么。"', word_count: 3240, status: 'review', cognitive_frame: '科学突破的震撼', emotional_anchor: '对李薇的微妙信任', world_texture: '雨后的研究所', concrete_mystery: '实验数据的一致性意味着什么？', interpersonal_tension: '林晨与李薇的合作', genre_beat: '实验数据提供关键线索' },
+    { id: 4, volume_id: 1, num: 4, title: '深入', outline: '林晨决定秘密调查导师的踪迹', content: '# 第四章 深入\n\n深夜，林晨独自一人回到了地下实验室。\n\n他已经决定无视所长的警告。', word_count: 1200, status: 'writing', cognitive_frame: '', emotional_anchor: '', world_texture: '', concrete_mystery: '', interpersonal_tension: '', genre_beat: '' },
+    { id: 5, volume_id: 2, num: 5, title: '新世界', outline: '', content: '', word_count: 0, status: 'pending', cognitive_frame: '', emotional_anchor: '', world_texture: '', concrete_mystery: '', interpersonal_tension: '', genre_beat: '' },
   ];
-  const chInsert = db.prepare(`INSERT INTO chapters (id, volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const chInsert = db.prepare(`INSERT INTO chapters (id, volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, genre_beat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   for (const ch of chapters) {
     chInsert.run(
       ch.id, ch.volume_id, ch.num, ch.title, ch.outline, ch.content, ch.word_count, ch.status,
       ch.cognitive_frame, ch.emotional_anchor, ch.world_texture, ch.concrete_mystery, ch.interpersonal_tension,
+      ch.genre_beat,
     );
   }
 
@@ -154,8 +172,9 @@ function seedProject(name) {
 if (require.main === module) {
   (async () => {
     await initDatabase();
-    seedProject('我的科幻小说');
-    console.log('✅ Seed complete.');
+    const force = process.argv.includes('--force');
+    const result = seedProject('我的科幻小说', { force });
+    console.log(result?.skipped ? 'ℹ️  Seed skipped.' : '✅ Seed complete.');
   })().catch(err => { console.error('❌ Seed failed:', err); process.exit(1); });
 }
 

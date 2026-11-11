@@ -44,12 +44,16 @@ const ALLOWED_GENRES = new Set([
 ]);
 const ALLOWED_MODES = new Set(['short-story', 'medium-novel', 'long-novel']);
 const ALLOWED_LANGUAGES = LANGUAGE_CODES;
-const WORLD_CATEGORIES = new Set(['location', 'organization', 'concept', 'event']);
+const WORLD_CATEGORIES = new Set(['location', 'organization', 'concept', 'event', 'other']);
 const MEMORY_CATEGORIES = new Set(['character', 'location', 'item', 'event', 'promise', 'other']);
 const FORESHADOW_STATUSES = new Set(['planted', 'progressing', 'resolved', 'abandoned']);
 const FORESHADOW_PRIORITIES = new Set(['low', 'normal', 'high']);
 const SCIENCE_LABELS = new Set(['known', 'extrapolation', 'hypothesis']);
 const CHARACTER_ROLES = new Set(['appears', 'speaks', 'pov', 'mentioned']);
+const CHARACTER_POSITIONS = new Set(['major', 'minor', 'extra']);
+const CLUE_KINDS = new Set(['clue', 'red-herring', 'deduction', 'question']);
+const PAYOFF_TYPES = new Set(['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other']);
+const PAYOFF_STATUSES = new Set(['planned', 'building', 'released', 'abandoned']);
 
 const ARCHIVE_CAPS = {
   characters: 80,
@@ -59,6 +63,8 @@ const ARCHIVE_CAPS = {
   foreshadows: 60,
   memories: 100,
   science: 40,
+  clues: 40,
+  payoffs: 40,
 };
 
 function createUsage() {
@@ -424,6 +430,7 @@ function normalizeChapterFields(item) {
     world_texture: cleanText(item?.world_texture, 200),
     concrete_mystery: cleanText(item?.concrete_mystery, 200),
     interpersonal_tension: cleanText(item?.interpersonal_tension, 200),
+    genre_beat: cleanText(item?.genre_beat, 200),
     characters,
   };
 }
@@ -565,6 +572,8 @@ function normalizeArchiveChunk(data) {
     .map((character) => ({
       name: cleanName(character?.name, 100),
       aliases: asArray(character?.aliases).map((alias) => cleanName(alias, 100)).filter(Boolean).slice(0, 5),
+      role: oneOf(character?.role, CHARACTER_POSITIONS, ''),
+      species: cleanText(character?.species, 100),
       age: cleanText(character?.age, 50),
       gender: cleanText(character?.gender, 20),
       appearance: cleanText(character?.appearance, 500),
@@ -630,11 +639,36 @@ function normalizeArchiveChunk(data) {
   const science = asArray(value.science)
     .map((entry) => ({
       label: oneOf(entry?.label, SCIENCE_LABELS, 'known'),
+      category: cleanName(entry?.category, 40),
       name: cleanName(entry?.name, 200),
       description: cleanText(entry?.description, 1000),
     }))
     .filter((entry) => entry.name)
     .slice(0, 4);
+
+  const clues = asArray(value.clues)
+    .map((clue) => ({
+      title: cleanName(clue?.title, 200),
+      description: cleanText(clue?.description, 1000),
+      kind: oneOf(clue?.kind, CLUE_KINDS, 'clue'),
+      resolved: clue?.resolved === true,
+      chapter_num: clampInt(clue?.chapter_num, 0, MAX_CHAPTERS, 0),
+    }))
+    .filter((clue) => clue.title)
+    .slice(0, 8);
+
+  const payoffs = asArray(value.payoffs)
+    .map((payoff) => ({
+      title: cleanName(payoff?.title, 200),
+      type: oneOf(payoff?.type, PAYOFF_TYPES, 'other'),
+      description: cleanText(payoff?.description, 1000),
+      status: oneOf(payoff?.status, PAYOFF_STATUSES, 'planned'),
+      intensity: clampInt(payoff?.intensity, 1, 5, 3),
+      setup_chapter: clampInt(payoff?.setup_chapter, 0, MAX_CHAPTERS, 0),
+      payoff_chapter: clampInt(payoff?.payoff_chapter, 0, MAX_CHAPTERS, 0),
+    }))
+    .filter((payoff) => payoff.title)
+    .slice(0, 8);
 
   return {
     synopsis: cleanText(value.synopsis, 800),
@@ -645,6 +679,8 @@ function normalizeArchiveChunk(data) {
     foreshadows,
     memories,
     science,
+    clues,
+    payoffs,
   };
 }
 
@@ -655,7 +691,7 @@ async function analyzeArchive({ text, volumes, language, adapter, maxOutputToken
     warnings.push('最大输出 Token 较低，完整档案可能不够完整，建议在设置中调高后重新分析');
   }
   const budgetNote = maxOutputTokens < 4096
-    ? '【本次输出预算】请严格控制数量：characters≤6，world≤5，relations≤6，events≤4，foreshadows≤4，memories≤4，science≤2；只保留最关键的信息。'
+    ? '【本次输出预算】请严格控制数量：characters≤6，world≤5，relations≤6，events≤4，foreshadows≤4，memories≤4，science≤2，clues≤2，payoffs≤2；只保留最关键的信息。'
     : '';
 
   await processBatches(chunks, 1, async (batch) => {
@@ -691,11 +727,13 @@ function normalizeName(value) {
 }
 
 function mergeCharacter(target, incoming) {
-  for (const field of ['age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc']) {
+  for (const field of ['species', 'age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc']) {
     if ((incoming[field] || '').length > (target[field] || '').length) target[field] = incoming[field];
   }
   const aliases = new Set([...(target.aliases || []), ...(incoming.aliases || [])]);
   target.aliases = [...aliases].filter(Boolean).slice(0, 8);
+  const roleRank = { major: 3, minor: 2, extra: 1, '': 0 };
+  if ((roleRank[incoming.role] || 0) > (roleRank[target.role] || 0)) target.role = incoming.role;
 }
 
 function mergeArchive(partials, charactersByChapter, warnings) {
@@ -707,6 +745,8 @@ function mergeArchive(partials, charactersByChapter, warnings) {
   const foreshadowMap = new Map();
   const memoryMap = new Map();
   const scienceMap = new Map();
+  const clueMap = new Map();
+  const payoffMap = new Map();
 
   const resolveCharacterKey = (name) => {
     const key = normalizeName(name);
@@ -809,6 +849,33 @@ function mergeArchive(partials, charactersByChapter, warnings) {
       const key = `${entry.label}|${normalizeName(entry.name)}`;
       if (!scienceMap.has(key)) scienceMap.set(key, { ...entry });
     }
+
+    for (const clue of partial.clues || []) {
+      const key = normalizeName(clue.title);
+      if (!key) continue;
+      const existing = clueMap.get(key);
+      if (!existing) {
+        clueMap.set(key, { ...clue });
+      } else {
+        if ((clue.description || '').length > (existing.description || '').length) existing.description = clue.description;
+        if (clue.resolved) existing.resolved = true;
+        if (!existing.chapter_num && clue.chapter_num) existing.chapter_num = clue.chapter_num;
+      }
+    }
+
+    for (const payoff of partial.payoffs || []) {
+      const key = normalizeName(payoff.title);
+      if (!key) continue;
+      const existing = payoffMap.get(key);
+      if (!existing) {
+        payoffMap.set(key, { ...payoff });
+      } else {
+        if ((payoff.description || '').length > (existing.description || '').length) existing.description = payoff.description;
+        existing.intensity = Math.max(existing.intensity || 3, payoff.intensity || 3);
+        if (!existing.setup_chapter && payoff.setup_chapter) existing.setup_chapter = payoff.setup_chapter;
+        if (!existing.payoff_chapter && payoff.payoff_chapter) existing.payoff_chapter = payoff.payoff_chapter;
+      }
+    }
   }
 
   // Count appearances for ranking and add stubs for characters that only
@@ -834,6 +901,7 @@ function mergeArchive(partials, charactersByChapter, warnings) {
       characterMap.set(key, {
         name: character.name,
         aliases: [],
+        role: '',
         age: '',
         gender: '',
         appearance: '',
@@ -901,6 +969,8 @@ function mergeArchive(partials, charactersByChapter, warnings) {
     foreshadows: [...foreshadowMap.values()].slice(0, ARCHIVE_CAPS.foreshadows),
     memories: [...memoryMap.values()].slice(0, ARCHIVE_CAPS.memories),
     science: [...scienceMap.values()].slice(0, ARCHIVE_CAPS.science),
+    clues: [...clueMap.values()].slice(0, ARCHIVE_CAPS.clues),
+    payoffs: [...payoffMap.values()].slice(0, ARCHIVE_CAPS.payoffs),
   };
 }
 
@@ -1064,6 +1134,15 @@ module.exports = {
   ALLOWED_GENRES,
   ALLOWED_MODES,
   ALLOWED_LANGUAGES,
+  WORLD_CATEGORIES,
+  MEMORY_CATEGORIES,
+  FORESHADOW_STATUSES,
+  FORESHADOW_PRIORITIES,
+  SCIENCE_LABELS,
+  CHARACTER_ROLES,
+  CLUE_KINDS,
+  PAYOFF_TYPES,
+  PAYOFF_STATUSES,
   runImportPipeline,
   // Exported for focused manual tests.
   _internal: {

@@ -105,6 +105,11 @@ async function run() {
   assert('Create science entry', sci.status === 201, JSON.stringify(sci.body));
   createdIds.scienceId = sci.body.id;
 
+  // User-defined category (not one of the built-in preset keys)
+  const sciCustom = await api('POST', `/${e(PROJECT)}/science`, { label: 'known', name: '测试自定义分类', description: '自定义分类', category: '自定义分类A' });
+  assert('Create science entry with custom category', sciCustom.status === 201, JSON.stringify(sciCustom.body));
+  createdIds.scienceCustomId = sciCustom.body.id;
+
   // Foreshadow
   const fs = await api('POST', `/${e(PROJECT)}/foreshadows`, { title: '测试伏笔', description: '测试伏笔描述', priority: 'high', expected_resolve_chapter: 10 });
   assert('Create foreshadow', fs.status === 201, JSON.stringify(fs.body));
@@ -150,6 +155,11 @@ async function run() {
 
   const sciList = await api('GET', `/${e(PROJECT)}/science`);
   assert('List science entries', sciList.status === 200 && sciList.body.length > 0);
+  assert(
+    'Custom science category preserved',
+    sciList.body.some((entry) => entry.id === createdIds.scienceCustomId && entry.category === '自定义分类A'),
+    JSON.stringify(sciList.body),
+  );
 
   const fsList = await api('GET', `/${e(PROJECT)}/foreshadows`);
   assert('List foreshadows', fsList.status === 200 && fsList.body.length > 0);
@@ -181,6 +191,16 @@ async function run() {
   assert('Get project meta', meta.status === 200 && meta.body.name === PROJECT, `meta name mismatch: ${JSON.stringify(meta.body)}`);
   // meta should include genres
   assert('Meta includes genres', Array.isArray(meta.body.genres), `genres not an array: ${JSON.stringify(meta.body)}`);
+
+  // ── Author notes ──
+  const notesPut = await api('PUT', `/${e(PROJECT)}/author-notes`, { authorNotes: '测试约定' });
+  assert('PUT author notes', notesPut.status === 200 && notesPut.body.authorNotes === '测试约定', JSON.stringify(notesPut.body));
+  const metaWithNotes = await api('GET', `/${e(PROJECT)}/meta`);
+  assert('Meta includes author notes', metaWithNotes.body.author_notes === '测试约定', JSON.stringify(metaWithNotes.body));
+  const notesTooLong = await api('PUT', `/${e(PROJECT)}/author-notes`, { authorNotes: 'x'.repeat(2001) });
+  assert('PUT author notes rejects oversized text', notesTooLong.status === 400, `got ${notesTooLong.status}`);
+  const notesClear = await api('PUT', `/${e(PROJECT)}/author-notes`, { authorNotes: '' });
+  assert('PUT author notes clears', notesClear.status === 200 && notesClear.body.authorNotes === '', JSON.stringify(notesClear.body));
 
   const settings = await api('GET', '/settings');
   assert('Get settings', settings.status === 200, `got ${settings.status}`);
@@ -302,9 +322,26 @@ async function run() {
   // The server flushes its config DB on a short debounce; wait so this
   // separate process sees the project registration written above.
   await new Promise((resolve) => setTimeout(resolve, 500));
-  const { executeTool } = require('./tools');
+  const { executeTool, getToolsForRequest, TOOLS } = require('./tools');
   const { initDatabase } = require('./db');
   await initDatabase();
+
+  // ── Per-request tool selection (fixed token overhead) ──
+  const writingTools = getToolsForRequest(PROJECT, 'writing', [{ role: 'user', content: '继续写下一章' }]);
+  const collabTools = getToolsForRequest(PROJECT, 'collab', [{ role: 'user', content: '继续讨论设定' }]);
+  const deleteTools = getToolsForRequest(PROJECT, 'writing', [{ role: 'user', content: '删除第 3 章' }]);
+  assert('writing tool set is smaller than full registry', writingTools.length < TOOLS.length, `${writingTools.length}/${TOOLS.length}`);
+  assert('writing tool set hides destructive tools', !writingTools.some((tool) => tool.function.name === 'delete_chapter'));
+  assert('delete intent exposes destructive tools', deleteTools.some((tool) => tool.function.name === 'delete_chapter'));
+  assert('collab tool set can create volumes', collabTools.some((tool) => tool.function.name === 'create_volume'));
+  const notesTools = getToolsForRequest(PROJECT, 'writing', [{ role: 'user', content: '记住我的偏好：每章 3000 字' }]);
+  assert('notes intent exposes update_author_notes', notesTools.some((tool) => tool.function.name === 'update_author_notes'));
+  assert('notes tool hidden without intent', !writingTools.some((tool) => tool.function.name === 'update_author_notes'));
+  const notesConfirmTools = getToolsForRequest(PROJECT, 'writing', [
+    { role: 'assistant', content: '要不要我把这条写进创作约定？' },
+    { role: 'user', content: '好' },
+  ]);
+  assert('assistant offer + confirmation exposes notes tool', notesConfirmTools.some((tool) => tool.function.name === 'update_author_notes'));
 
   // ── create_science_entry (was broken: "references" is SQL reserved word) ──
   let r = executeTool(PROJECT, 'create_science_entry', {
@@ -394,6 +431,94 @@ async function run() {
   r = executeTool(PROJECT, 'get_project_meta', {});
   assert('executeTool get_project_meta', r && typeof r.wordCount === 'number', JSON.stringify(r));
 
+  // ── update_author_notes ──
+  r = executeTool(PROJECT, 'update_author_notes', { notes: '每章 3000 字，结尾留钩子' });
+  assert('executeTool update_author_notes', r.updated === true && r.authorNotes.includes('3000'), JSON.stringify(r));
+  r = executeTool(PROJECT, 'get_project_meta', {});
+  assert('author notes exposed in project meta', r.authorNotes === '每章 3000 字，结尾留钩子', JSON.stringify(r));
+  const { buildProjectContext } = require('./prompts/context');
+  const ctx = buildProjectContext(PROJECT);
+  assert('author notes injected into project context', ctx.includes('作者约定') && ctx.includes('每章 3000 字'), ctx.slice(0, 200));
+  r = executeTool(PROJECT, 'update_author_notes', { notes: 'x'.repeat(2001) });
+  assert('update_author_notes rejects oversized notes', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'update_author_notes', { notes: '' });
+  assert('update_author_notes clears notes', r.updated === true && r.authorNotes === '', JSON.stringify(r));
+
+  // ── update_science_entry ──
+  r = executeTool(PROJECT, 'create_science_entry', {
+    label: 'known', category: 'tech', name: '工具更新前设定', description: '旧描述',
+  });
+  const scienceUpdateId = r.id;
+  assert('executeTool create_science_entry for update', r.created === true && scienceUpdateId, JSON.stringify(r));
+  r = executeTool(PROJECT, 'update_science_entry', {
+    id: scienceUpdateId, name: '工具更新后设定', description: '新描述', category: 'biology', sort_order: 7,
+  });
+  assert('executeTool update_science_entry', r.updated === true, JSON.stringify(r));
+  r = executeTool(PROJECT, 'list_science', {});
+  const updatedScience = r.find((entry) => entry.id === scienceUpdateId);
+  assert(
+    'update_science_entry persists fields',
+    updatedScience && updatedScience.name === '工具更新后设定' && updatedScience.category === 'biology' && updatedScience.sort_order === 7,
+    JSON.stringify(updatedScience),
+  );
+  executeTool(PROJECT, 'delete_science_entry', { id: scienceUpdateId });
+
+  // ── update_character rename ──
+  r = executeTool(PROJECT, 'create_character', { name: '工具改名前' });
+  const renameId = r.id;
+  r = executeTool(PROJECT, 'update_character', { id: renameId, new_name: '工具改名后', personality: '新性格' });
+  assert('executeTool update_character rename', r.updated === true && r.name === '工具改名后', JSON.stringify(r));
+  r = executeTool(PROJECT, 'get_character', { name: '工具改名后' });
+  assert('renamed character is readable', r && r.id === renameId && r.personality === '新性格', JSON.stringify(r));
+  executeTool(PROJECT, 'delete_character', { name: '工具改名后' });
+
+  // ── update_foreshadow fields ──
+  r = executeTool(PROJECT, 'create_foreshadow', { title: '工具更新伏笔', description: '旧', priority: 'low' });
+  const foreshadowId = r.id;
+  r = executeTool(PROJECT, 'update_foreshadow', {
+    id: foreshadowId, new_title: '工具更新后伏笔', status: 'progressing', priority: 'high', expected_resolve_chapter: 42,
+  });
+  assert('executeTool update_foreshadow fields', r.updated === true && r.title === '工具更新后伏笔', JSON.stringify(r));
+  r = executeTool(PROJECT, 'list_foreshadows', {});
+  const updatedForeshadow = r.find((item) => item.id === foreshadowId);
+  assert(
+    'update_foreshadow persists fields',
+    updatedForeshadow && updatedForeshadow.status === 'progressing' && updatedForeshadow.priority === 'high' && updatedForeshadow.expected_resolve_chapter === 42,
+    JSON.stringify(updatedForeshadow),
+  );
+  executeTool(PROJECT, 'delete_foreshadow', { id: foreshadowId });
+
+  // ── create_memory maps chapter number to chapter id ──
+  const chapter42 = await api('GET', `/${e(PROJECT)}/chapters/42`);
+  r = executeTool(PROJECT, 'create_memory', { category: 'event', content: '工具来源章节映射', source_chapter_num: 42 });
+  const memoryId = r.id;
+  r = executeTool(PROJECT, 'list_memories', { query: '工具来源章节映射' });
+  const createdMemory = r.find((item) => item.id === memoryId);
+  assert(
+    'create_memory resolves source chapter num to id',
+    createdMemory && createdMemory.source_chapter_id === chapter42.body.id && createdMemory.source_chapter_num === 42,
+    JSON.stringify(createdMemory),
+  );
+
+  // ── accepted chapter deletion guard ──
+  executeTool(PROJECT, 'update_chapter', { chapter_num: 42, status: 'accepted' });
+  r = executeTool(PROJECT, 'delete_chapter', { chapter_num: 42 });
+  assert('delete_chapter protects accepted chapter', typeof r.error === 'string', JSON.stringify(r));
+  executeTool(PROJECT, 'update_chapter', { chapter_num: 42, status: 'writing' });
+
+  // ── hidden-page genre gate ──
+  r = executeTool(PROJECT, 'create_clue', { title: '不该创建的线索', kind: 'clue' });
+  assert('create_clue is gated by genre', typeof r.error === 'string', JSON.stringify(r));
+
+  // ── delete_volume requires force and recalculates word count ──
+  r = executeTool(PROJECT, 'create_volume', { title: '工具测试卷' });
+  const testVolumeId = r.volume_id;
+  executeTool(PROJECT, 'create_chapter', { title: '工具测试卷章', chapter_num: 43, volume_id: testVolumeId });
+  r = executeTool(PROJECT, 'delete_volume', { volume_id: testVolumeId });
+  assert('delete_volume requires force when non-empty', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'delete_volume', { volume_id: testVolumeId, force: true });
+  assert('delete_volume force deletes and recalculates', r.deleted === true && r.deleted_chapters === 1, JSON.stringify(r));
+
   // ── Tool-level deletion ──
   r = executeTool(PROJECT, 'delete_science_entry', { id: dbg.sciId });
   assert('executeTool delete_science_entry', r && r.deleted === true, JSON.stringify(r));
@@ -442,6 +567,8 @@ async function run() {
   // Science
   const delSci = await api('DELETE', `/${e(PROJECT)}/science/${createdIds.scienceId}`);
   assert('Delete science entry', delSci.status === 200);
+  const delSciCustom = await api('DELETE', `/${e(PROJECT)}/science/${createdIds.scienceCustomId}`);
+  assert('Delete custom-category science entry', delSciCustom.status === 200);
 
   // Memory
   const delMem = await api('DELETE', `/${e(PROJECT)}/memories/${createdIds.memoryId}`);

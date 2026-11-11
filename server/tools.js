@@ -1,6 +1,7 @@
 // ─── Tool schema definitions (OpenAI function-calling format) ───
 const { stripLeadingChapterHeading } = require('./titles');
-const { ALLOWED_SETTING_CATEGORIES } = require('./settings');
+const { saveAuthorNotes } = require('./author-notes');
+const { ALLOWED_SETTING_CATEGORIES, SETTING_PAGE_GENRES } = require('./settings');
 const { STYLE_LABELS } = require('./styles');
 
 const TOOLS = [
@@ -36,20 +37,13 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_chapter',
-      description: '创建新章节。新建后会自动按全书顺序分配编号（跨卷唯一），并默认放入最后一卷。如需指定编号请传入 chapter_num。',
+      description: '创建新章节框架。新建后会自动按全书顺序分配编号（跨卷唯一）；默认与上一章同卷，第一章默认放入第一卷。如需指定编号或卷请传入 chapter_num / volume_id。大纲和正文请用 update_chapter 写入。',
       parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: '章节标题' },
           chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动按全书顺序编号；传入则使用指定编号' },
-          outline: { type: 'string', description: '章节大纲（可选）' },
-          content: { type: 'string', description: '章节正文（可选）' },
           volume_id: { type: 'number', description: '所属卷ID，默认为最后一卷' },
-          cognitive_frame: { type: 'string', description: '叙事维度 — 认知框架（可选）' },
-          emotional_anchor: { type: 'string', description: '叙事维度 — 情感锚点（可选）' },
-          world_texture: { type: 'string', description: '叙事维度 — 世界质感（可选）' },
-          concrete_mystery: { type: 'string', description: '叙事维度 — 悬念设置（可选）' },
-          interpersonal_tension: { type: 'string', description: '叙事维度 — 人际张力（可选）' },
         },
         required: ['title'],
       },
@@ -59,7 +53,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_chapter',
-      description: '更新章节内容。可以只更新部分字段，传入哪些就更新哪些。支持更新的字段：title、content、outline、status、summary、cognitive_frame、emotional_anchor、world_texture、concrete_mystery、interpersonal_tension。status 可选值：pending（待写）、writing（写作中）、review（审核中）、accepted（已定稿）。',
+      description: '更新章节内容。只传需要修改的字段。status: pending/writing/review/accepted。',
       parameters: {
         type: 'object',
         properties: {
@@ -69,11 +63,12 @@ const TOOLS = [
           outline: { type: 'string', description: '大纲（可选）' },
           status: { type: 'string', enum: ['pending', 'writing', 'review', 'accepted'], description: '状态（可选）' },
           summary: { type: 'string', description: '章节摘要（可选）' },
-          cognitive_frame: { type: 'string', description: '叙事维度 — 认知框架：角色的认知变化（可选）' },
-          emotional_anchor: { type: 'string', description: '叙事维度 — 情感锚点：章节的情感基调（可选）' },
-          world_texture: { type: 'string', description: '叙事维度 — 世界质感：场景氛围与细节（可选）' },
-          concrete_mystery: { type: 'string', description: '叙事维度 — 悬念设置：本章要埋下或推进的谜团（可选）' },
-          interpersonal_tension: { type: 'string', description: '叙事维度 — 人际张力：角色间的冲突与张力（可选）' },
+          cognitive_frame: { type: 'string', description: '叙事维度：认知框架（可选）' },
+          emotional_anchor: { type: 'string', description: '叙事维度：情感锚点（可选）' },
+          world_texture: { type: 'string', description: '叙事维度：世界质感（可选）' },
+          concrete_mystery: { type: 'string', description: '叙事维度：具体悬念（可选）' },
+          interpersonal_tension: { type: 'string', description: '叙事维度：人际张力（可选）' },
+          genre_beat: { type: 'string', description: '类型推进：本章在作品类型上的核心推进（可选）' },
         },
         required: ['chapter_num'],
       },
@@ -83,10 +78,13 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'delete_chapter',
-      description: '删除指定章节。此操作不可逆，请谨慎使用。',
+      description: '删除指定章节。已定稿（accepted）章节默认受保护；如用户明确要求删除，需传 force=true。此操作不可逆，请谨慎使用。',
       parameters: {
         type: 'object',
-        properties: { chapter_num: { type: 'number', description: '要删除的章节编号' } },
+        properties: {
+          chapter_num: { type: 'number', description: '要删除的章节编号' },
+          force: { type: 'boolean', description: '用户已明确确认删除定稿章节时传 true（默认 false）' },
+        },
         required: ['chapter_num'],
       },
     },
@@ -97,8 +95,15 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'list_characters',
-      description: '列出小说所有角色及其基本信息（姓名、年龄、性别、性格、背景等）。',
-      parameters: { type: 'object', properties: {}, required: [] },
+      description: '列出小说角色及其基本信息（姓名、种族/类型、年龄、性别、性格、背景等）。长篇/导入作品建议分页。',
+      parameters: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: '返回条数，默认 200，最大 1000' },
+          offset: { type: 'number', description: '偏移量，默认 0' },
+        },
+        required: [],
+      },
     },
   },
   {
@@ -122,15 +127,16 @@ const TOOLS = [
         type: 'object',
         properties: {
           name: { type: 'string', description: '姓名' },
-          age: { type: 'string', description: '年龄（可选）' },
+          species: { type: 'string', description: '种族/类型（可选）' },
+          age: { type: 'string', description: '年龄或存在时长（可选）' },
           gender: { type: 'string', description: '性别（可选）' },
-          appearance: { type: 'string', description: '外貌描述（可选）' },
-          personality: { type: 'string', description: '性格描述（可选）' },
+          appearance: { type: 'string', description: '外观/形态（可选）' },
+          personality: { type: 'string', description: '性格（可选）' },
           background: { type: 'string', description: '背景故事（可选）' },
           motivation: { type: 'string', description: '动机（可选）' },
           arc: { type: 'string', description: '角色弧线（可选）' },
-          role: { type: 'string', enum: ['major', 'minor', 'extra'], description: '角色定位：major(主角)、minor(配角)、extra(客串)，由作者指定（可选）' },
-          notes: { type: 'string', description: '备注、别名或作者要求 AI 记住的设定（可选）' },
+          role: { type: 'string', enum: ['major', 'minor', 'extra'], description: '角色定位（可选）' },
+          notes: { type: 'string', description: '备注/别名（可选）' },
         },
         required: ['name'],
       },
@@ -140,22 +146,25 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_character',
-      description: '更新已有角色的信息。只传需要修改的字段。',
+      description: '更新已有角色的信息。可用角色姓名或 id 定位；支持改名。只传需要修改的字段。',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: '角色姓名' },
-          age: { type: 'string', description: '年龄' },
-          gender: { type: 'string', description: '性别' },
-          appearance: { type: 'string', description: '外貌' },
-          personality: { type: 'string', description: '性格' },
-          background: { type: 'string', description: '背景' },
-          motivation: { type: 'string', description: '动机' },
-          arc: { type: 'string', description: '角色弧线' },
-          role: { type: 'string', enum: ['major', 'minor', 'extra'], description: '角色定位：major(主角)、minor(配角)、extra(客串)' },
-          notes: { type: 'string', description: '备注、别名或作者要求 AI 记住的设定' },
+          name: { type: 'string', description: '角色姓名（用于定位，可选；与 id 二选一）' },
+          id: { type: 'string', description: '角色 ID（用于定位，可选；与 name 二选一）' },
+          new_name: { type: 'string', description: '新姓名（可选，用于改名）' },
+          species: { type: 'string', description: '种族/类型（可选）' },
+          age: { type: 'string', description: '年龄或存在时长（可选）' },
+          gender: { type: 'string', description: '性别（可选）' },
+          appearance: { type: 'string', description: '外观/形态（可选）' },
+          personality: { type: 'string', description: '性格（可选）' },
+          background: { type: 'string', description: '背景（可选）' },
+          motivation: { type: 'string', description: '动机（可选）' },
+          arc: { type: 'string', description: '角色弧线（可选）' },
+          role: { type: 'string', enum: ['major', 'minor', 'extra'], description: '角色定位（可选）' },
+          notes: { type: 'string', description: '备注/别名（可选）' },
         },
-        required: ['name'],
+        required: [],
       },
     },
   },
@@ -177,7 +186,7 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          category: { type: 'string', enum: ['location', 'organization', 'concept', 'event'], description: '类别：location(地点)、organization(组织)、concept(概念)、event(事件)' },
+          category: { type: 'string', enum: ['location', 'organization', 'concept', 'event', 'other'], description: '类别：location(地点)、organization(组织)、concept(概念)、event(事件)、other(其他)' },
           name: { type: 'string', description: '条目名称' },
           description: { type: 'string', description: '详细描述' },
           tags: { type: 'string', description: '标签，逗号分隔（可选）' },
@@ -223,15 +232,19 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_foreshadow',
-      description: '更新伏笔状态。',
+      description: '更新伏笔的状态、标题、描述、优先级或预计回收章节。可用 id 或标题定位。',
       parameters: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: '伏笔标题' },
+          id: { type: 'string', description: '伏笔 ID（用于定位，可选；优先使用）' },
+          title: { type: 'string', description: '伏笔标题（用于定位，可选；与 id 二选一）' },
+          new_title: { type: 'string', description: '新标题（可选，用于改名）' },
           status: { type: 'string', enum: ['planted', 'progressing', 'resolved', 'abandoned'], description: '新状态' },
           description: { type: 'string', description: '更新描述（可选）' },
+          priority: { type: 'string', enum: ['low', 'normal', 'high'], description: '优先级（可选）' },
+          expected_resolve_chapter: { type: 'number', description: '预计揭晓章节编号（可选，0 表示未设置）' },
         },
-        required: ['title'],
+        required: [],
       },
     },
   },
@@ -260,7 +273,7 @@ const TOOLS = [
         type: 'object',
         properties: {
           title: { type: 'string', description: '爽点标题' },
-          type: { type: 'string', enum: ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'], description: '爽点类型：face-slap(打脸)、flex(装逼)、comeback(逆袭)、reveal(身份/实力揭晓)、reward(获得奇遇)、revenge(复仇)、breakthrough(突破)、other(其他)' },
+          type: { type: 'string', enum: ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'], description: '爽点类型（可选）' },
           description: { type: 'string', description: '爽点描述：如何铺垫、如何引爆、情绪如何释放' },
           intensity: { type: 'number', description: '爽感强度 1-5，默认 3' },
           setup_chapter: { type: 'number', description: '铺垫章节编号（可选）' },
@@ -274,19 +287,21 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_payoff',
-      description: '更新爽点的状态、类型、描述、强度或章节安排。写完后把已释放的爽点标记为 released。',
+      description: '更新爽点的标题、状态、类型、描述、强度或章节安排。可用 id 或标题定位。写完后把已释放的爽点标记为 released。',
       parameters: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: '爽点标题' },
-          status: { type: 'string', enum: ['planned', 'building', 'released', 'abandoned'], description: '新状态：planned(待铺垫)、building(铺垫中)、released(已释放)、abandoned(已放弃)' },
+          id: { type: 'string', description: '爽点 ID（用于定位，可选；优先使用）' },
+          title: { type: 'string', description: '爽点标题（用于定位，可选；与 id 二选一）' },
+          new_title: { type: 'string', description: '新标题（可选，用于改名）' },
+          status: { type: 'string', enum: ['planned', 'building', 'released', 'abandoned'], description: '新状态（可选）' },
           type: { type: 'string', enum: ['face-slap', 'flex', 'comeback', 'reveal', 'reward', 'revenge', 'breakthrough', 'other'], description: '更新类型（可选）' },
           description: { type: 'string', description: '更新描述（可选）' },
           intensity: { type: 'number', description: '更新爽感强度 1-5（可选）' },
           setup_chapter: { type: 'number', description: '更新铺垫章节（可选）' },
           payoff_chapter: { type: 'number', description: '更新释放章节（可选）' },
         },
-        required: ['title'],
+        required: [],
       },
     },
   },
@@ -324,8 +339,16 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'list_memories',
-      description: '列出所有创作记忆（关键事件、承诺、伏笔提醒等）。',
-      parameters: { type: 'object', properties: {}, required: [] },
+      description: '列出创作记忆（关键事件、承诺、伏笔提醒等）。可按内容关键词或类别筛选。',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: '内容关键词（可选）' },
+          category: { type: 'string', enum: ['character', 'location', 'item', 'event', 'promise', 'other'], description: '按类别筛选（可选）' },
+          limit: { type: 'number', description: '返回条数，默认 100，最大 500' },
+        },
+        required: [],
+      },
     },
   },
   {
@@ -377,7 +400,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_stats',
-      description: '获取小说的统计数据：总字数、章节数、角色数、伏笔数、世界观条目数、Token用量等。',
+      description: '获取小说的统计数据：总字数、目标字数、章节数、角色/关系/伏笔/世界观/设定/时间线/记忆/线索数量、章节状态分布与 Token 用量。',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -426,11 +449,12 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'delete_volume',
-      description: '删除指定卷及其下的所有章节。此操作不可逆，请谨慎使用。',
+      description: '删除指定卷及其下的所有章节。卷内有章节时必须由用户明确确认并传 force=true。此操作不可逆，请谨慎使用。',
       parameters: {
         type: 'object',
         properties: {
           volume_id: { type: 'number', description: '要删除的卷ID' },
+          force: { type: 'boolean', description: '用户已明确确认级联删除卷内章节时传 true（默认 false）' },
         },
         required: ['volume_id'],
       },
@@ -441,7 +465,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'list_science',
-      description: '列出小说的所有设定体系条目。科幻按标签（已知/外推/假设）分组，玄幻/仙侠/武侠/游戏按分类（境界/功法/门派/技能等）分组。',
+      description: '列出小说的所有设定体系条目。所有题材按分类（默认分类或用户自定义分类）分组，科幻条目同时带有标签（已知/外推/假设）。',
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
@@ -454,13 +478,33 @@ const TOOLS = [
         type: 'object',
         properties: {
           label: { type: 'string', enum: ['known', 'extrapolation', 'hypothesis'], description: '科幻条目的标签：已知/外推/假设（非科幻项目可省略）' },
-          category: { type: 'string', enum: ['realm', 'technique', 'artifact', 'sect', 'martial-art', 'school', 'weapon', 'system', 'skill', 'equipment', 'dungeon', 'other'], description: '玄幻/仙侠/武侠/游戏项目的分类：realm(境界)、technique(功法)、artifact(法宝)、sect(宗门)、martial-art(武功)、school(门派)、weapon(兵器)、system(系统)、skill(技能)、equipment(装备)、dungeon(副本)、other(其他)' },
+          category: { type: 'string', description: '分类键。科幻: tech/biology/physics/society/politics/military/ai/alien/planet/history/other；玄幻/仙侠: realm/technique/artifact/sect/other；武侠: martial-art/school/weapon/other；游戏: system/skill/equipment/dungeon/other；也可用项目已有自定义分类' },
           name: { type: 'string', description: '条目名称' },
           description: { type: 'string', description: '详细描述' },
           references: { type: 'string', description: '参考文献（可选）' },
           sort_order: { type: 'number', description: '排序（数字越小越靠前，用于境界/等级等有序体系）' },
         },
         required: ['name', 'description'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_science_entry',
+      description: '更新设定体系条目（科幻设定、修炼境界、武功体系、游戏系统等）。只传需要修改的字段。',
+      parameters: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '条目ID' },
+          label: { type: 'string', enum: ['known', 'extrapolation', 'hypothesis'], description: '科幻条目标签：已知/外推/假设（可选）' },
+          category: { type: 'string', description: '设定分类（可选，使用内置分类或项目已有自定义分类）' },
+          name: { type: 'string', description: '条目名称（可选）' },
+          description: { type: 'string', description: '详细描述（可选）' },
+          references: { type: 'string', description: '参考文献（可选）' },
+          sort_order: { type: 'number', description: '排序（可选）' },
+        },
+        required: ['id'],
       },
     },
   },
@@ -577,11 +621,14 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'delete_foreshadow',
-      description: '删除指定伏笔。此操作不可逆，请谨慎使用。',
+      description: '删除指定伏笔。优先用 id 定位（同名伏笔可能有多条）。此操作不可逆，请谨慎使用。',
       parameters: {
         type: 'object',
-        properties: { title: { type: 'string', description: '伏笔标题' } },
-        required: ['title'],
+        properties: {
+          id: { type: 'string', description: '伏笔 ID（可选，优先使用）' },
+          title: { type: 'string', description: '伏笔标题（与 id 二选一）' },
+        },
+        required: [],
       },
     },
   },
@@ -589,11 +636,14 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'delete_payoff',
-      description: '删除指定爽点。此操作不可逆，请谨慎使用。',
+      description: '删除指定爽点。优先用 id 定位（同名爽点可能有多条）。此操作不可逆，请谨慎使用。',
       parameters: {
         type: 'object',
-        properties: { title: { type: 'string', description: '爽点标题' } },
-        required: ['title'],
+        properties: {
+          id: { type: 'string', description: '爽点 ID（可选，优先使用）' },
+          title: { type: 'string', description: '爽点标题（与 id 二选一）' },
+        },
+        required: [],
       },
     },
   },
@@ -722,6 +772,7 @@ const TOOLS = [
           title: { type: 'string', description: '新标题（可选）' },
           description: { type: 'string', description: '新描述（可选）' },
           kind: { type: 'string', enum: ['clue', 'red-herring', 'deduction', 'question'], description: '新类型（可选）' },
+          related_chapter_num: { type: 'number', description: '关联章节编号（可选，0 表示取消关联）' },
           resolved: { type: 'boolean', description: '是否已解决（可选）' },
         },
         required: ['id'],
@@ -744,8 +795,22 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_project_meta',
-      description: '获取当前项目的完整元信息：名称、创作类型（genres）、篇幅模式、写作语言、当前阶段、总字数等。用于了解项目的基本定位和设定。',
+      description: '获取当前项目的完整元信息：名称、创作类型（genres）、篇幅模式、写作语言、当前阶段、总字数、作者约定等。用于了解项目的基本定位和设定。',
       parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'update_author_notes',
+      description: '更新本项目的「作者约定」——作者手写的写作规则（文风、人称、章节格式、禁区、协作方式等）。仅当用户明确要求记住或修改写作约定时调用，不要把对话内容自行总结写入。最多 2000 字；传空字符串可清空。',
+      parameters: {
+        type: 'object',
+        properties: {
+          notes: { type: 'string', description: '完整的创作约定内容（纯文本，最多 2000 字）' },
+        },
+        required: ['notes'],
+      },
     },
   },
   {
@@ -779,7 +844,7 @@ const HANDLERS = {
       const rows = pdb.prepare(
         'SELECT num, title, status, word_count, outline, summary, volume_id, created_at, updated_at FROM chapters ORDER BY num LIMIT ? OFFSET ?',
       ).all(limit, offset);
-      return { total, limit, offset, chapters: rows };
+      return { total, limit, offset, chapters: clipFields(rows, ['outline', 'summary'], 200) };
     },
   },
   get_chapter: {
@@ -802,27 +867,42 @@ const HANDLERS = {
   },
   create_chapter: {
     entity: 'chapter',
+    chapterTree: true,
     category: '章节与卷',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      const volId = args.volume_id || db.lastVolumeId(projectName);
+      // The chapter body can be far larger than a single tool call should
+      // carry. Keep this tool to the frame and make the model write prose via
+      // update_chapter, where the workflow expects it.
+      const hasText = (value) => typeof value === 'string' && value.trim().length > 0;
+      if (hasText(args.content) || hasText(args.outline)) {
+        return { error: 'create_chapter 只创建章节框架，不接收 outline/content。请先创建章节，再用 update_chapter 写入大纲和正文。' };
+      }
       const num = args.chapter_num !== undefined ? args.chapter_num : db.nextChapterNumber(projectName);
-      pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
-        .run(volId, num, args.title, args.outline || '', args.content || '',
-          args.content ? db.countWords(args.content) : 0,
+      // Keep continuation chapters in the previous chapter's volume; chapter 1
+      // belongs to the first volume. Falling back to "last volume" here used to
+      // put the collab mode's first three chapters into the final volume.
+      const previousVolume = num > 1
+        ? pdb.prepare('SELECT volume_id FROM chapters WHERE num = ?').get(num - 1)?.volume_id
+        : null;
+      const firstVolume = pdb.prepare('SELECT id FROM volumes ORDER BY sort_order, id LIMIT 1').get()?.id;
+      const volId = args.volume_id || previousVolume || firstVolume || db.lastVolumeId(projectName);
+      pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, genre_beat, created_at, updated_at)
+        VALUES (?, ?, ?, '', '', 0, 'pending', ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
+        .run(volId, num, args.title,
           args.cognitive_frame || '', args.emotional_anchor || '', args.world_texture || '',
-          args.concrete_mystery || '', args.interpersonal_tension || '');
+          args.concrete_mystery || '', args.interpersonal_tension || '', args.genre_beat || '');
       return { created: true, chapter_num: num, title: args.title };
     },
   },
   update_chapter: {
     entity: 'chapter',
+    chapterTree: true,
     category: '章节与卷',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const { chapter_num, ...fields } = args;
-      const allowed = ['title', 'content', 'outline', 'status', 'summary', 'cognitive_frame', 'emotional_anchor', 'world_texture', 'concrete_mystery', 'interpersonal_tension'];
+      const allowed = ['title', 'content', 'outline', 'status', 'summary', 'cognitive_frame', 'emotional_anchor', 'world_texture', 'concrete_mystery', 'interpersonal_tension', 'genre_beat'];
       const updates = [];
       const params = [];
       if (typeof fields.content === 'string') {
@@ -847,18 +927,30 @@ const HANDLERS = {
       }
       updates.push("updated_at = datetime('now')");
       params.push(chapter_num);
-      pdb.prepare(`UPDATE chapters SET ${updates.join(', ')} WHERE num = ?`).run(...params);
+      const info = pdb.prepare(`UPDATE chapters SET ${updates.join(', ')} WHERE num = ?`).run(...params);
+      if (info.changes === 0) {
+        return { error: `章节 ${chapter_num} 不存在，可能已被用户删除` };
+      }
       db.recalculateWordCount(projectName);
       return { updated: true, chapter_num, changed_fields: Object.keys(fields).filter(k => allowed.includes(k)) };
     },
   },
   delete_chapter: {
     entity: 'chapter',
+    chapterTree: true,
+    // Deleting a chapter cascades chapter_characters and nulls chapter
+    // references in foreshadows, memories and the clue board.
+    extraEntities: ['character', 'foreshadow', 'memory', 'clue'],
     category: '章节与卷',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      const row = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.chapter_num);
+      const { pdb, args, db, projectName } = ctx;
+      const row = pdb.prepare('SELECT id, status FROM chapters WHERE num = ?').get(args.chapter_num);
       if (!row) return { error: `章节 ${args.chapter_num} 不存在` };
+      // The UI protects accepted chapters from deletion. Mirror that guard in
+      // the tool layer; `force` is only for an explicit user instruction.
+      if (row.status === 'accepted' && args.force !== true) {
+        return { error: `章节 ${args.chapter_num} 已定稿（accepted），默认不允许删除。如用户明确要求删除，请传 force=true。` };
+      }
       pdb.prepare('DELETE FROM chapters WHERE num = ?').run(args.chapter_num);
       db.recalculateWordCount(projectName);
       return { deleted: true, chapter_num: args.chapter_num };
@@ -869,8 +961,16 @@ const HANDLERS = {
     entity: null,
     category: '设定构建',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT id, name, age, gender, role, personality, background, motivation, arc, notes FROM characters ORDER BY name').all();
+      const { pdb, args } = ctx;
+      const limit = Math.min(Math.max(parseInt(args.limit, 10) || 200, 1), 1000);
+      const offset = Math.max(parseInt(args.offset, 10) || 0, 0);
+      const rows = pdb.prepare(`
+        SELECT id, name, species, age, gender, role, personality, background, motivation, arc, notes
+        FROM characters
+        ORDER BY CASE role WHEN 'major' THEN 0 WHEN 'minor' THEN 1 WHEN 'extra' THEN 2 ELSE 3 END, name
+        LIMIT ? OFFSET ?
+      `).all(limit, offset);
+      return clipFields(rows, ['personality', 'background', 'motivation', 'arc', 'notes'], 300);
     },
   },
   get_character: {
@@ -896,9 +996,9 @@ const HANDLERS = {
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const id = randomUUID();
-      pdb.prepare(`INSERT INTO characters (id, name, age, gender, appearance, personality, background, motivation, arc, role, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, args.name, args.age || '', args.gender || '', args.appearance || '', args.personality || '',
+      pdb.prepare(`INSERT INTO characters (id, name, species, age, gender, appearance, personality, background, motivation, arc, role, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, args.name, args.species || '', args.age || '', args.gender || '', args.appearance || '', args.personality || '',
           args.background || '', args.motivation || '', args.arc || '', args.role || '', args.notes || '');
       return { created: true, id, name: args.name };
     },
@@ -907,21 +1007,33 @@ const HANDLERS = {
     entity: 'character',
     category: '设定构建',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      const { name, ...fields } = args;
-      const existing = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(name);
-      if (!existing) return { error: `角色 "${name}" 不存在` };
-      const allowed = ['age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'role', 'notes'];
+      const { pdb, args } = ctx;
+      const lookup = args.id
+        ? pdb.prepare('SELECT id, name FROM characters WHERE id = ?').get(args.id)
+        : pdb.prepare('SELECT id, name FROM characters WHERE name = ?').get(args.name);
+      if (!lookup) return { error: `角色 ${args.id || args.name} 不存在` };
+      const allowed = ['species', 'age', 'gender', 'appearance', 'personality', 'background', 'motivation', 'arc', 'role', 'notes'];
       const updates = [];
       const params = [];
+      if (args.new_name !== undefined) {
+        const nextName = String(args.new_name).trim();
+        if (!nextName) return { error: '新姓名不能为空' };
+        updates.push('name = ?');
+        params.push(nextName);
+      }
       for (const key of allowed) {
-        if (fields[key] !== undefined) { updates.push(`${key} = ?`); params.push(fields[key]); }
+        if (args[key] !== undefined) { updates.push(`${key} = ?`); params.push(args[key]); }
       }
       if (updates.length === 0) return { error: '没有要更新的字段' };
       updates.push("updated_at = datetime('now')");
-      params.push(name);
-      pdb.prepare(`UPDATE characters SET ${updates.join(', ')} WHERE name = ?`).run(...params);
-      return { updated: true, name };
+      params.push(lookup.id);
+      try {
+        pdb.prepare(`UPDATE characters SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      } catch (e) {
+        if (/UNIQUE/i.test(e.message)) return { error: `角色名 "${args.new_name}" 已存在` };
+        throw e;
+      }
+      return { updated: true, id: lookup.id, name: args.new_name || lookup.name };
     },
   },
   // ── World ──
@@ -930,7 +1042,10 @@ const HANDLERS = {
     category: '世界观',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT id, category, name, description, tags FROM world_entries ORDER BY category, name').all();
+      return clipFields(
+        pdb.prepare('SELECT id, category, name, description, tags FROM world_entries ORDER BY category, name').all(),
+        ['description'],
+      );
     },
   },
   create_world_entry: {
@@ -954,7 +1069,7 @@ const HANDLERS = {
       const params = [];
       if (args.status) { sql += ' WHERE status = ?'; params.push(args.status); }
       sql += ' ORDER BY created_at';
-      return pdb.prepare(sql).all(...params);
+      return clipFields(pdb.prepare(sql).all(...params), ['description']);
     },
   },
   create_foreshadow: {
@@ -973,18 +1088,30 @@ const HANDLERS = {
     entity: 'foreshadow',
     category: '伏笔与线索',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      const f = pdb.prepare('SELECT id FROM foreshadows WHERE title = ?').get(args.title);
-      if (!f) return { error: `伏笔 "${args.title}" 不存在` };
+      const { pdb, args } = ctx;
+      const f = args.id
+        ? pdb.prepare('SELECT id, title FROM foreshadows WHERE id = ?').get(args.id)
+        : pdb.prepare('SELECT id, title FROM foreshadows WHERE title = ?').get(args.title);
+      if (!f) return { error: `伏笔 ${args.id || args.title} 不存在` };
       const updates = [];
       const params = [];
+      if (args.new_title !== undefined) {
+        const nextTitle = String(args.new_title).trim();
+        if (!nextTitle) return { error: '伏笔标题不能为空' };
+        updates.push('title = ?'); params.push(nextTitle);
+      }
       if (args.status) { updates.push('status = ?'); params.push(args.status); }
-      if (args.description) { updates.push('description = ?'); params.push(args.description); }
+      if (args.description !== undefined) { updates.push('description = ?'); params.push(args.description); }
+      if (args.priority) { updates.push('priority = ?'); params.push(args.priority); }
+      if (args.expected_resolve_chapter !== undefined) {
+        updates.push('expected_resolve_chapter = ?');
+        params.push(Number(args.expected_resolve_chapter) || 0);
+      }
       if (updates.length === 0) return { error: '没有要更新的字段' };
       updates.push("updated_at = datetime('now')");
-      params.push(args.title);
-      pdb.prepare(`UPDATE foreshadows SET ${updates.join(', ')} WHERE title = ?`).run(...params);
-      return { updated: true, title: args.title };
+      params.push(f.id);
+      pdb.prepare(`UPDATE foreshadows SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      return { updated: true, id: f.id, title: args.new_title || f.title };
     },
   },
   // ── Payoff Points (爽点) ──
@@ -997,7 +1124,7 @@ const HANDLERS = {
       const params = [];
       if (args.status) { sql += ' WHERE status = ?'; params.push(args.status); }
       sql += ' ORDER BY payoff_chapter, created_at';
-      return pdb.prepare(sql).all(...params);
+      return clipFields(pdb.prepare(sql).all(...params), ['description']);
     },
   },
   create_payoff: {
@@ -1028,9 +1155,15 @@ const HANDLERS = {
       if (args.status && !['planned', 'building', 'released', 'abandoned'].includes(args.status)) {
         return { error: `无效状态: ${args.status}` };
       }
-      const p = pdb.prepare('SELECT id FROM payoff_points WHERE title = ?').get(args.title);
-      if (!p) return { error: `爽点 "${args.title}" 不存在` };
+      const p = args.id
+        ? pdb.prepare('SELECT id, title FROM payoff_points WHERE id = ?').get(args.id)
+        : pdb.prepare('SELECT id, title FROM payoff_points WHERE title = ?').get(args.title);
+      if (!p) return { error: `爽点 ${args.id || args.title} 不存在` };
+      if (args.new_title !== undefined && !String(args.new_title).trim()) {
+        return { error: '爽点标题不能为空' };
+      }
       const fields = {
+        title: args.new_title !== undefined ? String(args.new_title).trim() : undefined,
         type: args.type,
         description: args.description,
         status: args.status,
@@ -1038,7 +1171,7 @@ const HANDLERS = {
         setup_chapter: args.setup_chapter,
         payoff_chapter: args.payoff_chapter,
       };
-      return updateById(p.id, 'payoff_points', fields, ['type', 'description', 'status', 'intensity', 'setup_chapter', 'payoff_chapter'], true);
+      return updateById(p.id, 'payoff_points', fields, ['title', 'type', 'description', 'status', 'intensity', 'setup_chapter', 'payoff_chapter'], true);
     },
   },
   // ── Relations ──
@@ -1076,18 +1209,44 @@ const HANDLERS = {
     entity: null,
     category: '时间线与记忆',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT * FROM memories ORDER BY created_at DESC').all();
+      const { pdb, args } = ctx;
+      const conditions = [];
+      const params = [];
+      if (args.category) { conditions.push('m.category = ?'); params.push(args.category); }
+      if (args.query) { conditions.push('m.content LIKE ?'); params.push(`%${args.query}%`); }
+      const limit = Math.min(Math.max(parseInt(args.limit, 10) || 100, 1), 500);
+      const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      return clipFields(
+        pdb.prepare(`
+          SELECT m.*, c.num AS source_chapter_num
+          FROM memories m
+          LEFT JOIN chapters c ON c.id = m.source_chapter_id
+          ${where}
+          ORDER BY m.created_at DESC
+          LIMIT ?
+        `).all(...params, limit),
+        ['content'],
+      );
     },
   },
   create_memory: {
     entity: 'memory',
     category: '时间线与记忆',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      const { pdb, args } = ctx;
       const id = randomUUID();
+      // `source_chapter_id` is a foreign key to chapters.id, while the tool
+      // speaks in chapter numbers. Resolve the number before inserting —
+      // passing the number straight through either hit an FK error or linked
+      // the memory to an unrelated chapter.
+      let sourceChapterId = null;
+      if (args.source_chapter_num) {
+        const chapter = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(args.source_chapter_num);
+        if (!chapter) return { error: `章节 ${args.source_chapter_num} 不存在` };
+        sourceChapterId = chapter.id;
+      }
       pdb.prepare('INSERT INTO memories (id, category, content, source_chapter_id) VALUES (?, ?, ?, ?)')
-        .run(id, args.category, args.content, args.source_chapter_num || null);
+        .run(id, args.category, args.content, sourceChapterId);
       return { created: true, id, category: args.category };
     },
   },
@@ -1097,7 +1256,7 @@ const HANDLERS = {
     category: '时间线与记忆',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT * FROM timeline_events ORDER BY year').all();
+      return clipFields(pdb.prepare('SELECT * FROM timeline_events ORDER BY year').all(), ['description']);
     },
   },
   create_timeline_event: {
@@ -1116,17 +1275,48 @@ const HANDLERS = {
     entity: null,
     category: '项目状态',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      const { pdb } = ctx;
       const totalWords = pdb.prepare('SELECT SUM(word_count) as total FROM chapters').get().total || 0;
       const chCount = pdb.prepare('SELECT COUNT(*) as cnt FROM chapters').get().cnt;
       const charCount = pdb.prepare('SELECT COUNT(*) as cnt FROM characters').get().cnt;
       const foreshadowCount = pdb.prepare('SELECT COUNT(*) as cnt FROM foreshadows').get().cnt;
       const worldCount = pdb.prepare('SELECT COUNT(*) as cnt FROM world_entries').get().cnt;
       const sciCount = pdb.prepare('SELECT COUNT(*) as cnt FROM science_entries').get().cnt;
+      const relationCount = pdb.prepare('SELECT COUNT(*) as cnt FROM character_relations').get().cnt;
+      const memoryCount = pdb.prepare('SELECT COUNT(*) as cnt FROM memories').get().cnt;
+      const timelineCount = pdb.prepare('SELECT COUNT(*) as cnt FROM timeline_events').get().cnt;
+      const clueUnresolved = pdb.prepare('SELECT COUNT(*) as cnt FROM clue_board WHERE resolved = 0').get().cnt;
+      const volumeCount = pdb.prepare('SELECT COUNT(*) as cnt FROM volumes').get().cnt;
+      const payoffCount = pdb.prepare('SELECT COUNT(*) as cnt FROM payoff_points').get().cnt;
+      const tokenRow = pdb.prepare('SELECT COALESCE(SUM(input_tokens), 0) AS tokenInput, COALESCE(SUM(output_tokens), 0) AS tokenOutput FROM token_usage').get();
       const statusBreakdown = {};
       pdb.prepare('SELECT status, COUNT(*) as cnt FROM chapters GROUP BY status').all()
         .forEach(r => statusBreakdown[r.status] = r.cnt);
-      return { totalWords, chapterCount: chCount, characterCount: charCount, foreshadowCount, worldCount, sciCount, chapterStatus: statusBreakdown };
+      const meta = {};
+      pdb.prepare("SELECT key, value FROM project_meta WHERE key IN ('mode', 'target_words')").all()
+        .forEach((row) => { meta[row.key] = row.value; });
+      const modeTargets = { 'short-story': 30000, 'medium-novel': 100000, 'long-novel': 200000 };
+      const targetWords = meta.target_words
+        ? parseInt(meta.target_words, 10) || 0
+        : modeTargets[meta.mode] || 100000;
+      return {
+        totalWords,
+        targetWords,
+        chapterCount: chCount,
+        characterCount: charCount,
+        relationCount,
+        foreshadowCount,
+        worldCount,
+        sciCount,
+        memoryCount,
+        timelineCount,
+        clueUnresolved,
+        volumeCount,
+        payoffCount,
+        tokenInput: tokenRow.tokenInput,
+        tokenOutput: tokenRow.tokenOutput,
+        chapterStatus: statusBreakdown,
+      };
     },
   },
   // ── Volumes ──
@@ -1137,13 +1327,18 @@ const HANDLERS = {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const vols = pdb.prepare('SELECT * FROM volumes ORDER BY sort_order').all();
       for (const v of vols) {
-        v.chapters = pdb.prepare('SELECT num, title, status, word_count, outline, summary FROM chapters WHERE volume_id = ? ORDER BY num').all(v.id);
+        v.chapters = clipFields(
+          pdb.prepare('SELECT num, title, status, word_count, outline, summary FROM chapters WHERE volume_id = ? ORDER BY num').all(v.id),
+          ['outline', 'summary'],
+          200,
+        );
       }
       return vols;
     },
   },
   create_volume: {
     entity: 'volume',
+    chapterTree: true,
     category: '章节与卷',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1156,6 +1351,7 @@ const HANDLERS = {
   },
   update_volume: {
     entity: 'volume',
+    chapterTree: true,
     category: '章节与卷',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1165,20 +1361,35 @@ const HANDLERS = {
       if (args.summary !== undefined) { updates.push('summary = ?'); params.push(args.summary); }
       if (updates.length === 0) return { error: '没有要更新的字段' };
       params.push(args.volume_id);
-      pdb.prepare(`UPDATE volumes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      const info = pdb.prepare(`UPDATE volumes SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      if (info.changes === 0) {
+        return { error: `卷 ${args.volume_id} 不存在，可能已被用户删除` };
+      }
       return { updated: true, volume_id: args.volume_id };
     },
   },
   delete_volume: {
     entity: 'volume',
+    chapterTree: true,
+    // Removing a volume deletes its chapters, so the chapter tree and every
+    // chapter-deletion side effect are invalidated too.
+    extraEntities: ['chapter', 'character', 'foreshadow', 'memory', 'clue'],
     category: '章节与卷',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      const { pdb, args, db, projectName } = ctx;
       const vol = pdb.prepare('SELECT id FROM volumes WHERE id = ?').get(args.volume_id);
       if (!vol) return { error: `卷 ${args.volume_id} 不存在` };
+      const chapters = pdb.prepare('SELECT num, status FROM chapters WHERE volume_id = ?').all(args.volume_id);
+      if (chapters.length > 0 && args.force !== true) {
+        const accepted = chapters.filter((ch) => ch.status === 'accepted').length;
+        return {
+          error: `卷 ${args.volume_id} 内有 ${chapters.length} 章${accepted ? `（其中 ${accepted} 章已定稿）` : ''}，删除会一并删除。请先向用户确认；确认后传 force=true。`,
+        };
+      }
       pdb.prepare('DELETE FROM chapters WHERE volume_id = ?').run(args.volume_id);
       pdb.prepare('DELETE FROM volumes WHERE id = ?').run(args.volume_id);
-      return { deleted: true, volume_id: args.volume_id };
+      db.recalculateWordCount(projectName);
+      return { deleted: true, volume_id: args.volume_id, deleted_chapters: chapters.length };
     },
   },
   // ── Settings (science_entries) ──
@@ -1187,16 +1398,24 @@ const HANDLERS = {
     category: '设定体系',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return pdb.prepare('SELECT * FROM science_entries ORDER BY sort_order, category, label, name').all();
+      return clipFields(
+        pdb.prepare('SELECT * FROM science_entries ORDER BY sort_order, category, label, name').all(),
+        ['description', 'references'],
+      );
     },
   },
   create_science_entry: {
     entity: 'science',
     category: '设定体系',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      const { pdb, args } = ctx;
+      const gate = genreGate(pdb, SETTING_PAGE_GENRES, '设定体系');
+      if (gate) return gate;
       const id = randomUUID();
-      const category = ALLOWED_SETTING_CATEGORIES.has(args.category) ? args.category : '';
+      const category = resolveScienceCategory(
+        pdb,
+        typeof args.category === 'string' ? args.category.trim() : '',
+      );
       pdb.prepare(`INSERT INTO science_entries (id, label, name, description, "references", category, sort_order)
         VALUES (?, ?, ?, ?, ?, ?, ?)`)
         .run(
@@ -1209,6 +1428,39 @@ const HANDLERS = {
           Number(args.sort_order) || 0,
         );
       return { created: true, id, label: args.label || 'known', category, name: args.name };
+    },
+  },
+  update_science_entry: {
+    entity: 'science',
+    category: '设定体系',
+    run(ctx) {
+      const { pdb, args } = ctx;
+      const existing = pdb.prepare('SELECT id FROM science_entries WHERE id = ?').get(args.id);
+      if (!existing) return { error: `设定条目 ${args.id} 不存在` };
+      const fields = {};
+      if (args.label !== undefined) fields.label = args.label;
+      if (args.name !== undefined) fields.name = args.name;
+      if (args.description !== undefined) fields.description = args.description;
+      if (args.references !== undefined) fields.references = args.references;
+      if (args.sort_order !== undefined) fields.sort_order = Number(args.sort_order) || 0;
+      if (args.category !== undefined) {
+        fields.category = resolveScienceCategory(
+          pdb,
+          typeof args.category === 'string' ? args.category.trim() : '',
+        );
+      }
+      if (Object.keys(fields).length === 0) return { error: '没有要更新的字段' };
+      const updates = [];
+      const params = [];
+      for (const key of ['label', 'name', 'description', 'references', 'category', 'sort_order']) {
+        if (fields[key] === undefined) continue;
+        updates.push(key === 'references' ? '"references" = ?' : `${key} = ?`);
+        params.push(fields[key]);
+      }
+      updates.push("updated_at = datetime('now')");
+      params.push(args.id);
+      pdb.prepare(`UPDATE science_entries SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      return { updated: true, id: args.id, category: fields.category };
     },
   },
   // ── World update/delete ──
@@ -1302,16 +1554,20 @@ const HANDLERS = {
     entity: 'foreshadow',
     category: '伏笔与线索',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
-      return deleteById(args.title, 'foreshadows', 'title', '伏笔');
+      const { pdb, args, deleteById } = ctx;
+      if (args.id) return deleteById(args.id, 'foreshadows', 'id', '伏笔');
+      if (!args.title) return { error: '请提供 id 或 title' };
+      return deleteByTitle(pdb, deleteById, 'foreshadows', args.title, '伏笔');
     },
   },
   delete_payoff: {
     entity: 'payoff',
     category: '爽点设计',
     run(ctx) {
-      const { deleteById, args } = ctx;
-      return deleteById(args.title, 'payoff_points', 'title', '爽点');
+      const { pdb, args, deleteById } = ctx;
+      if (args.id) return deleteById(args.id, 'payoff_points', 'id', '爽点');
+      if (!args.title) return { error: '请提供 id 或 title' };
+      return deleteByTitle(pdb, deleteById, 'payoff_points', args.title, '爽点');
     },
   },
   // ── Chapter Characters ──
@@ -1350,6 +1606,7 @@ const HANDLERS = {
   },
   set_chapter_character: {
     entity: 'chapter',
+    extraEntities: ['character'],
     category: '章节与卷',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1365,6 +1622,7 @@ const HANDLERS = {
   },
   remove_chapter_character: {
     entity: 'chapter',
+    extraEntities: ['character'],
     category: '章节与卷',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
@@ -1386,14 +1644,16 @@ const HANDLERS = {
       let sql = 'SELECT * FROM clue_board ORDER BY resolved, created_at DESC';
       if (args.status === 'unresolved') { sql = 'SELECT * FROM clue_board WHERE resolved = 0 ORDER BY created_at DESC'; }
       if (args.status === 'resolved') { sql = 'SELECT * FROM clue_board WHERE resolved = 1 ORDER BY resolved_at DESC'; }
-      return pdb.prepare(sql).all();
+      return clipFields(pdb.prepare(sql).all(), ['description']);
     },
   },
   create_clue: {
     entity: 'clue',
     category: '伏笔与线索',
     run(ctx) {
-      const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      const { pdb, args } = ctx;
+      const gate = genreGate(pdb, ['mystery'], '线索板');
+      if (gate) return gate;
       const id = randomUUID();
       let relatedChapterId = null;
       if (args.related_chapter_num) {
@@ -1416,6 +1676,16 @@ const HANDLERS = {
       if (args.title !== undefined) { updates.push('title = ?'); params.push(args.title); }
       if (args.description !== undefined) { updates.push('description = ?'); params.push(args.description); }
       if (args.kind !== undefined) { updates.push('kind = ?'); params.push(args.kind); }
+      if (args.related_chapter_num !== undefined) {
+        const num = Number(args.related_chapter_num) || 0;
+        if (num > 0) {
+          const chapter = pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(num);
+          if (!chapter) return { error: `章节 ${num} 不存在` };
+          updates.push('related_chapter_id = ?'); params.push(chapter.id);
+        } else {
+          updates.push('related_chapter_id = NULL');
+        }
+      }
       if (args.resolved !== undefined) {
         updates.push('resolved = ?');
         params.push(args.resolved ? 1 : 0);
@@ -1460,7 +1730,22 @@ const HANDLERS = {
         wordCount: Number(meta.word_count) || 0,
         authorName: meta.author_name || '',
         description: meta.description || '',
+        authorNotes: meta.author_notes || '',
       };
+    },
+  },
+  // ── Author Notes ──
+  update_author_notes: {
+    entity: 'project',
+    category: '项目状态',
+    run(ctx) {
+      const { pdb, args } = ctx;
+      try {
+        const notes = saveAuthorNotes(pdb, args.notes);
+        return { updated: true, authorNotes: notes };
+      } catch (e) {
+        return { error: e.message };
+      }
     },
   },
   // ── Project Phase ──
@@ -1479,9 +1764,11 @@ const HANDLERS = {
   },
 };
 
-// Single tool registry: schema + handler + entity + prompt category.
+// Single tool registry: schema + handler + affected entities + prompt category.
 // TOOLS (the AI-facing schema array) is the source for names/params; the
 // handler map is validated against it at startup so the two cannot drift.
+// `entities` and `chapterTree` are sent to the client with every tool event so
+// the UI never has to mirror this table.
 const TOOL_REGISTRY = Object.fromEntries(
   TOOLS.map((schema) => {
     const name = schema.function.name;
@@ -1493,7 +1780,8 @@ const TOOL_REGISTRY = Object.fromEntries(
         name,
         description: schema.function.description,
         parameters: schema.function.parameters,
-        entity: handler.entity,
+        entities: [...(handler.entity ? [handler.entity] : []), ...(handler.extraEntities || [])],
+        chapterTree: handler.chapterTree === true,
         category: handler.category,
         run: handler.run,
       },
@@ -1504,7 +1792,211 @@ for (const name of Object.keys(HANDLERS)) {
   if (!TOOL_REGISTRY[name]) throw new Error(`Handler "${name}" has no tool schema`);
 }
 
-const CATEGORY_ORDER = ['设定构建', '世界观', '科幻设定', '伏笔与线索', '爽点设计', '章节与卷', '时间线与记忆', '项目状态', '其他'];
+const CATEGORY_ORDER = ['设定构建', '世界观', '设定体系', '伏笔与线索', '爽点设计', '章节与卷', '时间线与记忆', '项目状态', '其他'];
+
+// Pages hidden by genre/style must not be writable by the AI either, otherwise
+// entities land in a page the author cannot open or manage.
+// (Genre list lives in settings.js with the category presets.)
+
+// Tool results are appended to the conversation and resent on every later
+// round. Imported projects can hold 1000-character descriptions, so keep list
+// rows bounded; the AI can use get_* when it needs the full record.
+function clipFields(rows, fields, max = 400) {
+  for (const row of rows) {
+    for (const field of fields) {
+      if (typeof row[field] === 'string' && row[field].length > max) {
+        row[field] = `${row[field].slice(0, max)}…`;
+      }
+    }
+  }
+  return rows;
+}
+
+// Parameter names whose meaning is already carried by the name itself. Drop
+// their descriptions before sending the schema; keep descriptions for lookup
+// keys, ranges, enums with side effects, and anything ambiguous.
+const OMIT_PARAM_DESCRIPTIONS = new Set([
+  'id',
+  'name',
+  'title',
+  'content',
+  'outline',
+  'summary',
+  'description',
+  'age',
+  'gender',
+  'appearance',
+  'personality',
+  'background',
+  'motivation',
+  'status',
+  'label',
+  'role',
+  'kind',
+  'year',
+  'chapter_num',
+  'volume_id',
+  'references',
+]);
+
+function compactToolDescriptions(tools) {
+  return tools.map((tool) => {
+    const properties = tool.function?.parameters?.properties;
+    if (!properties) return tool;
+    const nextProperties = {};
+    for (const [key, value] of Object.entries(properties)) {
+      if (!OMIT_PARAM_DESCRIPTIONS.has(key) || !value.description) {
+        nextProperties[key] = value;
+        continue;
+      }
+      const { description, ...rest } = value;
+      nextProperties[key] = rest;
+    }
+    return {
+      ...tool,
+      function: {
+        ...tool.function,
+        parameters: { ...tool.function.parameters, properties: nextProperties },
+      },
+    };
+  });
+}
+
+function projectGenres(pdb) {
+  return pdb.prepare('SELECT genre FROM project_genres').all().map((row) => row.genre);
+}
+
+function genreGate(pdb, allowedGenres, featureName) {
+  const genres = projectGenres(pdb);
+  // Legacy projects without genre metadata: keep the old permissive behavior.
+  if (genres.length === 0 || genres.some((genre) => allowedGenres.includes(genre))) return null;
+  return { error: `当前项目类型没有「${featureName}」页面，不能创建此类内容。` };
+}
+
+/**
+ * Accept a built-in category key or one the project already uses, so the AI can
+ * file entries under custom categories but cannot invent new ones.
+ */
+function resolveScienceCategory(pdb, requested) {
+  if (!requested) return '';
+  if (ALLOWED_SETTING_CATEGORIES.has(requested)) return requested;
+  const used = pdb.prepare('SELECT 1 AS x FROM science_entries WHERE category = ? LIMIT 1').get(requested);
+  return used ? requested : '';
+}
+
+/**
+ * Delete by title, refusing when the title is ambiguous so a single tool call
+ * can never remove several rows.
+ */
+function deleteByTitle(pdb, deleteById, table, title, entityName) {
+  const matches = pdb.prepare(`SELECT id FROM ${table} WHERE title = ?`).all(title);
+  if (matches.length > 1) {
+    return { error: `标题 "${title}" 对应 ${matches.length} 条${entityName}，请改用 id 精确删除：${matches.map((m) => m.id).join(', ')}` };
+  }
+  return deleteById(title, table, 'title', entityName);
+}
+
+// ─── Per-request tool selection ───
+// Passing every schema on every round costs thousands of input tokens and makes the
+// model choose from tools that do not apply to the project or the current
+// intent. Keep the default set lean; destructive tools appear only when the
+// author explicitly asks to delete something.
+const DELETE_INTENT_RE = /删除|删掉|移除|去掉|清理|delete|remove|drop/i;
+const VOLUME_INTENT_RE = /卷|volume/i;
+// Author notes are user-owned rules. Only expose the write tool when the
+// author explicitly asks to remember/change a preference, so the model does
+// not silently promote its own summary of the conversation into the rules.
+const NOTES_INTENT_RE = /创作约定|作者约定|写作约定|写作规则|偏好|记住|记下|记录一下|以后都|每次都|不要再|别再|author\s*notes?|writing\s*rules?|preferences?|remember|from\s+now\s+on/i;
+const DESTRUCTIVE_TOOL_NAMES = new Set([
+  'delete_chapter',
+  'delete_volume',
+  'delete_character',
+  'delete_world_entry',
+  'delete_science_entry',
+  'delete_foreshadow',
+  'delete_payoff',
+  'delete_relation',
+  'delete_memory',
+  'delete_timeline_event',
+  'delete_clue',
+  'remove_chapter_character',
+]);
+const SETTING_TOOL_NAMES = new Set([
+  'list_science',
+  'create_science_entry',
+  'update_science_entry',
+  'delete_science_entry',
+]);
+const CLUE_TOOL_NAMES = new Set(['list_clues', 'create_clue', 'update_clue', 'delete_clue']);
+const PAYOFF_TOOL_NAMES = new Set(['list_payoffs', 'create_payoff', 'update_payoff', 'delete_payoff']);
+
+function projectFeatureFlags(projectName) {
+  try {
+    const db = require('./db');
+    const pdb = db.getProjectDb(projectName);
+    const genres = projectGenres(pdb);
+    const styles = pdb.prepare('SELECT style FROM project_styles').all().map((row) => row.style);
+    const legacyPowerFantasy = pdb
+      .prepare("SELECT value FROM project_meta WHERE key = 'power_fantasy'")
+      .get()?.value === '1';
+    return {
+      genres,
+      hasScience: pdb.prepare('SELECT COUNT(*) AS c FROM science_entries').get().c > 0,
+      hasClues: pdb.prepare('SELECT COUNT(*) AS c FROM clue_board').get().c > 0,
+      hasPayoffs:
+        styles.includes('power-fantasy') ||
+        legacyPowerFantasy ||
+        pdb.prepare('SELECT COUNT(*) AS c FROM payoff_points').get().c > 0,
+    };
+  } catch {
+    return { genres: [], hasScience: false, hasClues: false, hasPayoffs: false };
+  }
+}
+
+/**
+ * Return the tool schemas worth sending for this request.
+ *
+ * @param {string} projectName
+ * @param {'writing'|'collab'} mode
+ * @param {Array<{role: string, content?: string}>} messages
+ */
+function getToolsForRequest(projectName, mode, messages = []) {
+  const flags = projectFeatureFlags(projectName);
+  const recentUserText = messages
+    .filter((message) => message.role === 'user')
+    .slice(-3)
+    .map((message) => String(message.content || ''))
+    .join('\n');
+  // Notes can also be written right after the assistant offers to remember
+  // something and the author just replies "好". Keep the destructive-tool
+  // intents user-only, but let the assistant's own offer count for notes.
+  const recentAssistantText = messages
+    .filter((message) => message.role === 'assistant')
+    .slice(-3)
+    .map((message) => String(message.content || ''))
+    .join('\n');
+  const deleteIntent = DELETE_INTENT_RE.test(recentUserText);
+  const volumeIntent = VOLUME_INTENT_RE.test(recentUserText);
+  const notesIntent = NOTES_INTENT_RE.test(recentUserText) || NOTES_INTENT_RE.test(recentAssistantText);
+
+  const hasSettingPage = flags.genres.length === 0
+    || flags.genres.some((genre) => SETTING_PAGE_GENRES.includes(genre))
+    || flags.hasScience;
+  const hasCluePage = flags.genres.length === 0 || flags.genres.includes('mystery') || flags.hasClues;
+  const hasPayoffPage = flags.hasPayoffs;
+
+  return compactToolDescriptions(TOOLS.filter((tool) => {
+    const name = tool.function.name;
+    if (DESTRUCTIVE_TOOL_NAMES.has(name) && !deleteIntent) return false;
+    if (name === 'delete_volume' && !volumeIntent) return false;
+    if (name === 'create_volume' && mode === 'writing' && !volumeIntent) return false;
+    if (name === 'update_author_notes' && !notesIntent) return false;
+    if (!hasSettingPage && SETTING_TOOL_NAMES.has(name)) return false;
+    if (!hasCluePage && CLUE_TOOL_NAMES.has(name)) return false;
+    if (!hasPayoffPage && PAYOFF_TOOL_NAMES.has(name)) return false;
+    return true;
+  }));
+}
 
 function describeParams(tool) {
   const props = tool.parameters?.properties || {};
@@ -1568,5 +2060,5 @@ function executeTool(projectName, toolName, args) {
   return tool.run({ db, pdb, projectName, args, updateById, deleteById });
 }
 
-module.exports = { TOOLS, TOOL_REGISTRY, buildToolReference, executeTool };
+module.exports = { TOOLS, TOOL_REGISTRY, buildToolReference, getToolsForRequest, executeTool };
 

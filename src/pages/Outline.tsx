@@ -1,19 +1,38 @@
-import { Check, Loader, Pen, Plus, Save, ScrollText, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Check, Loader, Pen, Pencil, Plus, Save, ScrollText, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/hooks/useT'
 import { aiApi, chaptersApi, extractAIJsonObject, getAIResponseText } from '@/lib/api'
+import { createChapter, deleteChapter, renameVolume } from '@/lib/chapterActions'
 import { formatChapterTitle } from '@/lib/chapterTitle'
 import { formatVolumeTitle } from '@/lib/volumeTitle'
+import { useAgentStore } from '@/stores/useAgentStore'
 import { useChapterStore } from '@/stores/useChapterStore'
 import { useProjectStore } from '@/stores/useProjectStore'
+import type { Volume } from '@/types'
 
 export function Outline() {
   const { t } = useT()
   const volumes = useChapterStore((s) => s.volumes)
   const updateChapter = useChapterStore((s) => s.updateChapter)
-  const createChapter = useChapterStore((s) => s.createChapter)
   const currentProject = useProjectStore((s) => s.currentProject)
+  const projects = useProjectStore((s) => s.projects)
+  // Deleting a chapter mid-generation would fight the AI over the structure.
+  const aiRunning = useAgentStore((s) => {
+    if (!currentProject) return false
+    const projectRuns = s.runs[currentProject]
+    return projectRuns ? Object.values(projectRuns).some((run) => run.status === 'running') : false
+  })
   const [activeChapterId, setActiveChapterId] = useState<number | null>(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [editingVolumeId, setEditingVolumeId] = useState<number | null>(null)
+  const [volumeTitleDraft, setVolumeTitleDraft] = useState('')
+  const [volumeError, setVolumeError] = useState<{ volumeId: number; message: string } | null>(null)
+  const volumeInputRef = useRef<HTMLInputElement | null>(null)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
   const [collapsedVolumes, setCollapsedVolumes] = useState<Set<number>>(new Set())
   const [outlineText, setOutlineText] = useState('')
   const [dimensions, setDimensions] = useState({
@@ -22,6 +41,7 @@ export function Outline() {
     worldTexture: '',
     concreteMystery: '',
     interpersonalTension: '',
+    genreBeat: '',
   })
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -29,6 +49,10 @@ export function Outline() {
   const [aiSuggestion, setAiSuggestion] = useState('')
 
   const activeChapter = volumes.flatMap((v) => v.chapters).find((c) => c.id === activeChapterId)
+  const projectGenres = currentProject ? (projects.find((p) => p.name === currentProject)?.genres ?? []) : []
+  const genreBeatPlaceholder = projectGenres.length
+    ? projectGenres.map((genre) => t(`outline.genreBeatFocus.${genre}`)).join('；')
+    : t('outline.genreBeatHint')
 
   // Select first chapter on mount or when volumes change
   useEffect(() => {
@@ -48,10 +72,88 @@ export function Outline() {
         worldTexture: activeChapter.worldTexture || '',
         concreteMystery: activeChapter.concreteMystery || '',
         interpersonalTension: activeChapter.interpersonalTension || '',
+        genreBeat: activeChapter.genreBeat || '',
       })
       setAiSuggestion('')
     }
-  }, [activeChapterId, activeChapter?.outline, activeChapter?.cognitiveFrame])
+    setEditingTitle(false)
+  }, [activeChapterId, activeChapter?.outline, activeChapter?.cognitiveFrame, activeChapter?.genreBeat])
+
+  const startRenameVolume = (vol: Volume) => {
+    if (aiRunning) return
+    setVolumeError(null)
+    setEditingVolumeId(vol.id)
+    setVolumeTitleDraft(vol.title || '')
+  }
+
+  const saveVolumeTitle = async (vol: Volume) => {
+    const next = volumeTitleDraft.trim()
+    setEditingVolumeId(null)
+    if (!currentProject || !next || next === (vol.title || '')) return
+    try {
+      await renameVolume(currentProject, vol.id, next)
+    } catch (e) {
+      setVolumeError({ volumeId: vol.id, message: e instanceof Error ? e.message : t('common.saveFailed') })
+    }
+  }
+
+  // Focus/select the volume title when inline renaming starts.
+  useEffect(() => {
+    if (editingVolumeId != null) {
+      volumeInputRef.current?.focus()
+      volumeInputRef.current?.select()
+    }
+  }, [editingVolumeId])
+
+  // Focus the chapter title input when inline editing starts.
+  useEffect(() => {
+    if (editingTitle) titleInputRef.current?.select()
+  }, [editingTitle])
+
+  // Structure edits are unsafe while the AI is writing.
+  useEffect(() => {
+    if (!aiRunning) return
+    setEditingVolumeId(null)
+    setVolumeTitleDraft('')
+  }, [aiRunning])
+
+  // Close transient edit UI when switching projects.
+  useEffect(() => {
+    if (currentProject) {
+      setEditingVolumeId(null)
+      setVolumeTitleDraft('')
+      setVolumeError(null)
+    }
+  }, [currentProject])
+
+  // Close the delete confirmation when switching chapters, when the AI starts,
+  // or when the active chapter becomes finalized (accepted chapters have no
+  // delete affordance).
+  useEffect(() => {
+    if (activeChapterId || aiRunning || activeChapter?.status === 'accepted') {
+      setConfirmingDelete(false)
+      setDeleteError('')
+    }
+  }, [activeChapterId, aiRunning, activeChapter?.status])
+
+  const handleDeleteChapter = async () => {
+    if (!currentProject || !activeChapter || aiRunning || activeChapter.status === 'accepted') return
+    const all = volumes.flatMap((v) => v.chapters)
+    const index = all.findIndex((c) => c.id === activeChapter.id)
+    // Keep the user near the same spot instead of jumping back to chapter 1.
+    const nextChapter = all[index + 1] ?? all[index - 1] ?? null
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      await deleteChapter(currentProject, activeChapter.num)
+      setActiveChapterId(nextChapter?.id ?? null)
+      setConfirmingDelete(false)
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : t('common.deleteFailed'))
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const handleSaveOutline = async () => {
     if (!currentProject || !activeChapter) return
@@ -82,7 +184,7 @@ export function Outline() {
   const handleNewChapter = async (volumeId: number) => {
     if (!currentProject) return
     try {
-      const created = await createChapter(currentProject, t('chapter.defaultTitle'), '', volumeId)
+      const created = await createChapter(currentProject, t('chapter.defaultTitle'), volumeId)
       if (created?.num) {
         // Find the new chapter's ID from the reloaded store (match volume + num to avoid cross-volume collisions)
         const ch = volumes.flatMap((v) => v.chapters).find((c) => c.num === created.num && c.volumeId === volumeId)
@@ -130,19 +232,32 @@ export function Outline() {
       const text = getAIResponseText(res)
       const parsed = extractAIJsonObject(text)
       if (parsed) {
-        if (parsed.title && [t('chapter.defaultTitle'), t('chapter.firstChapterTitle')].includes(activeChapter.title)) {
-          handleSaveTitle(parsed.title)
-        }
-        if (parsed.outline) setOutlineText(parsed.outline)
-        setDimensions({
+        const shouldSetTitle = Boolean(
+          parsed.title && [t('chapter.defaultTitle'), t('chapter.firstChapterTitle')].includes(activeChapter.title),
+        )
+        const nextOutline = parsed.outline || outlineText
+        const nextDimensions = {
           cognitiveFrame: parsed.cognitive_frame || dimensions.cognitiveFrame,
           emotionalAnchor: parsed.emotional_anchor || dimensions.emotionalAnchor,
           worldTexture: parsed.world_texture || dimensions.worldTexture,
           concreteMystery: parsed.concrete_mystery || dimensions.concreteMystery,
           interpersonalTension: parsed.interpersonal_tension || dimensions.interpersonalTension,
-        })
-        // Auto-save after generation
-        setTimeout(() => handleSaveOutline(), 100)
+          genreBeat: parsed.genre_beat || dimensions.genreBeat,
+        }
+        setOutlineText(nextOutline)
+        setDimensions(nextDimensions)
+        // Persist immediately with the generated values. Deferring to
+        // handleSaveOutline() here would save the pre-generation state from
+        // this render's closure.
+        try {
+          await updateChapter(currentProject, activeChapter.num, {
+            ...(shouldSetTitle ? { title: parsed.title } : {}),
+            outline: nextOutline,
+            ...nextDimensions,
+          })
+        } catch (e) {
+          console.error('Auto-save generated outline failed:', e)
+        }
       } else if (text) {
         setOutlineText(text)
       }
@@ -159,6 +274,13 @@ export function Outline() {
     } catch (e) {
       console.error('Save title failed:', e)
     }
+  }
+
+  const commitTitle = async () => {
+    setEditingTitle(false)
+    const next = titleDraft.trim()
+    if (!activeChapter || !next || next === activeChapter.title) return
+    await handleSaveTitle(next)
   }
 
   const handleAIOptimize = async () => {
@@ -230,20 +352,65 @@ export function Outline() {
             return (
               <div key={vol.id}>
                 <div
-                  className="px-4 pb-2 pt-1 font-display text-sm font-medium text-[var(--ink)] flex items-center gap-1 cursor-pointer select-none hover:opacity-80 transition-opacity"
+                  className="group/vol px-4 pb-2 pt-1 font-display text-sm font-medium text-[var(--ink)] flex items-center gap-1 cursor-pointer select-none hover:opacity-80 transition-opacity"
                   onClick={() => toggleVolumeCollapse(vol.id)}
                 >
                   <span
-                    className="text-[10px] text-[var(--ink-mute)] transition-transform duration-200 inline-block"
+                    className="text-[10px] text-[var(--ink-mute)] transition-transform duration-200 inline-block shrink-0"
                     style={{ transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
                   >
                     ▼
                   </span>
-                  {formatVolumeTitle(vol.title, vol.sortOrder, t)}
-                  <span className="text-[10px] text-[var(--ink-tertiary)] ml-auto">
+                  {editingVolumeId === vol.id ? (
+                    <input
+                      ref={volumeInputRef}
+                      className="flex-1 min-w-0 bg-[var(--canvas-card)] border border-[var(--accent-gold)] rounded px-1.5 py-0.5 text-[13px] font-display font-medium text-[var(--ink)] outline-none"
+                      value={volumeTitleDraft}
+                      onChange={(e) => setVolumeTitleDraft(e.target.value)}
+                      onBlur={() => void saveVolumeTitle(vol)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.currentTarget.blur()
+                        }
+                        if (e.key === 'Escape') {
+                          // Unmount without blurring so onBlur doesn't save.
+                          setVolumeTitleDraft(vol.title || '')
+                          setEditingVolumeId(null)
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={t('common.edit')}
+                    />
+                  ) : (
+                    <span className="flex-1 truncate">{formatVolumeTitle(vol.title, vol.sortOrder, t)}</span>
+                  )}
+                  {editingVolumeId !== vol.id && (
+                    <button
+                      type="button"
+                      className={`w-5 h-5 flex items-center justify-center rounded border-none bg-transparent text-[var(--ink-mute)] focus:opacity-100 hover:text-[var(--accent-gold)] disabled:cursor-not-allowed cursor-pointer transition-opacity shrink-0 ${
+                        aiRunning ? 'opacity-30' : 'opacity-0 group-hover/vol:opacity-100'
+                      }`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        startRenameVolume(vol)
+                      }}
+                      disabled={aiRunning}
+                      title={aiRunning ? t('ai.generating') : t('common.edit')}
+                      aria-label={t('common.edit')}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
+                  <span className="text-[10px] text-[var(--ink-tertiary)] shrink-0">
                     {t('outline.chapterCount', { n: vol.chapters.length })}
                   </span>
                 </div>
+                {volumeError?.volumeId === vol.id && (
+                  <div className="mx-4 mb-2 px-2 py-1 rounded-md bg-[var(--error-soft)] text-[11px] leading-snug text-[var(--error)]">
+                    {volumeError.message}
+                  </div>
+                )}
                 {!collapsed && (
                   <>
                     {vol.chapters.map((ch) => (
@@ -296,12 +463,42 @@ export function Outline() {
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           {activeChapter ? (
             <>
-              <div className="font-display text-lg font-medium text-[var(--ink)] mb-1">
-                {formatChapterTitle(activeChapter.num, activeChapter.title, t)}
-              </div>
+              {editingTitle ? (
+                <input
+                  ref={titleInputRef}
+                  className="font-display text-lg font-medium text-[var(--ink)] mb-1 w-full bg-transparent border-none outline-none"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onBlur={() => void commitTitle()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.currentTarget.blur()
+                    }
+                    if (e.key === 'Escape') {
+                      setTitleDraft(activeChapter.title || '')
+                      setEditingTitle(false)
+                    }
+                  }}
+                  aria-label={t('common.edit')}
+                />
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 font-display text-lg font-medium text-[var(--ink)] mb-1 p-0 border-none bg-transparent cursor-pointer hover:text-[var(--accent-gold)] transition-colors"
+                  onClick={() => {
+                    setTitleDraft(activeChapter.title || '')
+                    setEditingTitle(true)
+                  }}
+                  title={t('editor.clickToEditTitle')}
+                >
+                  {formatChapterTitle(activeChapter.num, activeChapter.title, t)}
+                  <Pencil className="w-3 h-3 text-[var(--ink-mute)]" />
+                </button>
+              )}
               <div className="text-[12px] text-[var(--ink-tertiary)] mb-4">
                 <span
-                  className={`text-[10px] font-medium px-[6px] py-[1px] rounded-full
+                  className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-[6px] py-[1px] rounded-full
                   ${
                     activeChapter.status === 'accepted'
                       ? 'bg-[var(--success-soft)] text-[var(--success)]'
@@ -312,16 +509,14 @@ export function Outline() {
                           : 'bg-[var(--canvas-pop)] text-[var(--ink-mute)]'
                   }`}
                 >
-                  <span className="inline-flex items-center gap-0.5">
-                    {activeChapter.status === 'accepted' && <Check className="w-2.5 h-2.5" />}
-                    {activeChapter.status === 'accepted'
-                      ? t('status.accepted')
-                      : activeChapter.status === 'review'
-                        ? t('status.review')
-                        : activeChapter.status === 'writing'
-                          ? t('status.writing')
-                          : t('status.pending')}
-                  </span>
+                  {activeChapter.status === 'accepted' && <Check className="w-2.5 h-2.5" />}
+                  {activeChapter.status === 'accepted'
+                    ? t('status.accepted')
+                    : activeChapter.status === 'review'
+                      ? t('status.review')
+                      : activeChapter.status === 'writing'
+                        ? t('status.writing')
+                        : t('status.pending')}
                 </span>{' '}
                 {t('outline.outlineInfo', { count: volumes.flatMap((v) => v.chapters).length })}
               </div>
@@ -340,38 +535,46 @@ export function Outline() {
               </div>
 
               <div className="text-[11px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2">
-                {t('outline.lock5D')}
+                {t('outline.lockDimensions')}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <FiveDimField
+                <DimensionField
                   label={t('pages.dimensionFrame')}
                   value={dimensions.cognitiveFrame}
                   onChange={(v) => updateDimension('cognitiveFrame', v)}
                   placeholder={t('outline.placeholderFrame')}
                 />
-                <FiveDimField
+                <DimensionField
                   label={t('pages.dimensionAnchor')}
                   value={dimensions.emotionalAnchor}
                   onChange={(v) => updateDimension('emotionalAnchor', v)}
                   placeholder={t('outline.placeholderAnchor')}
                 />
-                <FiveDimField
+                <DimensionField
                   label={t('pages.dimensionTexture')}
                   value={dimensions.worldTexture}
                   onChange={(v) => updateDimension('worldTexture', v)}
                   placeholder={t('outline.placeholderTexture')}
                 />
-                <FiveDimField
+                <DimensionField
                   label={t('pages.dimensionMystery')}
                   value={dimensions.concreteMystery}
                   onChange={(v) => updateDimension('concreteMystery', v)}
                   placeholder={t('outline.placeholderMystery')}
                 />
-                <FiveDimField
+                <DimensionField
                   label={t('pages.dimensionTension')}
                   value={dimensions.interpersonalTension}
                   onChange={(v) => updateDimension('interpersonalTension', v)}
                   placeholder={t('outline.placeholderTension')}
+                />
+              </div>
+              <div className="mt-3">
+                <DimensionField
+                  label={t('outline.genreBeat')}
+                  value={dimensions.genreBeat}
+                  onChange={(v) => updateDimension('genreBeat', v)}
+                  placeholder={genreBeatPlaceholder}
                 />
               </div>
 
@@ -384,9 +587,9 @@ export function Outline() {
                 </div>
               )}
 
-              <div className="flex gap-2 mt-5">
+              <div className="flex flex-wrap items-center gap-2 mt-5">
                 <button
-                  className="btn-primary flex items-center gap-1.5"
+                  className="btn-primary flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                   style={{ height: 30, padding: '0 16px', minWidth: 110 }}
                   onClick={handleSaveOutline}
                   disabled={saving}
@@ -394,7 +597,7 @@ export function Outline() {
                   <Save className="w-3.5 h-3.5" /> {saving ? t('common.saving') : t('pages.outlineSave')}
                 </button>
                 <button
-                  className="btn-secondary flex items-center gap-1.5"
+                  className="btn-secondary flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                   style={{ height: 30, padding: '0 16px', minWidth: 135 }}
                   onClick={handleAIOptimize}
                   disabled={optimizing || !outlineText.trim()}
@@ -402,7 +605,55 @@ export function Outline() {
                   {optimizing ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   {optimizing ? t('outline.optimizing') : t('pages.outlineAI')}
                 </button>
+                {activeChapter.status !== 'accepted' && (
+                  <button
+                    type="button"
+                    className="ml-auto h-[30px] px-3 rounded-lg border border-[var(--hairline)] bg-[var(--canvas-elevated)] text-[var(--ink-tertiary)] text-[12px] cursor-pointer hover:text-[var(--error)] hover:border-[var(--error)] flex items-center gap-1.5 shrink-0 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={() => setConfirmingDelete(true)}
+                    disabled={aiRunning || deleting}
+                    title={aiRunning ? t('ai.generating') : t('common.delete')}
+                    aria-label={t('common.delete')}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> {t('common.delete')}
+                  </button>
+                )}
               </div>
+
+              {confirmingDelete && activeChapter.status !== 'accepted' && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-[var(--error-soft)] px-3 py-2 text-[12px] text-[var(--error)]">
+                  <span className="flex-1 leading-snug">
+                    {t('common.deleteConfirm', {
+                      name: formatChapterTitle(activeChapter.num, activeChapter.title, t),
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="h-[30px] px-3 rounded-lg border-none bg-[var(--error)] text-white text-[12px] cursor-pointer hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5 shrink-0 whitespace-nowrap"
+                    onClick={handleDeleteChapter}
+                    disabled={deleting}
+                  >
+                    {deleting && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                    {t('common.delete')}
+                  </button>
+                  <button
+                    type="button"
+                    className="h-[30px] px-3 rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] text-[var(--ink)] text-[12px] cursor-pointer hover:bg-[var(--canvas-mid)] disabled:opacity-50 shrink-0 whitespace-nowrap"
+                    onClick={() => {
+                      setConfirmingDelete(false)
+                      setDeleteError('')
+                    }}
+                    disabled={deleting}
+                  >
+                    {t('common.cancel')}
+                  </button>
+                </div>
+              )}
+
+              {deleteError && (
+                <div className="mt-2 px-3 py-2 rounded-lg bg-[var(--error-soft)] border border-[var(--error)] text-[12px] text-[var(--error)]">
+                  {deleteError}
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center pt-20 text-[var(--ink-tertiary)]">
@@ -417,7 +668,7 @@ export function Outline() {
   )
 }
 
-function FiveDimField({
+function DimensionField({
   label,
   value,
   onChange,

@@ -1,13 +1,18 @@
-import { Brain, Loader, Search, Sparkles, X } from 'lucide-react'
-import { useState } from 'react'
+import { Brain, FileText, Loader, Search, Sparkles, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
+import { useToast } from '@/hooks/useToast'
 import { track } from '@/lib/analytics'
-import { aiApi, extractAIJsonArray, getAIResponseText, memoriesApi } from '@/lib/api'
+import { aiApi, chaptersApi, extractAIJsonArray, getAIResponseText, memoriesApi, projectsApi } from '@/lib/api'
+import { buildRecentChapterDigest } from '@/lib/chapterDigest'
 import { projectProps } from '@/lib/projectIdentity'
 import { useMemories, useProjectName } from '@/lib/useProjectData'
 import type { Memory as MemoryItem } from '@/types'
+
+// Keep in sync with MAX_AUTHOR_NOTES in server/author-notes.js.
+const MAX_AUTHOR_NOTES = 2000
 
 const CAT_LABELS: Record<string, string> = {
   character: 'memory.categoryCharacter',
@@ -27,15 +32,83 @@ const CAT_COLORS: Record<string, { bg: string; text: string }> = {
 
 export function Memory() {
   const { data: memories, loading, reload } = useMemories()
-  useDataRefresh('memory', reload)
   const { t } = useT()
   const project = useProjectName()
+  const showToast = useToast((s) => s.show)
+  const [tab, setTab] = useState<'memories' | 'notes'>('memories')
   const [searchMode, setSearchMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[] | null>(null)
   const [searching, setSearching] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [editing, setEditing] = useState<MemoryItem | null>(null)
+
+  // Author notes are user-owned rules, loaded independently from narrative
+  // memories. Keep a separate saved copy so unsaved edits survive re-renders
+  // and are not clobbered by an AI refresh.
+  const [notes, setNotes] = useState('')
+  const [savedNotes, setSavedNotes] = useState('')
+  const [notesLoading, setNotesLoading] = useState(false)
+  const [notesSaving, setNotesSaving] = useState(false)
+  const notesRequestId = useRef(0)
+
+  const loadNotes = useCallback(async () => {
+    // Bump first: a late response from the previous project must not land
+    // after the switch, including a switch to "no project".
+    const requestId = ++notesRequestId.current
+    if (!project) {
+      setNotes('')
+      setSavedNotes('')
+      setNotesLoading(false)
+      return
+    }
+    setNotesLoading(true)
+    try {
+      const meta = await projectsApi.getMeta(project)
+      if (requestId !== notesRequestId.current) return
+      const value = typeof meta?.author_notes === 'string' ? meta.author_notes : ''
+      setNotes(value)
+      setSavedNotes(value)
+    } catch {
+      if (requestId === notesRequestId.current) showToast(t('memory.notesLoadFailed'), 'error')
+    } finally {
+      if (requestId === notesRequestId.current) setNotesLoading(false)
+    }
+  }, [project, showToast, t])
+
+  useEffect(() => {
+    // Project switch: never show the previous book's notes while the new
+    // project is loading, or a save could write them into the wrong project.
+    setNotes('')
+    setSavedNotes('')
+    void loadNotes()
+  }, [loadNotes])
+
+  useDataRefresh('memory', reload)
+  // The AI can update notes via update_author_notes. Do not overwrite edits
+  // the user has not saved yet; their explicit save wins.
+  useDataRefresh('project', () => {
+    if (notes === savedNotes) void loadNotes()
+  })
+
+  const notesDirty = notes !== savedNotes
+  const notesTooLong = notes.length > MAX_AUTHOR_NOTES
+
+  const handleSaveNotes = async () => {
+    if (!project || !notesDirty || notesTooLong || notesSaving) return
+    setNotesSaving(true)
+    try {
+      const res = await projectsApi.updateAuthorNotes(project, notes.trim())
+      const value = typeof res?.authorNotes === 'string' ? res.authorNotes : notes.trim()
+      setNotes(value)
+      setSavedNotes(value)
+      showToast(t('memory.notesSaved'), 'success')
+    } catch (e) {
+      showToast((e as Error).message || t('common.saveFailed'), 'error')
+    } finally {
+      setNotesSaving(false)
+    }
+  }
 
   const handleSearch = async () => {
     if (!project || !searchQuery.trim()) return
@@ -59,13 +132,21 @@ export function Memory() {
     if (!project) return
     setExtracting(true)
     try {
+      // The extraction prompt needs actual prose, not just chapter metadata.
+      // Pull the last few chapters' previews so the model can ground memories
+      // in what was written instead of inventing them from outlines.
+      const chapters = await chaptersApi.list(project, true)
+      const digest = await buildRecentChapterDigest(project, chapters, { count: 5, previewChars: 3000 })
       const res = await aiApi.chat(
         [
           {
             role: 'system',
             content: t('memory.aiPrompt'),
           },
-          { role: 'user', content: t('memory.aiUserMessage') },
+          {
+            role: 'user',
+            content: digest ? `${t('memory.aiUserMessage')}\n\n${digest}` : t('memory.aiUserMessage'),
+          },
         ],
         project,
       )
@@ -91,39 +172,66 @@ export function Memory() {
 
   const displayList = searchResults !== null ? searchResults : memories || []
 
-  if (loading)
+  if (tab === 'memories' && loading)
     return <div className="flex-1 flex items-center justify-center text-[var(--ink-mute)]">{t('common.loading')}</div>
 
   return (
     <>
       <div className="page-header">
         <h2 className="flex items-center gap-2">
-          <Brain className="w-5 h-5" /> {t('pages.narrativeMemory')}
+          {tab === 'notes' ? <FileText className="w-5 h-5" /> : <Brain className="w-5 h-5" />}
+          {tab === 'notes' ? t('memory.tabNotes') : t('pages.narrativeMemory')}
         </h2>
-        <div className="page-header-actions">
+        {tab === 'memories' && (
+          <div className="page-header-actions">
+            <button
+              type="button"
+              className="btn-secondary flex items-center gap-1.5"
+              style={{ height: 30, padding: '0 14px' }}
+              onClick={() => setSearchMode(!searchMode)}
+            >
+              <Search className="w-3.5 h-3.5" /> {t('pages.semanticSearch')}
+            </button>
+            <button
+              type="button"
+              className="btn-primary flex items-center gap-1.5"
+              style={{ height: 30, padding: '0 14px' }}
+              onClick={handleExtract}
+              disabled={extracting}
+            >
+              {extracting ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {extracting ? t('common.extracting') : t('pages.aiExtract')}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div
+        role="tablist"
+        className="flex gap-0 border-b border-[var(--hairline)] px-6 shrink-0 bg-[var(--canvas-soft)]"
+      >
+        {[
+          { key: 'memories' as const, label: t('memory.tabMemories'), icon: <Brain className="w-3.5 h-3.5" /> },
+          { key: 'notes' as const, label: t('memory.tabNotes'), icon: <FileText className="w-3.5 h-3.5" /> },
+        ].map(({ key, label, icon }) => (
           <button
+            key={key}
             type="button"
-            className="btn-secondary flex items-center gap-1.5"
-            style={{ height: 30, padding: '0 14px' }}
-            onClick={() => setSearchMode(!searchMode)}
+            role="tab"
+            aria-selected={tab === key}
+            className={`px-4 py-2.5 text-[13px] cursor-pointer border-b-2 transition-colors bg-transparent
+              ${tab === key ? 'text-[var(--ink)] border-[var(--accent-gold)]' : 'text-[var(--ink-tertiary)] border-transparent hover:text-[var(--ink-secondary)]'}`}
+            onClick={() => setTab(key)}
           >
-            <Search className="w-3.5 h-3.5" /> {t('pages.semanticSearch')}
+            <span className="flex items-center gap-1">
+              {icon} {label}
+            </span>
           </button>
-          <button
-            type="button"
-            className="btn-primary flex items-center gap-1.5"
-            style={{ height: 30, padding: '0 14px' }}
-            onClick={handleExtract}
-            disabled={extracting}
-          >
-            {extracting ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {extracting ? t('common.extracting') : t('pages.aiExtract')}
-          </button>
-        </div>
+        ))}
       </div>
 
       {/* Search bar */}
-      {searchMode && (
+      {tab === 'memories' && searchMode && (
         <div className="px-6 py-3 border-b border-[var(--hairline)] bg-[var(--canvas-soft)]">
           <div className="flex gap-2 max-w-[500px]">
             <input
@@ -220,32 +328,82 @@ export function Memory() {
         />
       )}
 
-      <div className="page-body" style={{ padding: 0 }}>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3 p-6">
-          {displayList.map((m: any) => {
-            const color = CAT_COLORS[m.category] || { bg: 'var(--canvas-mid)', text: 'var(--ink-tertiary)' }
-            return (
-              <button
-                key={m.id}
-                type="button"
-                className="text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
-                onClick={() => setEditing(m)}
-              >
-                <span
-                  className="text-[10px] px-[7px] py-[1px] rounded-full inline-block mb-2"
-                  style={{ background: color.bg, color: color.text }}
+      {tab === 'memories' && (
+        <div className="page-body" style={{ padding: 0 }}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3 p-6">
+            {displayList.map((m: any) => {
+              const color = CAT_COLORS[m.category] || { bg: 'var(--canvas-mid)', text: 'var(--ink-tertiary)' }
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                  onClick={() => setEditing(m)}
                 >
-                  {t(CAT_LABELS[m.category] || m.category)}
-                </span>
-                <div className="text-[13px] text-[var(--ink-secondary)] leading-[1.6]">{m.content}</div>
-                <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
-                  {m.sourceChapterId ? t('memory.sourceChapter', { n: m.sourceChapterId }) : ''}
-                </div>
-              </button>
-            )
-          })}
+                  <span
+                    className="text-[10px] px-[7px] py-[1px] rounded-full inline-block mb-2"
+                    style={{ background: color.bg, color: color.text }}
+                  >
+                    {t(CAT_LABELS[m.category] || m.category)}
+                  </span>
+                  <div className="text-[13px] text-[var(--ink-secondary)] leading-[1.6]">{m.content}</div>
+                  <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
+                    {m.sourceChapterId ? t('memory.sourceChapter', { n: m.sourceChapterId }) : ''}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
+
+      {tab === 'notes' && (
+        <div className="page-body" style={{ padding: 0 }}>
+          <div className="max-w-[820px] p-6">
+            <p className="text-[12px] leading-[1.7] text-[var(--ink-tertiary)] mb-3">{t('memory.notesHint')}</p>
+            {notesLoading ? (
+              <div className="flex items-center gap-2 py-10 text-[13px] text-[var(--ink-mute)]">
+                <Loader className="w-4 h-4 animate-spin" /> {t('common.loading')}
+              </div>
+            ) : (
+              <>
+                <textarea
+                  aria-label={t('memory.tabNotes')}
+                  className="w-full min-h-[340px] resize-y bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-lg px-3.5 py-3 font-sans text-[13px] leading-[1.75] text-[var(--ink)] outline-none focus:border-[var(--accent-gold)]"
+                  value={notes}
+                  placeholder={t('memory.notesPlaceholder')}
+                  onChange={(e) => setNotes(e.target.value)}
+                  spellCheck={false}
+                />
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <span
+                    className={`text-[12px] font-mono ${notesTooLong ? 'text-[var(--error)]' : 'text-[var(--ink-mute)]'}`}
+                  >
+                    {notesTooLong
+                      ? t('memory.notesTooLong', { n: notes.length - MAX_AUTHOR_NOTES })
+                      : t('memory.notesCount', { n: notes.length, max: MAX_AUTHOR_NOTES })}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    {notesDirty && !notesTooLong && (
+                      <span className="text-[12px] text-[var(--ink-mute)]">{t('memory.notesUnsaved')}</span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn-primary flex items-center gap-1.5"
+                      style={{ height: 30, padding: '0 14px' }}
+                      onClick={handleSaveNotes}
+                      disabled={!notesDirty || notesTooLong || notesSaving}
+                    >
+                      {notesSaving && <Loader className="w-3.5 h-3.5 animate-spin" />}
+                      {notesSaving ? t('common.saving') : t('memory.notesSave')}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   )
 }

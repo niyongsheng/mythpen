@@ -6,26 +6,19 @@ const fs = require('fs');
 const { randomUUID } = require('crypto');
 const db = require('../db');
 const { ALLOWED_STYLES } = require('../styles');
-
-const ALLOWED_GENRES = new Set([
-  'sci-fi',
-  'fantasy',
-  'xianxia',
-  'wuxia',
-  'romance',
-  'history',
-  'urban',
-  'mystery',
-  'game',
-  'biography',
-  'other',
-]);
-const WORLD_CATEGORIES = new Set(['location', 'organization', 'concept', 'event']);
-const MEMORY_CATEGORIES = new Set(['character', 'location', 'item', 'event', 'promise', 'other']);
-const FORESHADOW_STATUSES = new Set(['planted', 'progressing', 'resolved', 'abandoned']);
-const FORESHADOW_PRIORITIES = new Set(['low', 'normal', 'high']);
-const SCIENCE_LABELS = new Set(['known', 'extrapolation', 'hypothesis']);
-const CHARACTER_ROLES = new Set(['appears', 'speaks', 'pov', 'mentioned']);
+const { SETTING_PAGE_GENRES } = require('../settings');
+const {
+  ALLOWED_GENRES,
+  WORLD_CATEGORIES,
+  MEMORY_CATEGORIES,
+  FORESHADOW_STATUSES,
+  FORESHADOW_PRIORITIES,
+  SCIENCE_LABELS,
+  CHARACTER_ROLES,
+  CLUE_KINDS,
+  PAYOFF_TYPES,
+  PAYOFF_STATUSES,
+} = require('./pipeline');
 
 function cleanText(value, maxLength) {
   if (typeof value !== 'string') return '';
@@ -101,13 +94,15 @@ function createProjectFromImport(input) {
     usage = null,
     warnings = [],
     model = '',
+    filePath: requestedFilePath = null,
   } = input;
 
   if (db.dbGet('SELECT 1 AS x FROM recent_projects WHERE name = ?', [name])) {
     throw Object.assign(new Error(`项目"${name}"已存在`), { code: 'PROJECT_ALREADY_EXISTS' });
   }
 
-  const filePath = db.newProjectFilePath();
+  // User-selected .mythpen path (reserved by the route) or legacy internal path.
+  const filePath = requestedFilePath || db.newProjectFilePath();
   try {
     db.openProjectDb(filePath);
     db.registerRecentProject(name, filePath, 0);
@@ -167,6 +162,8 @@ function createProjectFromImport(input) {
     let insertedForeshadows = 0;
     let insertedMemories = 0;
     let insertedScience = 0;
+    let insertedClues = 0;
+    let insertedPayoffs = 0;
     let insertedChapterLinks = 0;
     const chapterIdByNum = new Map();
     const characterIdByName = new Map();
@@ -186,14 +183,14 @@ function createProjectFromImport(input) {
       const insertChapter = pdb.prepare(
         `INSERT INTO chapters
           (volume_id, num, title, outline, content, summary, word_count, status,
-           cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension,
+           cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, genre_beat,
            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'accepted', ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       );
       const insertCharacter = pdb.prepare(
         `INSERT INTO characters
-          (id, name, age, gender, appearance, personality, background, motivation, arc, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
+          (id, name, role, species, age, gender, appearance, personality, background, motivation, arc, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       );
       const insertChapterCharacter = pdb.prepare(
         'INSERT OR IGNORE INTO chapter_characters (chapter_id, character_id, role) VALUES (?, ?, ?)',
@@ -221,8 +218,16 @@ function createProjectFromImport(input) {
          VALUES (?, ?, ?, ?, datetime('now'))`,
       );
       const insertScience = pdb.prepare(
-        `INSERT INTO science_entries (id, label, name, description, "references", created_at, updated_at)
-         VALUES (?, ?, ?, ?, '', datetime('now'), datetime('now'))`,
+        `INSERT INTO science_entries (id, label, category, name, description, "references", created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, '', datetime('now'), datetime('now'))`,
+      );
+      const insertClue = pdb.prepare(
+        `INSERT INTO clue_board (id, title, description, kind, related_chapter_id, resolved, resolved_at, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      );
+      const insertPayoff = pdb.prepare(
+        `INSERT INTO payoff_points (id, title, type, description, status, intensity, setup_chapter, payoff_chapter, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       );
       const setMeta = pdb.prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)');
 
@@ -247,6 +252,7 @@ function createProjectFromImport(input) {
             cleanText(fields.world_texture, 200),
             cleanText(fields.concrete_mystery, 200),
             cleanText(fields.interpersonal_tension, 200),
+            cleanText(fields.genre_beat, 200),
           );
           chapterIdByNum.set(chapter.num, result.lastInsertRowid);
         }
@@ -264,6 +270,8 @@ function createProjectFromImport(input) {
         insertCharacter.run(
           id,
           characterName,
+          ['major', 'minor', 'extra'].includes(character.role) ? character.role : '',
+          cleanText(character.species, 100),
           cleanText(character.age, 50),
           cleanText(character.gender, 20),
           cleanText(character.appearance, 500),
@@ -375,16 +383,67 @@ function createProjectFromImport(input) {
         insertedMemories += 1;
       }
 
-      const scienceKeys = new Set();
-      for (const entry of asArray(archive.science)) {
-        const entryName = cleanName(entry.name, 200);
-        if (!entryName) continue;
-        const label = oneOf(entry.label, SCIENCE_LABELS, 'known');
-        const key = `${label}|${entryName}`;
-        if (scienceKeys.has(key)) continue;
-        scienceKeys.add(key);
-        insertScience.run(randomUUID(), label, entryName, cleanText(entry.description, 1000));
-        insertedScience += 1;
+      // Match the sidebar's visibility rules: writing a hidden page's data
+      // leaves the author with records they cannot open or manage.
+      const hasSettingPage = genres.length === 0
+        || genres.some((genre) => SETTING_PAGE_GENRES.includes(genre));
+      if (hasSettingPage) {
+        const scienceKeys = new Set();
+        for (const entry of asArray(archive.science)) {
+          const entryName = cleanName(entry.name, 200);
+          if (!entryName) continue;
+          const label = oneOf(entry.label, SCIENCE_LABELS, 'known');
+          const key = `${label}|${entryName}`;
+          if (scienceKeys.has(key)) continue;
+          scienceKeys.add(key);
+          insertScience.run(randomUUID(), label, cleanName(entry.category, 40), entryName, cleanText(entry.description, 1000));
+          insertedScience += 1;
+        }
+      }
+
+      if (genres.length === 0 || genres.includes('mystery')) {
+        const clueKeys = new Set();
+        for (const clue of asArray(archive.clues)) {
+          const title = cleanName(clue.title, 200);
+          if (!title) continue;
+          const key = `${clue.kind}|${title}`;
+          if (clueKeys.has(key)) continue;
+          clueKeys.add(key);
+          insertClue.run(
+            randomUUID(),
+            title,
+            cleanText(clue.description, 1000),
+            oneOf(clue.kind, CLUE_KINDS, 'clue'),
+            chapterIdByNum.get(Number(clue.chapter_num)) || null,
+            clue.resolved === true ? 1 : 0,
+            clue.resolved === true ? new Date().toISOString() : null,
+          );
+          insertedClues += 1;
+        }
+      }
+
+      if (powerFantasy || genres.length === 0) {
+        const payoffKeys = new Set();
+        for (const payoff of asArray(archive.payoffs)) {
+          const title = cleanName(payoff.title, 200);
+          if (!title) continue;
+          const type = oneOf(payoff.type, PAYOFF_TYPES, 'other');
+          const status = oneOf(payoff.status, PAYOFF_STATUSES, 'planned');
+          const key = `${type}|${title}`;
+          if (payoffKeys.has(key)) continue;
+          payoffKeys.add(key);
+          insertPayoff.run(
+            randomUUID(),
+            title,
+            type,
+            cleanText(payoff.description, 1000),
+            status,
+            Math.max(1, Math.min(5, Number(payoff.intensity) || 3)),
+            Number(payoff.setup_chapter) || 0,
+            Number(payoff.payoff_chapter) || 0,
+          );
+          insertedPayoffs += 1;
+        }
       }
 
       setMeta.run('import_chapter_count', String(totalChapters));
@@ -402,6 +461,8 @@ function createProjectFromImport(input) {
         foreshadows: insertedForeshadows,
         memories: insertedMemories,
         science: insertedScience,
+        clues: insertedClues,
+        payoffs: insertedPayoffs,
       }));
       setMeta.run('ai_import_warnings', JSON.stringify(warningList));
       setMeta.run('ai_import_model', cleanText(model, 200));
@@ -420,6 +481,9 @@ function createProjectFromImport(input) {
       }
     }
 
+    // Surface an unwritable destination before reporting the import as done.
+    db.getProjectDb(name).flush();
+
     return {
       project: name,
       volumes: volumes.length,
@@ -432,6 +496,8 @@ function createProjectFromImport(input) {
       foreshadows: insertedForeshadows,
       memories: insertedMemories,
       science: insertedScience,
+      clues: insertedClues,
+      payoffs: insertedPayoffs,
       wordCount,
       warnings: warningList,
     };
