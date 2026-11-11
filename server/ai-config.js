@@ -22,12 +22,13 @@ function getAiConfig() {
     const rows = db.dbQuery('SELECT key, value FROM app_settings');
     const map = {};
     for (const r of rows) map[r.key] = r.value;
+    const apiModel = map.api_model || DEFAULTS.apiModel;
     aiConfigCache = {
       apiBaseUrl: map.api_base_url || DEFAULTS.apiBaseUrl,
       apiKey: map.api_key || DEFAULTS.apiKey,
-      apiModel: map.api_model || DEFAULTS.apiModel,
+      apiModel,
       apiType: map.api_type || DEFAULTS.apiType,
-      maxOutputTokens: Number(map.max_output_tokens) || DEFAULTS.maxOutputTokens,
+      maxOutputTokens: db.resolveMaxOutputTokens(map.max_output_tokens, apiModel),
     };
     return aiConfigCache;
   } catch (e) {

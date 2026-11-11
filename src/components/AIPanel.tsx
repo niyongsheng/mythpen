@@ -1,8 +1,9 @@
 import { Gamepad2, Joystick, Lightbulb, MessageSquare, Plus, SendHorizonal, ShieldCheck, Square, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { SessionSelect } from '@/components/SessionSelect'
 import { ToastContainer } from '@/components/ToastContainer'
+import { useMountTransition } from '@/hooks/useMountTransition'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
 import { getSessionTitlePlaceholders } from '@/i18n'
@@ -12,6 +13,7 @@ import { aiApi, chatApi } from '@/lib/api'
 import { type EntityType, notifyDataChanged } from '@/lib/dataEvents'
 import { trackMilestone } from '@/lib/milestones'
 import { bucketCount, projectKey, projectProps } from '@/lib/projectIdentity'
+import { captureError } from '@/lib/sentry'
 import { playAiCompletionSound, primeCompletionSound } from '@/lib/sound'
 import { useProjectName } from '@/lib/useProjectData'
 import { useAgentStore } from '@/stores/useAgentStore'
@@ -24,10 +26,49 @@ import { useUIStore } from '@/stores/useUIStore'
 const EMPTY_TOOL_CALLS: any[] = []
 const abortControllers = new Map<string, AbortController>()
 const runModifiedEntities = new Map<string, Set<EntityType>>()
+const runPendingEntities = new Map<string, Set<EntityType>>()
+const runRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>()
 // Timing for analytics lives outside the store: it is only needed by the
 // handlers that finish (or fail) a run.
 const runMetrics = new Map<string, { startedAt: number; firstTokenAt?: number }>()
 const runKey = (project: string, sessionId: string) => `${project}\u0000${sessionId}`
+
+// Collab runs create entities over many rounds. Flush page refreshes while the
+// run is still streaming instead of waiting for it to finish.
+const PROGRESSIVE_REFRESH_MS = 1000
+// Chapter/foreshadow stay on the end-of-run refresh: the sidebar tree is fed
+// by the chapter store, and Consistency re-runs its local check on these.
+const PROGRESSIVE_SKIP = new Set<EntityType>(['chapter', 'foreshadow'])
+
+/** Queue a throttled page refresh for entities a tool run just touched. */
+function queueProgressiveRefresh(key: string, project: string, entities?: EntityType[]): void {
+  const fresh = (entities || []).filter((entity) => !PROGRESSIVE_SKIP.has(entity))
+  if (fresh.length === 0) return
+
+  let pending = runPendingEntities.get(key)
+  if (!pending) runPendingEntities.set(key, (pending = new Set()))
+  for (const entity of fresh) pending.add(entity)
+  if (runRefreshTimers.has(key)) return
+
+  runRefreshTimers.set(
+    key,
+    setTimeout(() => {
+      runRefreshTimers.delete(key)
+      const batch = runPendingEntities.get(key)
+      runPendingEntities.delete(key)
+      if (!batch?.size || useProjectStore.getState().currentProject !== project) return
+      for (const entity of batch) notifyDataChanged(entity)
+    }, PROGRESSIVE_REFRESH_MS),
+  )
+}
+
+/** Drop a run's pending progressive refreshes. */
+function clearRunRefresh(key: string): void {
+  const timer = runRefreshTimers.get(key)
+  if (timer) clearTimeout(timer)
+  runRefreshTimers.delete(key)
+  runPendingEntities.delete(key)
+}
 
 /** Tool name → entity type, for entity_created on successful collab writes. */
 const AI_CREATE_ENTITIES: Record<string, string> = {
@@ -43,7 +84,78 @@ const AI_CREATE_ENTITIES: Record<string, string> = {
   create_clue: 'clue',
 }
 
-export function AIPanel() {
+// Chapter fields shown in the sidebar/outline tree. An update_chapter call
+// that only writes prose does not need the full tree reloaded.
+const TREE_CHAPTER_FIELDS = new Set([
+  'title',
+  'status',
+  'outline',
+  'summary',
+  'cognitive_frame',
+  'emotional_anchor',
+  'world_texture',
+  'concrete_mystery',
+  'interpersonal_tension',
+  'genre_beat',
+])
+
+/**
+ * Whether a run changed the data behind the sidebar/outline tree. The server
+ * marks tree-affecting tools with `chapterTree` on every tool event.
+ */
+function hasChapterTreeChange(toolCalls: any[]): boolean {
+  return toolCalls.some((tc) => {
+    if (!tc.chapterTree) return false
+    // update_chapter is also used for prose-only writes; only fields shown in
+    // the tree need the full reload.
+    if (tc.name !== 'update_chapter') return true
+    const changed = tc.result?.changed_fields
+    // Missing results mean the run was cut short; reload conservatively.
+    if (!Array.isArray(changed)) return true
+    return changed.some((field: string) => TREE_CHAPTER_FIELDS.has(field))
+  })
+}
+
+/** Collect the entities a run touched and clear its pending set. */
+function takeModifiedEntities(key: string): Set<EntityType> {
+  clearRunRefresh(key)
+  const modified = new Set<EntityType>(runModifiedEntities.get(key) || [])
+  runModifiedEntities.delete(key)
+  return modified
+}
+
+/** Notify pages and reload stores affected by a finished/cancelled run. */
+function refreshAfterRun(
+  project: string,
+  modified: Set<EntityType>,
+  toolCalls: any[],
+  {
+    collab = false,
+    chapter = null,
+    force = false,
+  }: {
+    collab?: boolean
+    chapter?: { num?: number; volumeId?: number } | null
+    force?: boolean
+  } = {},
+): void {
+  if (!force && modified.size === 0) return
+  if (useProjectStore.getState().currentProject !== project) return
+
+  for (const entity of modified) notifyDataChanged(entity)
+  // The stats endpoint aggregates every entity, so any change invalidates it.
+  if (modified.size > 0) notifyDataChanged('stats')
+
+  if (collab || hasChapterTreeChange(toolCalls)) {
+    // Reload the sidebar/outline tree (and the selected chapter's body).
+    void useChapterStore.getState().loadChapters(project)
+    void useProjectStore.getState().loadProjects()
+  } else if (chapter?.num) {
+    void useChapterStore.getState().loadChapterContent(project, chapter.num, chapter.volumeId)
+  }
+}
+
+function AIPanelContent() {
   const {
     messages,
     loading,
@@ -61,7 +173,6 @@ export function AIPanel() {
     finishRun,
   } = useAgentStore()
   const currentChapter = useChapterStore((s) => s.currentChapter)
-  const loadChapterContent = useChapterStore((s) => s.loadChapterContent)
   const project = useProjectName()
   const [input, setInput] = useState('')
   const [showConsistency, setShowConsistency] = useState(() => !localStorage.getItem('mythpen-hide-consistency'))
@@ -71,6 +182,7 @@ export function AIPanel() {
   const sessionsLoadedRef = useRef(false)
   const resizingRef = useRef(false)
   const setRightPanelWidth = useUIStore((s) => s.setRightPanelWidth)
+  const setRightPanelResizing = useUIStore((s) => s.setRightPanelResizing)
   const [mode, setMode] = useState<'writing' | 'collab'>('collab')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { toasts, show: showToast, dismiss: dismissToast } = useToast()
@@ -82,11 +194,22 @@ export function AIPanel() {
   const streamText = activeRun?.streamText ?? ''
   const toolCalls = activeRun?.toolCalls ?? EMPTY_TOOL_CALLS
 
+  // Drop pending progressive-refresh timers when the panel unmounts.
+  useEffect(
+    () => () => {
+      for (const timer of runRefreshTimers.values()) clearTimeout(timer)
+      runRefreshTimers.clear()
+      runPendingEntities.clear()
+    },
+    [],
+  )
+
   // Resize handle drag logic
   const handleResizeMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
       resizingRef.current = true
+      setRightPanelResizing(true)
       const startX = e.clientX
       const startWidth =
         parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--right-panel-w')) || 320
@@ -100,6 +223,7 @@ export function AIPanel() {
 
       const handleMouseUp = () => {
         resizingRef.current = false
+        setRightPanelResizing(false)
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
         document.body.style.cursor = ''
@@ -111,7 +235,7 @@ export function AIPanel() {
       document.body.style.cursor = 'col-resize'
       document.body.style.userSelect = 'none'
     },
-    [setRightPanelWidth],
+    [setRightPanelWidth, setRightPanelResizing],
   )
 
   // Generate AI title for a new session based on first exchange
@@ -238,8 +362,7 @@ export function AIPanel() {
     })
     abortControllers.get(key)?.abort()
     abortControllers.delete(key)
-    const modified = [...(runModifiedEntities.get(key) || [])]
-    runModifiedEntities.delete(key)
+    const modified = takeModifiedEntities(key)
     finishRun(project, currentSessionId)
 
     // Stopping keeps the partial answer instead of discarding what the model
@@ -255,16 +378,10 @@ export function AIPanel() {
       saveMsg(aiMsg).catch(() => {})
     }
 
-    if (modified.length > 0 && useProjectStore.getState().currentProject === project) {
-      for (const entity of modified) notifyDataChanged(entity)
-      const chapter = useChapterStore.getState().currentChapter
-      if (mode === 'collab') {
-        useChapterStore.getState().loadChapters(project)
-        useProjectStore.getState().loadProjects()
-      } else if (chapter?.num) {
-        void loadChapterContent(project, chapter.num, chapter.volumeId)
-      }
-    }
+    refreshAfterRun(project, modified, run.toolCalls, {
+      collab: mode === 'collab',
+      chapter: useChapterStore.getState().currentChapter,
+    })
 
     showToast(t('ai.stopped'), 'info')
   }
@@ -361,8 +478,7 @@ export function AIPanel() {
         await saveMsg(aiMsg).catch(() => {})
 
         const hadToolCalls = runToolCalls.length > 0
-        const modified = [...(runModifiedEntities.get(key) || [])]
-        runModifiedEntities.delete(key)
+        const modified = takeModifiedEntities(key)
         abortControllers.delete(key)
         finishRun(runProject, runSessionId)
 
@@ -373,19 +489,11 @@ export function AIPanel() {
 
         // Only touch visible project data when that project is still on
         // screen; switching back reloads chapters and data anyway.
-        if (hadToolCalls && useProjectStore.getState().currentProject === runProject) {
-          for (const entity of modified) {
-            notifyDataChanged(entity)
-          }
-          if (isChat) {
-            // Collab mode: reload all data for immediate responsiveness
-            useChapterStore.getState().loadChapters(runProject)
-            useProjectStore.getState().loadProjects()
-          } else if (ch?.num) {
-            // Writing mode: reload chapter content that was written
-            await loadChapterContent(runProject, ch.num, ch.volumeId)
-          }
-        }
+        refreshAfterRun(runProject, modified, runToolCalls, {
+          collab: isChat,
+          chapter: ch,
+          force: hadToolCalls,
+        })
       },
       // onError
       (err: any) => {
@@ -407,29 +515,45 @@ export function AIPanel() {
           ...projectProps(runProject),
         })
         const visible = isRunVisible()
+        captureError(err, {
+          area: 'ai_chat',
+          mode: isChat ? 'collab' : 'writing',
+        })
         const errMsg = { role: 'ai' as const, content: t('ai.errorPrefix', { msg: err.error || err }) }
         if (visible) {
           if (!isChat) showToast(t('ai.chatError'), 'error')
           addMessage({ id: nextMsgId(), ...errMsg })
         }
         saveMsg(errMsg).catch(() => {})
-        runModifiedEntities.delete(key)
+
+        // The run may have written data before failing; refresh those pages
+        // instead of leaving them stale until a manual refresh.
+        const modified = takeModifiedEntities(key)
         abortControllers.delete(key)
         finishRun(runProject, runSessionId)
+        refreshAfterRun(runProject, modified, run.toolCalls)
       },
       mode,
       (tc: any) => {
         const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
         if (!run) return
+        // Record entities from the call event too, so a run stopped before the
+        // result arrives still refreshes the pages the tool touched.
+        for (const entity of tc.entities || []) {
+          runModifiedEntities.get(key)?.add(entity as EntityType)
+        }
         updateRun(runProject, runSessionId, {
           toolCalls: [...run.toolCalls, { ...tc, status: 'running' }],
         })
       },
       (tr: any) => {
-        if (tr.entity) runModifiedEntities.get(key)?.add(tr.entity as EntityType)
+        for (const entity of tr.entities || []) {
+          runModifiedEntities.get(key)?.add(entity as EntityType)
+        }
         const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
         if (!run) return
         if (!tr.result?.error) {
+          queueProgressiveRefresh(key, runProject, tr.entities)
           if (tr.name === 'create_chapter') {
             track('chapter_created', { source: 'ai_collab', ...projectProps(runProject) })
             trackMilestone('first_chapter', projectKey(runProject))
@@ -460,7 +584,7 @@ export function AIPanel() {
   ]
 
   return (
-    <aside className="w-[var(--right-panel-w)] bg-[var(--canvas-soft)] border-l border-[var(--hairline)] shrink-0 flex flex-col min-h-0 relative">
+    <aside className="w-full h-full bg-[var(--canvas-soft)] border-l border-[var(--hairline)] flex flex-col min-h-0 relative">
       {/* Resize handle */}
       <div
         className="absolute left-0 top-0 bottom-0 w-[4px] cursor-col-resize z-10 transition-colors hover:bg-[var(--accent-gold)] active:bg-[var(--accent-gold)]"
@@ -794,5 +918,43 @@ export function AIPanel() {
         </div>
       )}
     </aside>
+  )
+}
+
+// The shell re-renders on every animation frame state change; memoizing the
+// heavy chat transcript keeps the width transition from re-rendering it.
+const AIPanel = memo(AIPanelContent)
+
+/**
+ * Width-animated shell for the AI panel. Keeps the panel mounted during the
+ * 300ms close transition, then unmounts it so streaming/timer effects stop.
+ * The inner content keeps its full width while the shell collapses, avoiding
+ * a reflow flash.
+ */
+export function AIPanelShell() {
+  const visible = useUIStore((s) => s.rightPanelVisible)
+  const resizing = useUIStore((s) => s.rightPanelResizing)
+  // Two frames: the first paints the collapsed width, the second starts the
+  // transition. A drag interrupted by the panel closing must not disable the
+  // next open/close transition, so reset it on exit.
+  const { mounted, entered } = useMountTransition(visible, {
+    frames: 2,
+    onExit: () => useUIStore.getState().setRightPanelResizing(false),
+  })
+
+  if (!mounted) return null
+
+  return (
+    <div
+      className={`shrink-0 overflow-hidden will-change-[width,opacity] ${
+        resizing ? 'transition-none' : 'transition-[width,opacity] duration-300 ease-out'
+      } ${entered ? 'opacity-100' : 'opacity-0'}`}
+      style={{ width: entered ? 'var(--right-panel-w)' : '0px' }}
+      aria-hidden={!entered}
+    >
+      <div className="h-full w-[var(--right-panel-w)]">
+        <AIPanel />
+      </div>
+    </div>
   )
 }

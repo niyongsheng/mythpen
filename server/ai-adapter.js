@@ -31,6 +31,23 @@ function toClaudeTools(openaiTools) {
 
 // ─── Message format conversion ───
 
+/**
+ * Merge system-role messages into the provider's top-level system prompt.
+ * Claude rejects system roles inside `messages`; several OpenAI-compatible
+ * providers reject more than one system message. Keeping a single merged
+ * system prompt is the portable form.
+ */
+function mergeSystemPrompt(systemPrompt, messages) {
+  const extra = (messages || [])
+    .filter((msg) => msg.role === 'system' && typeof msg.content === 'string' && msg.content.trim())
+    .map((msg) => msg.content.trim());
+  return [systemPrompt, ...extra].filter(Boolean).join('\n\n');
+}
+
+function nonSystemMessages(messages) {
+  return (messages || []).filter((msg) => msg.role !== 'system');
+}
+
 function toClaudeMessages(openaiMessages) {
   const msgs = [];
   for (const msg of openaiMessages) {
@@ -76,6 +93,11 @@ function makeResponse(content, toolCalls, inputTokens, outputTokens, finishReaso
 // Default output budget per request. Models are free to split long tool-call
 // batches across rounds, but a single response must fit within this limit.
 const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+// One oversized tool call should not fail the whole run: when the arguments
+// are cut off, retry the same round with a larger budget. Reasoning models
+// (e.g. DeepSeek Flash) can spend most of `max_tokens` thinking before they
+// start emitting the call.
+const MAX_RETRY_OUTPUT_TOKENS = 65536;
 
 function apiError(status, text) {
   const detail = String(text || '').slice(0, 500);
@@ -107,6 +129,14 @@ async function postOpenAI(apiConfig, body, signal) {
   throw apiError(response.status, await response.text());
 }
 
+/** Error signalling that a tool call was cut off by the output budget. */
+function toolArgsTruncationError(name) {
+  return Object.assign(
+    new Error(`模型输出达到单次 token 上限，工具「${name}」的参数被截断。请重试，或在设置中调大「最大输出 Token」。`),
+    { code: 'TOOL_ARGS_TRUNCATED' },
+  );
+}
+
 /**
  * Parse a tool call's JSON arguments defensively.
  *
@@ -116,21 +146,49 @@ async function postOpenAI(apiConfig, body, signal) {
  */
 function parseToolArguments(toolCall, finishReason) {
   const raw = toolCall.function?.arguments ?? '';
-  if (!raw.trim()) return {};
+  const name = toolCall.function?.name || 'unknown';
+  const truncated = finishReason === 'length' || finishReason === 'max_tokens';
+
+  // Empty arguments can also mean the model was cut off before writing any.
+  if (!raw.trim()) {
+    if (truncated) throw toolArgsTruncationError(name);
+    return {};
+  }
+
   try {
     return JSON.parse(raw);
   } catch (err) {
-    const name = toolCall.function?.name || 'unknown';
-    if (finishReason === 'length') {
-      throw Object.assign(
-        new Error(`模型输出达到单次 token 上限，工具「${name}」的参数被截断。请重试，或在设置中调大「最大输出 Token」。`),
-        { code: 'TOOL_ARGS_TRUNCATED' },
-      );
-    }
+    if (truncated) throw toolArgsTruncationError(name);
     throw Object.assign(
       new Error(`模型返回的工具「${name}」参数不是合法 JSON：${err.message}`),
       { code: 'TOOL_ARGS_INVALID', detail: raw.slice(0, 200) },
     );
+  }
+}
+
+/**
+ * Run one completion round, retrying once with a doubled output budget when a
+ * tool call was truncated. Shared by every provider: the "one oversized call
+ * should not fail the run" invariant must not depend on the backend.
+ */
+async function completeWithOutputRetry(initialMaxTokens, attemptOnce) {
+  let maxTokens = initialMaxTokens;
+  let truncationError = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await attemptOnce(maxTokens);
+    } catch (err) {
+      if (err.code !== 'TOOL_ARGS_TRUNCATED' || truncationError || maxTokens >= MAX_RETRY_OUTPUT_TOKENS) {
+        // The retry failed (for example because the model caps `max_tokens`
+        // below the new value). Surface the original, actionable truncation.
+        throw truncationError || err;
+      }
+      truncationError = err;
+      const nextTokens = Math.min(maxTokens * 2, MAX_RETRY_OUTPUT_TOKENS);
+      console.warn(`[AI Adapter] Tool call truncated at max_tokens=${maxTokens}; retrying with ${nextTokens}`);
+      maxTokens = nextTokens;
+    }
   }
 }
 
@@ -149,30 +207,37 @@ class OpenAIProvider {
    */
   async complete(systemPrompt, messages, tools, options = {}) {
     const { apiConfig } = this;
-    const body = {
-      model: apiConfig.apiModel,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      tools: tools || undefined,
-      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
-      stream: false,
-    };
 
-    const response = await postOpenAI(apiConfig, body, options.signal);
+    return completeWithOutputRetry(
+      apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
+      async (maxTokens) => {
+        const body = {
+          model: apiConfig.apiModel,
+          messages: [
+            { role: 'system', content: mergeSystemPrompt(systemPrompt, messages) },
+            ...nonSystemMessages(messages),
+          ],
+          tools: tools || undefined,
+          max_tokens: maxTokens,
+          stream: false,
+        };
 
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const msg = choice?.message;
-    const finishReason = choice?.finish_reason;
-    const inputTokens = data.usage?.prompt_tokens || 0;
-    const outputTokens = data.usage?.completion_tokens || 0;
+        const response = await postOpenAI(apiConfig, body, options.signal);
+        const data = await response.json();
+        const choice = data.choices?.[0];
+        const msg = choice?.message;
+        const finishReason = choice?.finish_reason;
+        const inputTokens = data.usage?.prompt_tokens || 0;
+        const outputTokens = data.usage?.completion_tokens || 0;
 
-    const toolCalls = (msg?.tool_calls || []).map(tc => ({
-      id: tc.id,
-      name: tc.function.name,
-      args: parseToolArguments(tc, finishReason),
-    }));
-
-    return makeResponse(msg?.content || null, toolCalls, inputTokens, outputTokens, finishReason);
+        const toolCalls = (msg?.tool_calls || []).map(tc => ({
+          id: tc.id,
+          name: tc.function.name,
+          args: parseToolArguments(tc, finishReason),
+        }));
+        return makeResponse(msg?.content || null, toolCalls, inputTokens, outputTokens, finishReason);
+      },
+    );
   }
 
   /**
@@ -183,7 +248,10 @@ class OpenAIProvider {
     const { apiConfig } = this;
     const body = {
       model: apiConfig.apiModel,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      messages: [
+        { role: 'system', content: mergeSystemPrompt(systemPrompt, messages) },
+        ...nonSystemMessages(messages),
+      ],
       max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       stream: true,
     };
@@ -235,36 +303,61 @@ class ClaudeProvider {
   async complete(systemPrompt, messages, tools, options = {}) {
     const { apiConfig, client } = this;
 
-    const params = {
-      model: apiConfig.apiModel,
-      system: systemPrompt,
-      messages: toClaudeMessages(messages),
-      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
-    };
+    return completeWithOutputRetry(
+      apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
+      async (maxTokens) => {
+        const claudeTools = toClaudeTools(tools);
+        // The system prompt and tool schemas are a stable prefix across every
+        // round of the tool loop. Marking them ephemeral lets Anthropic reuse
+        // the cached prefix instead of re-billing the whole ~6k-token block.
+        if (claudeTools && claudeTools.length > 0) {
+          claudeTools[claudeTools.length - 1] = {
+            ...claudeTools[claudeTools.length - 1],
+            cache_control: { type: 'ephemeral' },
+          };
+        }
+        const params = {
+          model: apiConfig.apiModel,
+          system: [{
+            type: 'text',
+            text: mergeSystemPrompt(systemPrompt, messages),
+            cache_control: { type: 'ephemeral' },
+          }],
+          messages: toClaudeMessages(messages),
+          max_tokens: maxTokens,
+        };
 
-    if (tools && tools.length > 0) {
-      params.tools = toClaudeTools(tools);
-    }
+        if (claudeTools && claudeTools.length > 0) {
+          params.tools = claudeTools;
+        }
 
-    const response = await client.messages.create(
-      params,
-      options.signal ? { signal: options.signal } : undefined,
+        const response = await client.messages.create(
+          params,
+          options.signal ? { signal: options.signal } : undefined,
+        );
+        const toolCalls = [];
+        let content = '';
+
+        for (const block of response.content) {
+          if (block.type === 'text') {
+            content += block.text;
+          } else if (block.type === 'tool_use') {
+            toolCalls.push({ id: block.id, name: block.name, args: block.input });
+          }
+        }
+
+        // A response cut off inside a tool call carries partial arguments;
+        // retry the round with a larger budget instead of executing them.
+        if (response.stop_reason === 'max_tokens' && toolCalls.length > 0) {
+          throw toolArgsTruncationError(toolCalls[0].name);
+        }
+
+        const inputTokens = response.usage?.input_tokens || 0;
+        const outputTokens = response.usage?.output_tokens || 0;
+
+        return makeResponse(content || null, toolCalls, inputTokens, outputTokens, response.stop_reason);
+      },
     );
-    const toolCalls = [];
-    let content = '';
-
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        content += block.text;
-      } else if (block.type === 'tool_use') {
-        toolCalls.push({ id: block.id, name: block.name, args: block.input });
-      }
-    }
-
-    const inputTokens = response.usage?.input_tokens || 0;
-    const outputTokens = response.usage?.output_tokens || 0;
-
-    return makeResponse(content || null, toolCalls, inputTokens, outputTokens, response.stop_reason);
   }
 
   /**
@@ -275,7 +368,7 @@ class ClaudeProvider {
 
     const params = {
       model: apiConfig.apiModel,
-      system: systemPrompt,
+      system: mergeSystemPrompt(systemPrompt, messages),
       messages: toClaudeMessages(messages),
       max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
     };

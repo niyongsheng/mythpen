@@ -1,9 +1,11 @@
 const express = require('express');
+const Sentry = require('../instrument');
 const db = require('../db');
-const { TOOLS, TOOL_REGISTRY, executeTool } = require('../tools');
+const { TOOL_REGISTRY, getToolsForRequest, executeTool } = require('../tools');
 const { createAIAdapter } = require('../ai-adapter');
 const { getAiConfig } = require('../ai-config');
 const { buildWritingPrompt, buildContinuePrompt } = require('../prompts/writing');
+const { buildTaskPrompt } = require('../prompts/task');
 const { stripToolMarkup } = require('../tool-markup');
 const { buildCollabPrompt } = require('../prompts/collab');
 const { stripLeadingChapterHeading } = require('../titles');
@@ -34,9 +36,11 @@ router.post('/ai/chat', async (req, res) => {
       aiConfig.apiModel = req.body.apiModel;
     }
     const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
-    const systemPrompt = buildWritingPrompt(project);
-
-    const result = await adapter.complete(systemPrompt, messages, null);
+    // Page-level AI calls send their task contract as a system message; the
+    // adapter merges system roles into the top-level prompt (Claude rejects
+    // system roles inside `messages`, and some OpenAI-compatible providers only
+    // accept a single system message).
+    const result = await adapter.complete(buildTaskPrompt(project), messages, null);
 
     // Record token usage
     if (result.usage.inputTokens || result.usage.outputTokens) {
@@ -49,6 +53,7 @@ router.post('/ai/chat', async (req, res) => {
     });
   } catch (err) {
     console.error('AI chat error:', err);
+    Sentry.captureException(err, { tags: { area: 'ai_chat' } });
     res.status(500).json({ error: { code: 'AI_ERROR', message: err.message, recoverable: true } });
   }
 });
@@ -92,6 +97,11 @@ router.post('/ai/chat/stream', async (req, res) => {
     };
 
     const conversation = [...messages]; // system is passed separately to adapter
+    // Send only the schemas that apply to this project and request. This keeps
+    // the fixed per-round input small and hides destructive tools unless the
+    // author explicitly asked to delete something.
+    const tools = getToolsForRequest(project, mode, conversation);
+    console.log(`[AI Stream] tools: ${tools.length}`);
     let fullContent = '';
     let inputTokens = 0;
     let outputTokens = 0;
@@ -103,8 +113,15 @@ router.post('/ai/chat/stream', async (req, res) => {
 
       let result;
       try {
-        result = await adapter.complete(systemPrompt, conversation, TOOLS);
+        result = await adapter.complete(systemPrompt, conversation, tools);
       } catch (err) {
+        Sentry.captureException(err, {
+          tags: {
+            area: 'ai_stream',
+            mode,
+            error_code: err.code || (err.status ? 'api_error' : 'unknown'),
+          },
+        });
         if (err.status) {
           send('error', { error: `API Error: ${err.status}`, detail: err.detail });
         } else {
@@ -142,8 +159,13 @@ router.post('/ai/chat/stream', async (req, res) => {
         for (const tc of result.toolCalls) {
           if (clientClosed) break;
 
-          // Notify frontend: tool call started
-          send('tool_call', { id: tc.id, name: tc.name, arguments: tc.args });
+          const tool = TOOL_REGISTRY[tc.name];
+          const entities = tool?.entities || [];
+          const chapterTree = tool?.chapterTree === true;
+
+          // Notify frontend: tool call started. Entities are sent here too so
+          // a run cut short before the result still refreshes the right pages.
+          send('tool_call', { id: tc.id, name: tc.name, arguments: tc.args, entities, chapterTree });
 
           // Execute tool against project database
           let toolResult;
@@ -159,7 +181,8 @@ router.post('/ai/chat/stream', async (req, res) => {
           send('tool_result', {
             id: tc.id,
             name: tc.name,
-            entity: TOOL_REGISTRY[tc.name]?.entity || null,
+            entities,
+            chapterTree,
             result: toolResult,
           });
 
@@ -188,6 +211,7 @@ router.post('/ai/chat/stream', async (req, res) => {
 
   } catch (err) {
     console.error('AI stream error:', err);
+    Sentry.captureException(err, { tags: { area: 'ai_stream_outer' } });
     if (clientClosed) return;
     if (!res.headersSent) {
       res.status(500).json({ error: { code: 'AI_ERROR', message: err.message, recoverable: true } });
@@ -264,6 +288,7 @@ router.post('/ai/continue', async (req, res) => {
       }
     } catch (err) {
       console.error('Continue stream error:', err);
+      Sentry.captureException(err, { tags: { area: polishing ? 'ai_polish' : 'ai_continue' } });
       res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
       res.end();
       return;
@@ -298,7 +323,10 @@ router.post('/ai/continue', async (req, res) => {
           [cleaned, wc, chapterNum]
         );
         db.recalculateWordCount(project);
-      } catch(e) { console.error('Save error:', e); }
+      } catch(e) {
+        console.error('Save error:', e);
+        Sentry.captureException(e, { tags: { area: 'chapter_save' } });
+      }
     } else if (fullContent.length > 10) {
       try {
         const existing = db.projectGet(project, 'SELECT content FROM chapters WHERE num = ?', [chapterNum]);
@@ -314,7 +342,10 @@ router.post('/ai/continue', async (req, res) => {
           [newContent, wc, chapterNum]
         );
         db.recalculateWordCount(project);
-      } catch(e) { console.error('Save error:', e); }
+      } catch(e) {
+        console.error('Save error:', e);
+        Sentry.captureException(e, { tags: { area: 'chapter_save' } });
+      }
     }
 
     if (fullContent) {
@@ -327,6 +358,7 @@ router.post('/ai/continue', async (req, res) => {
     res.end();
   } catch (err) {
     console.error('Continue error:', err);
+    Sentry.captureException(err, { tags: { area: 'ai_continue_outer' } });
     if (!res.headersSent) {
       res.status(500).json({ error: { code: 'AI_ERROR', message: err.message, recoverable: true } });
     } else {
