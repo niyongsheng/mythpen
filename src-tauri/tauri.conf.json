@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Mythpen",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "com.mythpen.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -48,7 +48,7 @@
       {
         "ext": ["mythpen"],
         "name": "Mythpen Project",
-        "description": "Mythpen 项目文件",
+        "description": "Mythpen project file",
         "mimeType": "application/x-mythpen",
         "role": "Editor",
         "rank": "Owner",
