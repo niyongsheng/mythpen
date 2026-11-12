@@ -1109,6 +1109,102 @@ function nextChapterNumber(projectName) {
   return (projectGet(projectName, 'SELECT MAX(num) as mx FROM chapters')?.mx || 0) + 1;
 }
 
+/**
+ * Move a chapter to a new global chapter number, shifting the chapters it
+ * passes one slot in the opposite direction.
+ *
+ * `num` is a UNIQUE column, not the primary key, so every ID-based reference
+ * (chapter_characters, foreshadows planted/resolved, memories, clues) follows
+ * the chapter automatically. The three num-based references are remapped in
+ * the same transaction.
+ *
+ * Throws CHAPTER_NOT_FOUND / INVALID_POSITION / INVALID_VOLUME.
+ */
+function moveChapter(projectName, { chapterNum, position, volumeId }) {
+  const from = Number(chapterNum);
+  const to = Number(position);
+
+  return projectTransaction(projectName, () => {
+    const rows = projectQuery(projectName, 'SELECT id, num FROM chapters ORDER BY num');
+    const moving = rows.find((row) => row.num === from);
+    if (!moving) {
+      const err = new Error(`章节 ${chapterNum} 不存在`);
+      err.code = 'CHAPTER_NOT_FOUND';
+      throw err;
+    }
+    const maxNum = rows.length ? rows[rows.length - 1].num : 0;
+    if (!Number.isInteger(to) || to < 1 || to > maxNum) {
+      const err = new Error(`目标章号 ${position} 超出范围：应为 1 到 ${maxNum}`);
+      err.code = 'INVALID_POSITION';
+      throw err;
+    }
+    if (volumeId !== undefined && !projectGet(projectName, 'SELECT id FROM volumes WHERE id = ?', [volumeId])) {
+      const err = new Error(`卷 ${volumeId} 不存在`);
+      err.code = 'INVALID_VOLUME';
+      throw err;
+    }
+
+    if (from === to) {
+      if (volumeId !== undefined) {
+        projectExecute(
+          projectName,
+          "UPDATE chapters SET volume_id = ?, updated_at = datetime('now') WHERE id = ?",
+          [volumeId, moving.id],
+        );
+      }
+      return projectGet(projectName, 'SELECT * FROM chapters WHERE id = ?', [moving.id]);
+    }
+
+    // Chapters strictly between source and target shift one slot; the moved
+    // chapter takes the target slot. Compute everything before mutating.
+    const shift = from < to ? -1 : 1;
+    const affected = rows.filter((row) => (
+      from < to ? row.num > from && row.num <= to : row.num >= to && row.num < from
+    ));
+    const assignments = [moving, ...affected].map((row) => ({
+      id: row.id,
+      newNum: row.id === moving.id ? to : row.num + shift,
+    }));
+
+    // Two-phase shift: park affected rows at negative ids first, otherwise the
+    // UNIQUE(num) index rejects a transient duplicate while rows move.
+    for (const item of assignments) {
+      projectExecute(projectName, 'UPDATE chapters SET num = -id WHERE id = ?', [item.id]);
+    }
+    for (const item of assignments) {
+      projectExecute(projectName, 'UPDATE chapters SET num = ? WHERE id = ?', [item.newNum, item.id]);
+    }
+    if (volumeId !== undefined) {
+      projectExecute(projectName, 'UPDATE chapters SET volume_id = ? WHERE id = ?', [volumeId, moving.id]);
+    }
+    projectExecute(projectName, "UPDATE chapters SET updated_at = datetime('now') WHERE id = ?", [moving.id]);
+
+    // Remap numeric references with one CASE statement per column. Sequential
+    // UPDATEs could cascade (e.g. 5→6 then 6→7); a single statement cannot.
+    const remap = (table, column) => {
+      const rangeCond = from < to
+        ? `${column} > ? AND ${column} <= ?`
+        : `${column} >= ? AND ${column} < ?`;
+      // Forward moves use [from, to] for the range; backward moves use
+      // [to, from] — passing [from, to] would make the backward range empty.
+      const rangeParams = from < to ? [from, to] : [to, from];
+      projectExecute(
+        projectName,
+        `UPDATE ${table} SET ${column} = CASE
+           WHEN ${column} = ? THEN ?
+           WHEN ${rangeCond} THEN ${column} + ?
+           ELSE ${column} END`,
+        [from, to, ...rangeParams, shift],
+      );
+    };
+    remap('foreshadows', 'expected_resolve_chapter');
+    remap('payoff_points', 'setup_chapter');
+    remap('payoff_points', 'payoff_chapter');
+
+    return projectGet(projectName, 'SELECT * FROM chapters WHERE id = ?', [moving.id]);
+  });
+}
+
 function getCoverDir(projectName) {
   return path.join(PROJECTS_DIR, projectName);
 }
@@ -1216,6 +1312,7 @@ module.exports = {
   validateProjectName,
   registerRecentProject,
   nextChapterNumber,
+  moveChapter,
   getCoverDir,
   findCoverPath,
   getCoverAsset,

@@ -51,6 +51,8 @@ ${context}
 
 ⚠️ create_chapter 只创建章节框架，大纲和正文必须通过后续的 update_chapter 写入。
 
+⚠️ **调整章序**：需要移动已有章节（含把新章插到中间）时用 move_chapter，途经章节会自动顺延，正文与元数据不动。插新章流程：先 create_chapter 追加，再用 move_chapter 移到目标章号。**不要**搬移正文或元数据来"腾位置"。
+
 ---
 
 ### 第一步 · 了解项目

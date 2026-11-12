@@ -37,12 +37,12 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_chapter',
-      description: '创建新章节框架。新建后会自动按全书顺序分配编号（跨卷唯一）。必须指定 volume_id（卷结构里有卷ID）。大纲和正文请用 update_chapter 写入。',
+      description: '创建新章节框架并追加到全书末尾。新建后会自动按全书顺序分配编号（跨卷唯一）。必须指定 volume_id（卷结构里有卷ID）。大纲和正文请用 update_chapter 写入。要调整章序或把新章放到中间，请创建后用 move_chapter 移动。',
       parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: '章节标题' },
-          chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动按全书顺序编号；传入则使用指定编号' },
+          chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动追加到全书末尾；传入则使用指定编号（编号已存在会报错，调整章序请用 move_chapter）' },
           volume_id: { type: 'number', description: '所属卷ID（必填），见项目上下文「卷结构」' },
         },
         required: ['title', 'volume_id'],
@@ -72,6 +72,22 @@ const TOOLS = [
           volume_id: { type: 'number', description: '移动到指定卷ID（可选）。用于修正章节归属的卷，不会改动正文' },
         },
         required: ['chapter_num'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'move_chapter',
+      description: '调整章序：把已有章节移动到新的全局章号位置，途经章节自动顺延，正文与元数据不变。用于修复章序；插入新章时先 create_chapter 追加，再用本工具移到目标位置。可选 volume_id 同步修改所属卷。',
+      parameters: {
+        type: 'object',
+        properties: {
+          chapter_num: { type: 'number', description: '要移动的章节当前编号' },
+          position: { type: 'number', description: '目标全局章号（1-based）。例如把第10章移到第5章的位置，传 5' },
+          volume_id: { type: 'number', description: '移动后所属卷ID（可选，不传则保持原卷）' },
+        },
+        required: ['chapter_num', 'position'],
       },
     },
   },
@@ -889,6 +905,9 @@ const HANDLERS = {
         return { error: `卷 ${volId} 不存在，可先用 list_volumes 查看卷ID` };
       }
       const num = args.chapter_num !== undefined ? args.chapter_num : db.nextChapterNumber(projectName);
+      if (args.chapter_num !== undefined && pdb.prepare('SELECT id FROM chapters WHERE num = ?').get(num)) {
+        return { error: `章节 ${num} 已存在。要调整章序请用 move_chapter（把已有章节移到目标位置）；要插新章请先 create_chapter 追加，再用 move_chapter 移到 position=${num}` };
+      }
       pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, genre_beat, created_at, updated_at)
         VALUES (?, ?, ?, '', '', 0, 'pending', ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
         .run(volId, num, args.title,
@@ -939,6 +958,39 @@ const HANDLERS = {
       }
       db.recalculateWordCount(projectName);
       return { updated: true, chapter_num, changed_fields: Object.keys(fields).filter(k => allowed.includes(k)) };
+    },
+  },
+  move_chapter: {
+    entity: 'chapter',
+    chapterTree: true,
+    category: '章节与卷',
+    run(ctx) {
+      const { db, projectName, args } = ctx;
+      const chapterNum = Number(args.chapter_num);
+      const position = Number(args.position);
+      if (!Number.isInteger(chapterNum) || !Number.isInteger(position)) {
+        return { error: 'chapter_num 和 position 必须是整数' };
+      }
+      try {
+        const moved = db.moveChapter(projectName, {
+          chapterNum,
+          position,
+          volumeId: args.volume_id !== undefined && args.volume_id !== null ? Number(args.volume_id) : undefined,
+        });
+        return {
+          moved: true,
+          chapter_num: moved.num,
+          title: moved.title,
+          from: chapterNum,
+          to: position,
+          volume_id: moved.volume_id,
+        };
+      } catch (e) {
+        if (e.code === 'CHAPTER_NOT_FOUND' || e.code === 'INVALID_POSITION' || e.code === 'INVALID_VOLUME') {
+          return { error: e.message };
+        }
+        throw e;
+      }
     },
   },
   delete_chapter: {
