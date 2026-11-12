@@ -47,6 +47,9 @@ button { font-family: inherit; cursor: pointer; }
 .skip-link:focus { transform: translateY(0); }
 @media (prefers-reduced-motion: reduce) {
 *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+.line-write { transform: none !important; opacity: 0.9 !important; animation: none !important; }
+.ai-quill-wrap { left: var(--quill-x-tail-end); transform: translateY(calc(3 * var(--mockup-line-pitch))); opacity: 1 !important; animation: none !important; }
+.ai-quill { animation: none !important; }
 html { scroll-behavior: auto; }
 }
 ::-webkit-scrollbar { width: 8px; }
@@ -139,22 +142,40 @@ html[data-theme="light"] .mockup-frame { box-shadow: 0 8px 40px rgba(0,0,0,0.12)
 .mockup-sidebar-item:nth-child(4) { width: 75%; }
 .mockup-sidebar-item:nth-child(5) { width: 50%; }
 .mockup-sidebar-item:nth-child(6) { width: 65%; }
-.mockup-editor { flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 6px; }
-.mockup-line { height: 10px; background: var(--canvas-mid); border-radius: 4px; width: 100%; animation: mockupFade 3s ease-in-out infinite alternate; }
+.mockup-editor { flex: 1; display: flex; flex-direction: column; gap: var(--mockup-line-gap); padding: var(--mockup-pad-top) var(--mockup-pad-x); position: relative; --mockup-pad-top: 20px; --mockup-pad-x: 24px; --mockup-line-h: 10px; --mockup-line-gap: 6px; --mockup-line-pitch: calc(var(--mockup-line-h) + var(--mockup-line-gap)); --quill-w: 17px; --quill-h: 24px; --quill-gap: 8px; --quill-x-gold: calc(70% - 0.4 * var(--mockup-pad-x) + var(--quill-gap)); --quill-x-line2: calc(45% + 0.1 * var(--mockup-pad-x) + var(--quill-gap)); --quill-x-line3: calc(55% - 0.1 * var(--mockup-pad-x) + var(--quill-gap)); --quill-x-tail-start: calc(var(--mockup-pad-x) + var(--quill-gap)); --quill-x-tail-end: calc(38% + 0.24 * var(--mockup-pad-x) + var(--quill-gap)); }
+.mockup-line { height: var(--mockup-line-h); background: var(--canvas-mid); border-radius: 4px; width: 100%; animation: mockupFade 3s ease-in-out infinite alternate; }
 .mockup-line:nth-child(2) { width: 85%; animation-delay: 0.1s; }
 .mockup-line:nth-child(3) { width: 92%; animation-delay: 0.2s; }
 .mockup-line:nth-child(4) { width: 70%; animation-delay: 0.3s; }
 .mockup-line:nth-child(5) { width: 78%; animation-delay: 0.4s; }
 .mockup-line:nth-child(6) { width: 60%; animation-delay: 0.5s; }
 .mockup-line.gold { background: var(--accent-gold-soft); opacity: 0.6; }
-.mockup-line.gold + .ai-cursor { display: inline-block; width: 2px; height: 14px; background: var(--accent-gold); animation: blink 0.8s step-end infinite; vertical-align: text-bottom; margin-top: 2px; }
+.line-write { transform-origin: left center; }
+.mockup-editor .line-write { animation-delay: 0s; }
+.lw-tail { animation: lineWriteTail 6s var(--ease) infinite; }
+.ai-quill-wrap { position: absolute; left: var(--quill-x-tail-end); top: calc(var(--mockup-pad-top) + 4 * var(--mockup-line-h) + 3 * var(--mockup-line-gap) - var(--quill-h)); width: var(--quill-w); height: var(--quill-h); animation: quillTail 6s var(--ease) infinite; }
+.ai-quill { display: block; width: var(--quill-w); height: var(--quill-h); color: var(--accent-gold); transform-origin: 18% 92%; animation: quillWrite 0.32s ease-in-out infinite alternate; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent-gold) 40%, transparent)); }
+@keyframes quillTail {
+0% { left: var(--quill-x-gold); transform: translateY(0); opacity: 0; }
+4%, 14% { left: var(--quill-x-gold); transform: translateY(0); opacity: 1; }
+20%, 32% { left: var(--quill-x-line2); transform: translateY(var(--mockup-line-pitch)); opacity: 1; }
+38%, 50% { left: var(--quill-x-line3); transform: translateY(calc(2 * var(--mockup-line-pitch))); opacity: 1; }
+56% { left: var(--quill-x-tail-start); transform: translateY(calc(3 * var(--mockup-line-pitch))); opacity: 1; }
+78%, 88% { left: var(--quill-x-tail-end); transform: translateY(calc(3 * var(--mockup-line-pitch))); opacity: 1; }
+94%, 100% { left: var(--quill-x-tail-end); transform: translateY(calc(3 * var(--mockup-line-pitch))); opacity: 0; }
+}
+@keyframes lineWriteTail {
+0%, 56% { transform: scaleX(0); opacity: 0.9; }
+78%, 88% { transform: scaleX(1); opacity: 0.9; }
+94%, 100% { transform: scaleX(1); opacity: 0; }
+}
+@keyframes quillWrite {
+from { transform: rotate(-14deg) translateY(0); }
+to { transform: rotate(-4deg) translateY(-2px); }
+}
 @keyframes mockupFade {
 0% { opacity: 0.3; }
 100% { opacity: 0.9; }
-}
-@keyframes blink {
-0%, 100% { opacity: 1; }
-50% { opacity: 0; }
 }
 .mockup-right { width: 80px; background: var(--canvas-soft); border-left: 1px solid var(--hairline); padding: 12px 8px; flex-shrink: 0; }
 .mockup-right-item { height: 24px; background: var(--canvas-card); border-radius: var(--radius-sm); margin-bottom: 8px; border: 1px solid var(--hairline); }
@@ -167,43 +188,117 @@ html[data-theme="light"] .mockup-frame { box-shadow: 0 8px 40px rgba(0,0,0,0.12)
 .feature-title-zh { font-family: var(--font-display); font-size: 20px; font-weight: 500; color: var(--ink); margin-bottom: 2px; }
 .feature-title-en { font-size: 11px; color: var(--ink-mute); font-weight: 500; margin-bottom: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
 .feature-desc { font-size: 16px; color: var(--ink-tertiary); line-height: 1.65; }
-.preview-frame { background: var(--canvas-soft); border: 1px solid var(--hairline-light); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 820px; margin: 0 auto; position: relative; }
-.preview-header { height: 36px; background: var(--canvas-card); border-bottom: 1px solid var(--hairline); display: flex; align-items: center; padding: 0 14px; gap: 8px; }
-.preview-tabs { display: flex; gap: 0; margin-left: 20px; border-bottom: none; }
-.preview-tab { font-size: 10px; padding: 2px 10px; color: var(--ink-mute); border-bottom: 2px solid transparent; cursor: pointer; font-family: var(--font-sans); letter-spacing: 0.02em; white-space: nowrap; }
+.preview-frame { background: var(--canvas-soft); border: 1px solid var(--hairline-light); border-radius: var(--radius-lg); overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.4); max-width: 920px; margin: 0 auto; position: relative; }
+html[data-theme="light"] .preview-frame { box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
+.preview-header { height: 38px; background: var(--canvas-card); border-bottom: 1px solid var(--hairline); display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+.preview-tabs { display: flex; gap: 0; margin-left: 18px; overflow-x: auto; scrollbar-width: none; }
+.preview-tabs::-webkit-scrollbar { display: none; }
+.preview-tab { font-size: 10px; padding: 3px 10px; color: var(--ink-mute); border-bottom: 2px solid transparent; cursor: pointer; font-family: var(--font-sans); letter-spacing: 0.02em; white-space: nowrap; transition: color .2s, border-color .2s; }
+.preview-tab:hover { color: var(--ink-secondary); }
 .preview-tab.active { color: var(--ink); border-bottom-color: var(--accent-gold); }
 .preview-slides { display: flex; overflow: hidden; position: relative; }
-.preview-slide { min-width: 100%; display: flex; padding: 24px 28px; gap: 24px; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
-.preview-slide-editor .slide-left { flex: 1; }
-.preview-slide-editor .slide-right { width: 140px; flex-shrink: 0; }
-.slide-label { font-size: 11px; font-weight: 500; color: var(--ink-mute); letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 12px; }
-.slide-content-text { font-family: var(--font-editor); font-size: 15px; line-height: 1.9; color: var(--ink); }
+.preview-slide { min-width: 100%; min-height: 424px; display: flex; padding: 24px 28px 26px; gap: 22px; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.slide-label { display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; color: var(--ink-mute); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px; }
+.slide-label::before { content: ""; width: 12px; height: 1px; background: var(--accent-gold); opacity: .7; flex-shrink: 0; }
+.writing-main, .outline-main, .char-profile, .foreshadow-main, .world-main, .timeline-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+/* Writing slide */
+.writing-breadcrumb { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-mute); letter-spacing: .03em; margin-bottom: 5px; }
+.writing-chapter { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--ink); line-height: 1.2; margin-bottom: 14px; }
+.writing-badge { font-family: var(--font-sans); font-size: 9px; font-weight: 600; color: var(--accent-gold); background: color-mix(in srgb, var(--accent-gold) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent-gold) 22%, transparent); border-radius: var(--radius-pill); padding: 2px 8px; letter-spacing: .02em; white-space: nowrap; }
+.slide-content-text { font-family: var(--font-editor); font-size: 15px; line-height: 1.95; color: var(--ink); }
+.slide-content-text p + p { margin-top: 7px; }
 .slide-content-text .dim { color: var(--ink-tertiary); }
 .slide-content-text .highlight { color: var(--accent-gold-soft); }
-.slide-panel { background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 14px; }
-.slide-panel-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; color: var(--ink-secondary); border-bottom: 1px solid var(--hairline); }
-.slide-panel-item:last-child { border-bottom: none; }
-.slide-panel-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.slide-panel-dot.gold { background: var(--accent-gold); }
-.slide-panel-dot.mist { background: var(--accent-mist); }
-.preview-slide-char .char-grid { display: flex; gap: 12px; flex: 1; }
-.preview-slide-char .char-card { background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 16px; flex: 1; text-align: center; }
-.char-avatar { width: 40px; height: 40px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+.ai-writing { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; font-size: 11px; color: var(--accent-gold); }
+.slide-ai { width: 218px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: 12px; }
+.ai-head { display: flex; align-items: center; gap: 6px; padding-bottom: 9px; margin-bottom: 9px; border-bottom: 1px solid var(--hairline); font-size: 11.5px; color: var(--ink); }
+.ai-head .spark { color: var(--accent-gold); font-size: 12px; }
+.ai-mode { margin-left: auto; font-size: 8px; color: var(--accent-gold); background: color-mix(in srgb, var(--accent-gold) 12%, transparent); border-radius: var(--radius-pill); padding: 2px 7px; letter-spacing: .04em; }
+.ai-steps { display: flex; flex-direction: column; gap: 5px; }
+.ai-step { display: flex; align-items: center; gap: 6px; background: var(--canvas-soft); border: 1px solid var(--hairline); border-radius: 6px; padding: 6px 8px; font-size: 9.5px; color: var(--ink-tertiary); white-space: nowrap; }
+.ai-step code { font-family: var(--font-mono); font-size: 9px; color: var(--accent-gold); }
+.ai-step .ok { margin-left: auto; color: var(--success); font-size: 9px; }
+.ai-step .run { margin-left: auto; color: var(--accent-gold); font-size: 8.5px; animation: pulse 1.6s ease-in-out infinite; }
+.ai-reply { margin-top: 9px; background: var(--canvas-soft); border-radius: 6px; padding: 8px 9px; font-size: 9.5px; line-height: 1.65; color: var(--ink-tertiary); }
+.ai-reply b { color: var(--ink-secondary); font-weight: 500; }
+.ai-foot { margin-top: auto; padding-top: 9px; border-top: 1px solid var(--hairline); display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 8px; color: var(--ink-mute); }
+/* Outline slide */
+.outline-list { width: 138px; flex-shrink: 0; display: flex; flex-direction: column; gap: 1px; padding-right: 14px; border-right: 1px solid var(--hairline); }
+.outline-vol { font-family: var(--font-display); font-size: 12px; color: var(--ink-tertiary); margin-bottom: 7px; }
+.outline-ch { display: flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 5px; font-size: 10.5px; color: var(--ink-tertiary); }
+.outline-ch span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outline-ch .ch-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-mute); flex-shrink: 0; opacity: .7; }
+.outline-ch.active { background: var(--canvas-card); color: var(--ink); box-shadow: inset 2px 0 0 var(--accent-gold); }
+.outline-ch.active .ch-dot { background: var(--accent-gold); opacity: 1; }
+.outline-head { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.outline-title { font-family: var(--font-display); font-size: 19px; color: var(--ink); }
+.outline-ai-btn { margin-left: auto; font-size: 8.5px; color: var(--accent-gold); border: 1px solid color-mix(in srgb, var(--accent-gold) 30%, transparent); border-radius: var(--radius-pill); padding: 3px 9px; background: color-mix(in srgb, var(--accent-gold) 8%, transparent); white-space: nowrap; }
+.outline-text { font-family: var(--font-editor); font-size: 12px; line-height: 1.75; color: var(--ink-secondary); background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: 8px; padding: 9px 11px; }
+.dim-grid, .profile-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 7px; }
+.dim-grid { margin-top: 9px; }
+.dim-item, .profile-field { display: flex; flex-direction: column; justify-content: center; background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: 7px; padding: 7px 9px; min-width: 0; }
+.dim-name { font-size: 8px; font-weight: 600; color: var(--accent-gold); letter-spacing: .05em; margin-bottom: 2px; }
+.dim-value, .profile-field-value { font-size: 9.5px; color: var(--ink-secondary); line-height: 1.5; }
+/* Characters slide */
+.char-list { width: 158px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; padding-right: 12px; border-right: 1px solid var(--hairline); }
+.char-list-item { display: flex; align-items: center; gap: 8px; padding: 6px 7px; border-radius: 6px; }
+.char-list-item.active { background: var(--canvas-card); }
+.char-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
 .char-avatar.gold { background: var(--accent-gold); color: var(--canvas); }
 .char-avatar.mist { background: var(--accent-mist); color: var(--ink); }
 .char-avatar.mid { background: var(--canvas-mid); color: var(--ink-tertiary); }
-.char-name { font-size: 13px; color: var(--ink); font-weight: 500; }
-.char-role { font-size: 10px; color: var(--ink-mute); margin-top: 2px; }
-.preview-slide-world .world-items { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-.world-item { background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 10px 14px; display: flex; align-items: center; gap: 10px; }
-.world-tag { font-size: 9px; padding: 1px 6px; border-radius: var(--radius-pill); background: var(--canvas-mid); color: var(--ink-tertiary); flex-shrink: 0; }
-.world-title { font-size: 13px; color: var(--ink); }
-.world-desc { font-size: 11px; color: var(--ink-tertiary); flex: 1; text-align: right; }
-.preview-slide-timeline .timeline-items { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.timeline-item { display: flex; gap: 12px; align-items: flex-start; }
-.timeline-year { font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold); width: 50px; flex-shrink: 0; text-align: right; }
-.timeline-bar { width: 2px; min-height: 28px; background: var(--hairline-light); flex-shrink: 0; }
-.timeline-content { font-size: 13px; color: var(--ink-secondary); }
+.char-list-name { font-size: 10.5px; color: var(--ink); line-height: 1.35; }
+.char-list-role { font-size: 8.5px; color: var(--ink-mute); line-height: 1.35; margin-top: 1px; }
+.char-list-foot { margin-top: auto; padding: 8px 7px 0; border-top: 1px solid var(--hairline); font-family: var(--font-mono); font-size: 8.5px; color: var(--ink-mute); }
+.profile-head { display: flex; align-items: center; gap: 10px; }
+.profile-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--accent-gold); color: var(--canvas); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.profile-name { font-family: var(--font-display); font-size: 21px; color: var(--ink); line-height: 1.15; }
+.profile-sub { font-size: 9px; color: var(--ink-tertiary); margin-top: 2px; }
+.profile-badge { margin-left: auto; font-size: 8.5px; color: var(--accent-gold); background: color-mix(in srgb, var(--accent-gold) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent-gold) 20%, transparent); border-radius: var(--radius-pill); padding: 2px 8px; white-space: nowrap; }
+.profile-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }
+.profile-chip { font-size: 8.5px; color: var(--ink-secondary); background: var(--canvas-mid); border-radius: var(--radius-pill); padding: 2px 8px; }
+.profile-field-label { font-size: 8px; color: var(--ink-mute); letter-spacing: .05em; margin-bottom: 2px; }
+/* Foreshadow board slide */
+.fs-stats { display: flex; gap: 7px; margin-bottom: 10px; }
+.fs-stat { flex: 1; display: flex; align-items: baseline; gap: 6px; background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: 7px; padding: 6px 9px; }
+.fs-stat b { font-family: var(--font-mono); font-size: 14px; font-weight: 500; color: var(--accent-gold); }
+.fs-stat.warn b { color: var(--accent-ember); }
+.fs-stat span { font-size: 8.5px; color: var(--ink-tertiary); }
+.fs-board { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fs-col { display: flex; flex-direction: column; gap: 6px; background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: 8px; padding: 7px; min-width: 0; }
+.fs-col-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 5px; border-bottom: 1px solid var(--hairline); font-size: 9px; color: var(--ink-tertiary); }
+.fs-col-head b { font-family: var(--font-mono); font-size: 9px; font-weight: 500; color: var(--ink-mute); }
+.fs-card { background: var(--canvas-soft); border: 1px solid var(--hairline); border-radius: 6px; padding: 6px 7px; }
+.fs-card-title { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--ink); line-height: 1.35; }
+.fs-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+.fs-dot.high { background: var(--accent-ember); }
+.fs-dot.normal { background: var(--accent-gold); }
+.fs-dot.low { background: var(--ink-mute); }
+.fs-card-desc { font-size: 8.5px; color: var(--ink-tertiary); line-height: 1.45; margin-top: 3px; }
+.fs-card-foot { font-family: var(--font-mono); font-size: 8px; color: var(--ink-mute); margin-top: 3px; }
+/* World slide */
+.world-tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--hairline); margin-bottom: 10px; }
+.world-tab { font-size: 9.5px; color: var(--ink-mute); padding-bottom: 6px; margin-bottom: -1px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.world-tab.active { color: var(--ink); border-bottom-color: var(--accent-gold); }
+.world-grid { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: 1fr; gap: 8px; }
+.world-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; background: var(--canvas-card); border: 1px solid var(--hairline); border-radius: 8px; padding: 9px 12px; min-width: 0; }
+.world-tag { display: inline-block; font-size: 8px; padding: 1px 6px; border-radius: var(--radius-pill); background: var(--canvas-mid); color: var(--ink-tertiary); margin-bottom: 5px; }
+.world-name { font-size: 11px; color: var(--ink); margin-bottom: 3px; }
+.world-desc { font-size: 9px; color: var(--ink-tertiary); line-height: 1.5; }
+/* Timeline slide */
+.timeline-list { flex: 1; display: flex; flex-direction: column; position: relative; padding-left: 16px; }
+.timeline-list::before { content: ""; position: absolute; left: 4px; top: 5px; bottom: 8px; width: 1.5px; background: var(--hairline-light); }
+.tl-item { flex: 1; position: relative; display: flex; gap: 10px; padding-bottom: 10px; }
+.tl-item::before { content: ""; position: absolute; left: -16px; top: 4px; width: 9px; height: 9px; border-radius: 50%; background: var(--canvas-pop); z-index: 1; }
+.tl-item.major::before { background: var(--accent-gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-gold) 15%, transparent); }
+.tl-year { width: 50px; flex-shrink: 0; font-family: var(--font-display); font-size: 13px; color: var(--accent-gold); line-height: 1.3; }
+.tl-body { flex: 1; min-width: 0; }
+.tl-title { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink); line-height: 1.35; }
+.tl-item.major .tl-title { color: var(--accent-gold-soft); }
+.tl-dots { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.tl-dots i { width: 3.5px; height: 3.5px; border-radius: 50%; background: var(--canvas-mid); }
+.tl-dots i.on { background: var(--accent-gold); }
+.tl-desc { font-size: 9px; color: var(--ink-tertiary); line-height: 1.5; margin-top: 2px; }
 .carousel-dots { display: flex; justify-content: center; gap: 8px; padding: 16px 0 24px; }
 .carousel-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--canvas-mid); border: none; cursor: pointer; transition: all 0.2s; padding: 0; }
 .carousel-dot.active { background: var(--accent-gold); width: 24px; border-radius: 4px; }
@@ -217,8 +312,8 @@ html[data-theme="light"] .mockup-frame { box-shadow: 0 8px 40px rgba(0,0,0,0.12)
 .platform-detail { font-size: 13px; color: var(--ink-tertiary); margin-bottom: 16px; }
 .platform-badge { display: inline-block; font-size: 10px; padding: 3px 10px; border-radius: var(--radius-pill); background: var(--success-soft); color: var(--success); font-weight: 500; letter-spacing: 0.02em; }
 .workflow-steps { display: flex; justify-content: center; gap: 0; position: relative; max-width: 800px; margin: 0 auto; flex-wrap: wrap; }
-.workflow-step { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; min-width: 80px; position: relative; }
-.workflow-step-num { width: 40px; height: 40px; border-radius: 50%; background: var(--canvas-card); border: 2px solid var(--hairline-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 13px; color: var(--ink-tertiary); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; z-index: 1; }
+.workflow-step { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; min-width: 80px; position: relative; --step-size: 40px; }
+.workflow-step-num { width: var(--step-size); height: var(--step-size); border-radius: 50%; background: var(--canvas-card); border: 2px solid var(--hairline-light); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 13px; color: var(--ink-tertiary); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; z-index: 1; }
 .workflow-step-num::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; background: var(--accent-gold); opacity: 0; transform: scale(0.6); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); z-index: -1; }
 .workflow-step.active-glow .workflow-step-num { background: var(--accent-gold); color: var(--canvas); border-color: var(--accent-gold); transform: scale(1.08); }
 .workflow-step.active-glow .workflow-step-num::after { opacity: 0.25; transform: scale(1); animation: glowPulse 1s ease-in-out infinite; }
@@ -235,9 +330,17 @@ html[data-theme="light"] .mockup-frame { box-shadow: 0 8px 40px rgba(0,0,0,0.12)
 .workflow-step.active-glow .workflow-step-label { color: var(--accent-gold); font-weight: 600; }
 .workflow-step.dimmed .workflow-step-label { color: var(--ink-mute); }
 .workflow-step.dimmed-left .workflow-step-label { color: var(--ink-tertiary); }
-.workflow-connector { height: 2px; flex: 1; min-width: 20px; background: var(--hairline-light); margin-top: -28px; align-self: flex-start; transition: background 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s; }
+.workflow-connector { position: absolute; top: calc((var(--step-size) - 10px) / 2); left: calc(50% + var(--step-size) * 0.5 + 7px); width: calc(100% - var(--step-size) - 14px); height: 10px; display: flex; align-items: center; justify-content: space-between; color: var(--canvas-pop); z-index: 0; transition: color 0.5s var(--ease), opacity 0.5s var(--ease); }
+.workflow-connector i { width: 7px; height: 7px; border-top: 1.6px solid currentColor; border-right: 1.6px solid currentColor; border-radius: 1px; transform: rotate(45deg); opacity: 0.9; transition: background-color 0.3s; }
 .workflow-step:last-child .workflow-connector { display: none; }
-.workflow-connector.done { background: var(--accent-gold); opacity: 0.6; }
+.workflow-connector.done { color: var(--accent-gold); }
+.workflow-connector.done i { animation: chevronFlow 1.6s var(--ease) infinite; }
+.workflow-connector.done i:nth-child(2) { animation-delay: 0.2s; }
+.workflow-connector.done i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes chevronFlow {
+0%, 100% { opacity: 0.2; }
+35% { opacity: 1; }
+}
 .faq { width: 100%; max-width: 820px; min-width: 0; margin: 0 auto; border-top: 1px solid var(--hairline-light); }
 .faq-action { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 15px; padding: 10px 14px; border: 1px solid var(--hairline-light); border-radius: var(--radius-md); background: var(--canvas-elevated); color: var(--ink-secondary); font-size: 13px; transition: color 0.15s, border-color 0.15s, background 0.15s; }
 .faq-action:hover { color: var(--ink); border-color: var(--accent-gold); background: var(--canvas-mid); }
@@ -329,7 +432,7 @@ to { opacity: 1; transform: scale(1); }
 .mockup-body { height: 200px; }
 .mockup-sidebar { width: 60px; }
 .mockup-right { display: none; }
-.mockup-editor { padding: 14px 16px; }
+.mockup-editor { --mockup-pad-top: 14px; --mockup-pad-x: 16px; }
 .features-grid { grid-template-columns: 1fr; }
 .feature-card { padding: 24px; }
 .platform-grid { grid-template-columns: 1fr; gap: 12px; }
@@ -337,9 +440,20 @@ to { opacity: 1; transform: scale(1); }
 .section-title { font-size: 30px; }
 .faq summary { padding: 18px 40px 18px 0; font-size: 16px; }
 .faq details p { padding-right: 40px; font-size: 14px; }
-.preview-slide { flex-direction: column; padding: 16px; }
-.preview-slide-editor .slide-right { width: 100%; }
-.preview-slide-char .char-grid { flex-direction: column; }
+.preview-slide { min-height: 0; flex-direction: column; justify-content: center; padding: 16px; gap: 14px; }
+.writing-main, .outline-main, .char-profile, .foreshadow-main, .world-main, .timeline-main { flex: 0 0 auto; }
+.slide-ai { width: 100%; }
+.outline-list { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--hairline); padding: 0 0 8px; }
+.outline-vol { display: none; }
+.outline-ch { flex-shrink: 0; white-space: nowrap; }
+.char-list { width: 100%; flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--hairline); padding: 0 0 8px; }
+.char-list-item { flex-shrink: 0; }
+.char-list-foot { display: none; }
+.fs-board { display: flex; overflow-x: auto; }
+.fs-col { flex: 0 0 170px; }
+.fs-stat { flex-direction: column; align-items: center; gap: 0; padding: 6px 4px; }
+.dim-grid, .profile-grid, .world-grid { grid-auto-rows: auto; align-content: start; }
+.world-grid { grid-template-columns: repeat(2, 1fr); }
 .workflow-steps { flex-direction: column; align-items: center; gap: 16px; }
 .workflow-connector { display: none; }
 .workflow-step { flex-direction: row; width: 100%; max-width: 300px; gap: 14px; }
@@ -361,7 +475,7 @@ to { opacity: 1; transform: scale(1); }
 .mockup-body { height: 160px; }
 .mockup-sidebar { width: 48px; padding: 8px 6px; }
 .mockup-sidebar-item { height: 6px; margin-bottom: 8px; }
-.mockup-line { height: 7px; }
+.mockup-editor { --mockup-line-h: 7px; }
 .section-title { font-size: 26px; }
 }
 </style>
@@ -622,9 +736,14 @@ to { opacity: 1; transform: scale(1); }
             <div class="mockup-line"></div>
             <div class="mockup-line"></div>
             <div class="mockup-line gold"></div>
-            <span class="ai-cursor"></span>
             <div class="mockup-line" style="width:45%;"></div>
             <div class="mockup-line" style="width:55%;"></div>
+            <div class="mockup-line line-write lw-tail" style="width:38%;"></div>
+            <span class="ai-quill-wrap" aria-hidden="true">
+              <svg class="ai-quill" viewBox="235.861 102.4 570.773 819.2" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M640.085333 519.68c12.778667-3.584 25.045333-7.168 36.821334-10.752 10.218667-3.072 20.693333-6.122667 31.445333-9.194667 10.730667-3.072 19.690667-5.888 26.837333-8.448l-10.730666 40.661334c-3.072 11.242667-5.888 19.690667-8.448 25.301333-5.12 13.824-11.114667 26.602667-18.026667 38.357333-6.890667 11.776-13.418667 21.973333-19.562667 30.677334-7.146667 10.24-14.570667 19.690667-22.229333 28.373333l-94.357333 28.394667 77.482666 13.802666c-10.24 8.704-21.226667 17.642667-32.981333 26.858667-10.24 7.68-21.866667 15.722667-34.901333 24.149333a427.306667 427.306667 0 0 1-41.045334 23.402667c-14.314667 7.146667-30.293333 10.88-47.936 11.114667a288.917333 288.917333 0 0 1-50.24-3.456 308.693333 308.693333 0 0 1-55.232-13.013334c5.632-8.704 11.776-18.432 18.410667-29.162666 5.632-9.216 12.394667-20.053333 20.330667-32.597334a1010.133333 1010.133333 0 0 0 24.917333-41.813333A12065.706667 12065.706667 0 0 0 512 540.373333c23.018667-39.893333 43.733333-75.946667 62.144-108.16a7072.853333 7072.853333 0 0 1 60.586667-105.834666 2144.810667 2144.810667 0 0 0-75.946667 92.8 2294.186667 2294.186667 0 0 0-76.693333 103.936 2569.984 2569.984 0 0 0-85.909334 131.562666c-6.144 9.706667-13.034667 20.970667-20.693333 33.749334-7.68 12.778667-15.744 26.325333-24.170667 40.64-8.448 14.336-17.130667 29.013333-26.090666 44.117333-8.96 15.082667-17.770667 29.781333-26.453334 44.096a6981.802667 6981.802667 0 0 0-62.912 104.32c0.512-10.730667 2.56-24.533333 6.144-41.429333 3.072-14.293333 8.192-32.213333 15.36-53.674667 7.146667-21.482667 17.365333-46.805333 30.656-75.946667 8.704-18.410667 15.36-32.725333 19.946667-42.944l10.752-23.786666c2.56-6.144 4.586667-10.24 6.122667-12.266667-2.56-3.072-3.072-9.216-1.536-18.410667 1.024-8.192 3.968-20.074667 8.832-35.669333 4.864-15.594667 13.162667-37.461333 24.917333-65.578667 11.776-28.650667 27.242667-59.456 46.421333-92.437333a1064.874667 1064.874667 0 0 1 64.810667-98.176 1125.077333 1125.077333 0 0 1 78.229333-94.357333 790.058667 790.058667 0 0 1 86.293334-80.917334c29.397333-23.509333 58.816-42.816 88.213333-57.898666 29.397333-15.104 57.92-23.68 85.525333-25.706667 0.512 17.898667-1.28 41.557333-5.376 70.954667a2236.224 2236.224 0 0 1-15.338666 94.336c-6.122667 33.493333-13.034667 67.498667-20.693334 102.016-7.68 34.517333-15.104 65.856-22.250666 93.973333l-102.784 56z"/>
+              </svg>
+            </span>
           </div>
           <div class="mockup-right">
             <div class="mockup-right-item"></div>
@@ -717,7 +836,7 @@ to { opacity: 1; transform: scale(1); }
     <div class="section-header animate-on-scroll">
       <div class="section-label" data-i18n="preview.label">02 · 应用预览</div>
       <h2 class="section-title" id="previewTitle" data-i18n="preview.title">墨境沉心</h2>
-      <p class="section-desc" data-i18n="preview.desc">编辑、角色、世界观、时间线，都收在同一片墨境里。</p>
+      <p class="section-desc" data-i18n="preview.desc">大纲、角色、伏笔、世界观、时间线，都收在同一片墨境里。</p>
     </div>
     <div class="preview-frame animate-on-scroll scale-in">
       <div class="preview-header">
@@ -725,88 +844,239 @@ to { opacity: 1; transform: scale(1); }
         <span class="preview-dot"></span>
         <span class="preview-dot"></span>
         <div class="preview-tabs" id="previewTabs">
-          <span class="preview-tab active" onclick="goToSlide(0)">Editor</span>
-          <span class="preview-tab" onclick="goToSlide(1)">Characters</span>
-          <span class="preview-tab" onclick="goToSlide(2)">World</span>
-          <span class="preview-tab" onclick="goToSlide(3)">Timeline</span>
+          <span class="preview-tab active" data-i18n="preview.tab.writing" onclick="goToSlide(0)">写作</span>
+          <span class="preview-tab" data-i18n="preview.tab.outline" onclick="goToSlide(1)">大纲</span>
+          <span class="preview-tab" data-i18n="preview.tab.characters" onclick="goToSlide(2)">角色</span>
+          <span class="preview-tab" data-i18n="preview.tab.foreshadow" onclick="goToSlide(3)">伏笔</span>
+          <span class="preview-tab" data-i18n="preview.tab.world" onclick="goToSlide(4)">世界观</span>
+          <span class="preview-tab" data-i18n="preview.tab.timeline" onclick="goToSlide(5)">时间线</span>
         </div>
       </div>
       <div class="preview-slides" id="previewSlides">
-        <div class="preview-slide preview-slide-editor" style="transform: translateX(0);">
-          <div class="slide-left">
-            <div class="slide-label" data-i18n="preview.slide1.label">编辑区</div>
+        <div class="preview-slide" style="transform: translateX(0);">
+          <div class="writing-main">
+            <div class="slide-label" data-i18n="preview.slide1.label">写作区</div>
+            <div class="writing-breadcrumb">第一卷 · 归墟 / 第 3 章</div>
+            <div class="writing-chapter">雨停之后 <span class="writing-badge">写作中 · 2,148 字</span></div>
             <div class="slide-content-text">
               <p>她推开门的时候，雨已经停了。</p>
               <p class="dim">屋檐还在滴水，一滴一滴落在青石板上，像是某种没有节奏的钟声。</p>
               <p class="dim">空气里弥漫着雨后泥土的气息，混着一点若有若无的铁锈味。</p>
               <p class="highlight">她走到他身后，屏幕上的波形图还在跳动。</p>
               <p class="dim">三十二组实验，三十二组完全一致的结果——</p>
-              <span class="highlight" style="font-family:var(--font-sans);font-size:13px;">✨ AI 正在写入</span>
             </div>
+            <div class="ai-writing">✦ AI 正在续写…</div>
           </div>
-          <div class="slide-right">
-            <div class="slide-label" data-i18n="preview.slide1.panel">AI 面板</div>
-            <div class="slide-panel">
-              <div class="slide-panel-item"><span class="slide-panel-dot gold"></span> 读取角色: 林晨</div>
-              <div class="slide-panel-item"><span class="slide-panel-dot gold"></span> 读取第2章大纲</div>
-              <div class="slide-panel-item"><span class="slide-panel-dot mist"></span> 续写完成 ✓</div>
+          <div class="slide-ai">
+            <div class="ai-head"><span class="spark">✦</span> <span data-i18n="preview.slide1.panel">AI 助手</span><span class="ai-mode">写作模式</span></div>
+            <div class="ai-steps">
+              <div class="ai-step"><code>get_chapter</code> 第 2 章 <span class="ok">✓</span></div>
+              <div class="ai-step"><code>list_characters</code> 3 个角色 <span class="ok">✓</span></div>
+              <div class="ai-step"><code>list_foreshadows</code> 5 条伏笔 <span class="ok">✓</span></div>
+              <div class="ai-step"><code>update_chapter</code> 第 3 章 <span class="run">写入中…</span></div>
             </div>
-            <div style="margin-top:12px;font-size:11px;color:var(--ink-mute);font-family:var(--font-mono);">
-              Tokens: 12.4k / 128k
+            <div class="ai-reply"><b>林晨的手指停在纸页边缘。</b><br/>被撕去的那一页，只剩下一道整齐的毛边。</div>
+            <div class="ai-foot"><span>7 次工具调用</span><span>12.4k / 128k</span></div>
+          </div>
+        </div>
+        <div class="preview-slide" style="transform: translateX(0);">
+          <div class="outline-list">
+            <div class="outline-vol">第一卷 · 归墟</div>
+            <div class="outline-ch"><span class="ch-dot"></span><span>第 1 章 雨夜来客</span></div>
+            <div class="outline-ch"><span class="ch-dot"></span><span>第 2 章 十七秒</span></div>
+            <div class="outline-ch active"><span class="ch-dot"></span><span>第 3 章 雨停之后</span></div>
+            <div class="outline-ch"><span class="ch-dot"></span><span>第 4 章 缺页</span></div>
+            <div class="outline-ch"><span class="ch-dot"></span><span>第 5 章 地下三层</span></div>
+          </div>
+          <div class="outline-main">
+            <div class="slide-label" data-i18n="preview.slide2.label">章节大纲</div>
+            <div class="outline-head">
+              <span class="outline-title">第 3 章 · 雨停之后</span>
+              <span class="outline-ai-btn">✦ AI 生成大纲</span>
+            </div>
+            <div class="outline-text">林晨在导师笔记的最后一页发现一道撕痕。缺页指向研究所地下三层——三年前"静谧"事故后被永久封锁的区域。他决定今晚潜入，而陈教授似乎早已知道他会这么做。</div>
+            <div class="dim-grid">
+              <div class="dim-item"><div class="dim-name">认知框架</div><div class="dim-value">真相藏在被删去的十七秒里</div></div>
+              <div class="dim-item"><div class="dim-name">情感锚点</div><div class="dim-value">对导师的信任开始动摇</div></div>
+              <div class="dim-item"><div class="dim-name">世界质感</div><div class="dim-value">雨后的研究所，铁锈与消毒水</div></div>
+              <div class="dim-item"><div class="dim-name">具体悬念</div><div class="dim-value">笔记第 47 页被谁撕走</div></div>
+              <div class="dim-item"><div class="dim-name">人际张力</div><div class="dim-value">陈教授反常的回避与试探</div></div>
+              <div class="dim-item"><div class="dim-name">类型推进</div><div class="dim-value">科幻悬疑 · 逼近核心秘密</div></div>
             </div>
           </div>
         </div>
-        <div class="preview-slide preview-slide-char" style="transform: translateX(0);">
-          <div style="flex:1;">
-            <div class="slide-label" data-i18n="preview.slide2.label">角色管理</div>
-            <div class="char-grid">
-              <div class="char-card">
-                <div class="char-avatar gold">林</div>
-                <div class="char-name">林晨</div>
-                <div class="char-role">28岁 · 主角 · 12章出场</div>
-              </div>
-              <div class="char-card">
-                <div class="char-avatar mist">陈</div>
-                <div class="char-name">陈教授</div>
-                <div class="char-role">55岁 · 配角 · 9章出场</div>
-              </div>
-              <div class="char-card">
-                <div class="char-avatar mist">李</div>
-                <div class="char-name">李薇</div>
-                <div class="char-role">26岁 · 配角 · 6章出场</div>
-              </div>
-              <div class="char-card">
-                <div class="char-avatar mid">王</div>
-                <div class="char-name">王队长</div>
-                <div class="char-role">42岁 · 客串 · 2章出场</div>
-              </div>
+        <div class="preview-slide" style="transform: translateX(0);">
+          <div class="char-list">
+            <div class="char-list-item active">
+              <div class="char-avatar gold">林</div>
+              <div><div class="char-list-name">林晨</div><div class="char-list-role">主角 · 28 岁</div></div>
             </div>
-            <div style="margin-top:12px;display:flex;gap:16px;font-size:12px;color:var(--ink-tertiary);">
-              <span>👤 4 个角色</span>
-              <span>💞 6 条关系</span>
+            <div class="char-list-item">
+              <div class="char-avatar mist">陈</div>
+              <div><div class="char-list-name">陈教授</div><div class="char-list-role">配角 · 55 岁</div></div>
+            </div>
+            <div class="char-list-item">
+              <div class="char-avatar mist">李</div>
+              <div><div class="char-list-name">李薇</div><div class="char-list-role">配角 · 26 岁</div></div>
+            </div>
+            <div class="char-list-item">
+              <div class="char-avatar mid">王</div>
+              <div><div class="char-list-name">王队长</div><div class="char-list-role">客串 · 42 岁</div></div>
+            </div>
+            <div class="char-list-foot">4 个角色 · 6 条关系</div>
+          </div>
+          <div class="char-profile">
+            <div class="slide-label" data-i18n="preview.slide3.label">角色档案</div>
+            <div class="profile-head">
+              <div class="profile-avatar">林</div>
+              <div>
+                <div class="profile-name">林晨</div>
+                <div class="profile-sub">量子物理研究员 · 导师失踪案亲历者</div>
+              </div>
+              <span class="profile-badge">主角 · 12 章出场</span>
+            </div>
+            <div class="profile-chips">
+              <span class="profile-chip">冷静</span>
+              <span class="profile-chip">执拗</span>
+              <span class="profile-chip">长期失眠</span>
+              <span class="profile-chip">对规则过敏</span>
+            </div>
+            <div class="profile-grid">
+              <div class="profile-field"><div class="profile-field-label">动机</div><div class="profile-field-value">找到导师失踪的真相，哪怕推翻整个研究所</div></div>
+              <div class="profile-field"><div class="profile-field-label">成长弧线</div><div class="profile-field-value">从相信规则，到亲手打破规则</div></div>
+              <div class="profile-field"><div class="profile-field-label">背景</div><div class="profile-field-value">"静谧"事故中唯一保持清醒的目击者</div></div>
+              <div class="profile-field"><div class="profile-field-label">关系</div><div class="profile-field-value">陈教授 · 师生 / 李薇 · 搭档 / 王队 · 对立</div></div>
+              <div class="profile-field"><div class="profile-field-label">外貌</div><div class="profile-field-value">总穿一件洗旧的灰色外套，袖口磨得发白</div></div>
+              <div class="profile-field"><div class="profile-field-label">备注</div><div class="profile-field-value">事故后，每晚都会听见那 17 秒的静默</div></div>
             </div>
           </div>
         </div>
-        <div class="preview-slide preview-slide-world" style="transform: translateX(0);">
-          <div style="flex:1;">
-            <div class="slide-label" data-i18n="preview.slide3.label">世界观设定</div>
-            <div class="world-items">
-              <div class="world-item"><span class="world-tag">📍 地点</span><span class="world-title">量子物理研究所</span><span class="world-desc">城市西郊，建于2035年</span></div>
-              <div class="world-item"><span class="world-tag">🏛️ 组织</span><span class="world-title">国家量子科学研究中心</span><span class="world-desc">科技部直属机构</span></div>
-              <div class="world-item"><span class="world-tag">💡 概念</span><span class="world-title">量子纠缠通信</span><span class="world-desc">即时通信技术</span></div>
-              <div class="world-item"><span class="world-tag">🔬 科学</span><span class="world-title">量子态稳定技术</span><span class="world-desc">🔴 核心假设</span></div>
-              <div class="world-item"><span class="world-tag">📅 事件</span><span class="world-title">"静谧"实验事故</span><span class="world-desc">三年前全体失明17秒</span></div>
+        <div class="preview-slide" style="transform: translateX(0);">
+          <div class="foreshadow-main">
+            <div class="slide-label" data-i18n="preview.slide4.label">伏笔看板</div>
+            <div class="fs-stats">
+              <div class="fs-stat"><b>11</b><span>全部伏笔</span></div>
+              <div class="fs-stat"><b>6</b><span>已埋下</span></div>
+              <div class="fs-stat"><b>3</b><span>推进中</span></div>
+              <div class="fs-stat"><b>2</b><span>已回收</span></div>
+              <div class="fs-stat warn"><b>1</b><span>已逾期</span></div>
+            </div>
+            <div class="fs-board">
+              <div class="fs-col">
+                <div class="fs-col-head"><span>已埋下</span><b>6</b></div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot high"></span>导师笔记的缺页</div>
+                  <div class="fs-card-desc">第 47 页被整齐撕走，纸边留下半枚指纹。</div>
+                  <div class="fs-card-foot">预期第 12 章回收</div>
+                </div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot normal"></span>停在 3:17 的怀表</div>
+                  <div class="fs-card-desc">导师从不离身的旧表，停在事故发生的那一刻。</div>
+                  <div class="fs-card-foot">预期第 9 章回收</div>
+                </div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot low"></span>李薇的旧工牌</div>
+                  <div class="fs-card-desc">她从未提过自己曾参与"静谧"项目。</div>
+                </div>
+              </div>
+              <div class="fs-col">
+                <div class="fs-col-head"><span>推进中</span><b>3</b></div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot high"></span>陈教授隐瞒的实验记录</div>
+                  <div class="fs-card-desc">第三份记录缺失，签名却是他的笔迹。</div>
+                  <div class="fs-card-foot">推进至第 6 章</div>
+                </div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot normal"></span>停电夜的第七次敲门</div>
+                  <div class="fs-card-desc">每次停电，走廊尽头都会多一道脚步声。</div>
+                </div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot low"></span>档案室的温度</div>
+                  <div class="fs-card-desc">地下三层比别处低三度，无人能解释。</div>
+                </div>
+              </div>
+              <div class="fs-col">
+                <div class="fs-col-head"><span>已回收</span><b>2</b></div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot normal"></span>十七秒的集体失明</div>
+                  <div class="fs-card-desc">第 8 章揭示：量子态覆盖视网膜的副作用。</div>
+                  <div class="fs-card-foot">✓ 第 8 章回收</div>
+                </div>
+                <div class="fs-card">
+                  <div class="fs-card-title"><span class="fs-dot low"></span>雨夜里的铁锈味</div>
+                  <div class="fs-card-desc">指向地下三层的通风系统。</div>
+                  <div class="fs-card-foot">✓ 第 5 章回收</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-        <div class="preview-slide preview-slide-timeline" style="transform: translateX(0);">
-          <div style="flex:1;">
-            <div class="slide-label" data-i18n="preview.slide4.label">故事时间线</div>
-            <div class="timeline-items">
-              <div class="timeline-item"><span class="timeline-year">2032</span><span class="timeline-bar"></span><span class="timeline-content">量子态稳定技术首次验证</span></div>
-              <div class="timeline-item"><span class="timeline-year">2033</span><span class="timeline-bar"></span><span class="timeline-content" style="color:var(--accent-ember);">"静谧"实验事故 · 导师失踪</span></div>
-              <div class="timeline-item"><span class="timeline-year">2033.9</span><span class="timeline-bar"></span><span class="timeline-content">研究所封锁消息</span></div>
-              <div class="timeline-item"><span class="timeline-year">2036.3</span><span class="timeline-bar"></span><span class="timeline-content" style="color:var(--accent-gold);">林晨发现导师笔记 ← 故事开始</span></div>
+        <div class="preview-slide" style="transform: translateX(0);">
+          <div class="world-main">
+            <div class="slide-label" data-i18n="preview.slide5.label">世界观设定</div>
+            <div class="world-tabs">
+              <span class="world-tab active">全部</span>
+              <span class="world-tab">地点</span>
+              <span class="world-tab">组织</span>
+              <span class="world-tab">概念</span>
+              <span class="world-tab">事件</span>
+            </div>
+            <div class="world-grid">
+              <div class="world-card"><span class="world-tag">地点</span><div class="world-name">量子物理研究所</div><div class="world-desc">城市西郊，建于 2035 年，地上七层，地下三层。</div></div>
+              <div class="world-card"><span class="world-tag">组织</span><div class="world-name">国家量子科学研究中心</div><div class="world-desc">科技部直属机构，掌握全部"静谧"实验档案。</div></div>
+              <div class="world-card"><span class="world-tag">概念</span><div class="world-name">量子纠缠通信</div><div class="world-desc">无视距离的即时通信技术，理论带宽无限。</div></div>
+              <div class="world-card"><span class="world-tag">事件</span><div class="world-name">"静谧"实验事故</div><div class="world-desc">三年前全体人员失明 17 秒，导师随后失踪。</div></div>
+              <div class="world-card"><span class="world-tag">概念</span><div class="world-name">量子态稳定技术</div><div class="world-desc">维持纠缠态超过 17 秒的核心假设，尚未被验证。</div></div>
+              <div class="world-card"><span class="world-tag">地点</span><div class="world-name">地下三层档案室</div><div class="world-desc">需要导师权限才能进入，事故后被永久封锁。</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="preview-slide" style="transform: translateX(0);">
+          <div class="timeline-main">
+            <div class="slide-label" data-i18n="preview.slide6.label">故事时间线</div>
+            <div class="timeline-list">
+              <div class="tl-item">
+                <span class="tl-year">2031</span>
+                <div class="tl-body">
+                  <div class="tl-title">量子态稳定技术立项 <span class="tl-dots"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
+                  <div class="tl-desc">导师主持首批实验，研究所获得专项拨款。</div>
+                </div>
+              </div>
+              <div class="tl-item">
+                <span class="tl-year">2032</span>
+                <div class="tl-body">
+                  <div class="tl-title">量子态稳定技术首次验证 <span class="tl-dots"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+                  <div class="tl-desc">三十二组实验完全一致，论文未发表即被列为机密。</div>
+                </div>
+              </div>
+              <div class="tl-item major">
+                <span class="tl-year">2033.4</span>
+                <div class="tl-body">
+                  <div class="tl-title">"静谧"实验事故 · 导师失踪 <span class="tl-dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></span></div>
+                  <div class="tl-desc">全体人员失明 17 秒，实验记录被封存。</div>
+                </div>
+              </div>
+              <div class="tl-item">
+                <span class="tl-year">2033.9</span>
+                <div class="tl-body">
+                  <div class="tl-title">研究所封锁消息 <span class="tl-dots"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
+                  <div class="tl-desc">对外称设备检修，地下三层永久封闭。</div>
+                </div>
+              </div>
+              <div class="tl-item">
+                <span class="tl-year">2034.7</span>
+                <div class="tl-body">
+                  <div class="tl-title">陈教授接任所长 <span class="tl-dots"><i class="on"></i><i></i><i></i><i></i><i></i></span></div>
+                  <div class="tl-desc">"静谧"项目转入地下，档案权限收紧。</div>
+                </div>
+              </div>
+              <div class="tl-item major">
+                <span class="tl-year">2036.3</span>
+                <div class="tl-body">
+                  <div class="tl-title">林晨发现导师笔记 <span class="tl-dots"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+                  <div class="tl-desc">缺页指向地下三层——故事开始。</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -817,6 +1087,8 @@ to { opacity: 1; transform: scale(1); }
       <button class="carousel-dot" onclick="goToSlide(1)"></button>
       <button class="carousel-dot" onclick="goToSlide(2)"></button>
       <button class="carousel-dot" onclick="goToSlide(3)"></button>
+      <button class="carousel-dot" onclick="goToSlide(4)"></button>
+      <button class="carousel-dot" onclick="goToSlide(5)"></button>
     </div>
   </div>
 </section>
@@ -860,42 +1132,42 @@ to { opacity: 1; transform: scale(1); }
     <div class="section-header animate-on-scroll">
       <div class="section-label" data-i18n="workflow.label">04 · 创作流程</div>
       <h2 class="section-title" id="workflowTitle" data-i18n="workflow.title">七步成书</h2>
-      <p class="section-desc" data-i18n="workflow.desc">从灵感到成书，你把控方向，流程交给 Mythpen。</p>
+      <p class="section-desc" data-i18n="workflow.desc">从灵感到成书，你把控方向，流程交给它。</p>
     </div>
     <div class="workflow-steps animate-on-scroll" id="workflowSteps">
       <div class="workflow-step" data-step="0">
         <div class="workflow-step-num">1</div>
-        <div class="workflow-connector"></div>
+        <div class="workflow-connector" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="workflow-step-label" data-i18n="workflow.step1">选题</div>
         <div class="workflow-step-sub" data-i18n="workflow.desc1">确定故事方向</div>
       </div>
       <div class="workflow-step" data-step="1">
         <div class="workflow-step-num">2</div>
-        <div class="workflow-connector"></div>
+        <div class="workflow-connector" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="workflow-step-label" data-i18n="workflow.step2">设定</div>
         <div class="workflow-step-sub" data-i18n="workflow.desc2">构建世界与角色</div>
       </div>
       <div class="workflow-step" data-step="2">
         <div class="workflow-step-num">3</div>
-        <div class="workflow-connector"></div>
+        <div class="workflow-connector" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="workflow-step-label" data-i18n="workflow.step3">大纲</div>
         <div class="workflow-step-sub" data-i18n="workflow.desc3">规划情节脉络</div>
       </div>
       <div class="workflow-step" data-step="3">
         <div class="workflow-step-num">4</div>
-        <div class="workflow-connector"></div>
+        <div class="workflow-connector" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="workflow-step-label" data-i18n="workflow.step4">写作</div>
         <div class="workflow-step-sub" data-i18n="workflow.desc4">AI 协作创作</div>
       </div>
       <div class="workflow-step" data-step="4">
         <div class="workflow-step-num">5</div>
-        <div class="workflow-connector"></div>
+        <div class="workflow-connector" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="workflow-step-label" data-i18n="workflow.step5">审阅</div>
         <div class="workflow-step-sub" data-i18n="workflow.desc5">修订与润色</div>
       </div>
       <div class="workflow-step" data-step="5">
         <div class="workflow-step-num">6</div>
-        <div class="workflow-connector"></div>
+        <div class="workflow-connector" aria-hidden="true"><i></i><i></i><i></i></div>
         <div class="workflow-step-label" data-i18n="workflow.step6">一致性</div>
         <div class="workflow-step-sub" data-i18n="workflow.desc6">AI 检查矛盾</div>
       </div>
@@ -955,7 +1227,7 @@ to { opacity: 1; transform: scale(1); }
   <div class="container">
     <div class="animate-on-scroll">
       <h2 class="section-title" id="downloadTitle" data-i18n="cta.title">即刻动笔</h2>
-      <p class="cta-desc" data-i18n="cta.desc">免费下载 Mythpen，写下你的第一个字。本地数据，隐私无忧。</p>
+      <p class="cta-desc" data-i18n="cta.desc">免费下载 Mythpen，写下你的第一部作品。本地数据，隐私无忧。</p>
       <div class="download-buttons">
         <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-primary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-macos"/></svg>
@@ -1044,12 +1316,20 @@ const i18n = {
     'features.consistency.desc': 'AI 驱动的一致性检查。自动发现设定矛盾、角色偏差、时间逻辑问题，确保长篇创作的前后统一。',
     'preview.label': '02 · 应用预览',
     'preview.title': '墨境沉心',
-    'preview.desc': '编辑、角色、世界观、时间线，都收在同一片墨境里。',
-    'preview.slide1.label': '编辑区',
-    'preview.slide1.panel': 'AI 面板',
-    'preview.slide2.label': '角色管理',
-    'preview.slide3.label': '世界观设定',
-    'preview.slide4.label': '故事时间线',
+    'preview.desc': '大纲、角色、伏笔、世界观、时间线，都收在同一片墨境里。',
+    'preview.tab.writing': '写作',
+    'preview.tab.outline': '大纲',
+    'preview.tab.characters': '角色',
+    'preview.tab.foreshadow': '伏笔',
+    'preview.tab.world': '世界观',
+    'preview.tab.timeline': '时间线',
+    'preview.slide1.label': '写作区',
+    'preview.slide1.panel': 'AI 助手',
+    'preview.slide2.label': '章节大纲',
+    'preview.slide3.label': '角色档案',
+    'preview.slide4.label': '伏笔看板',
+    'preview.slide5.label': '世界观设定',
+    'preview.slide6.label': '故事时间线',
     'platform.label': '03 · 跨平台',
     'platform.title': '多端适配',
     'platform.desc': 'macOS、Windows、Linux，同一部小说，同一套体验。',
@@ -1059,7 +1339,7 @@ const i18n = {
     'platform.available': '✓ 可用',
     'workflow.label': '04 · 创作流程',
     'workflow.title': '七步成书',
-    'workflow.desc': '从灵感到成书，你把控方向，流程交给 Mythpen。',
+    'workflow.desc': '从灵感到成书，你把控方向，流程交给它。',
     'workflow.step1': '选题',
     'workflow.step2': '设定',
     'workflow.step3': '大纲',
@@ -1093,7 +1373,7 @@ const i18n = {
     'faq.q7': '升级会丢数据吗？',
     'faq.a7': '不会。项目数据独立保存在 .mythpen 目录，升级只会替换应用本身。仍建议定期备份该目录，尤其是在大幅调整设定或导入旧书之前。',
     'cta.title': '即刻动笔',
-    'cta.desc': '免费下载 Mythpen，写下你的第一个字。本地数据，隐私无忧。',
+    'cta.desc': '免费下载 Mythpen，写下你的第一部作品。本地数据，隐私无忧。',
     'download.baiduLabel': '国内用户可通过百度网盘下载：',
     'download.baiduLink': 'Mythpen（提取码 n63e）',
     'group.label': '遇到问题，或想和作者交流创作经验？',
@@ -1130,12 +1410,20 @@ const i18n = {
     'features.consistency.desc': 'AI-powered consistency checking. Automatically detect setting contradictions, character drift, and timeline issues across your entire novel.',
     'preview.label': '02 · App Preview',
     'preview.title': 'Sink Into the Ink Realm',
-    'preview.desc': 'Editor, characters, world, and timeline — all in one realm of ink.',
-    'preview.slide1.label': 'Editor',
-    'preview.slide1.panel': 'AI Panel',
-    'preview.slide2.label': 'Characters',
-    'preview.slide3.label': 'World Settings',
-    'preview.slide4.label': 'Story Timeline',
+    'preview.desc': 'Outline, characters, foreshadowing, world, and timeline — all in one realm of ink.',
+    'preview.tab.writing': 'Writing',
+    'preview.tab.outline': 'Outline',
+    'preview.tab.characters': 'Characters',
+    'preview.tab.foreshadow': 'Foreshadow',
+    'preview.tab.world': 'World',
+    'preview.tab.timeline': 'Timeline',
+    'preview.slide1.label': 'Writing',
+    'preview.slide1.panel': 'AI Assistant',
+    'preview.slide2.label': 'Chapter Outline',
+    'preview.slide3.label': 'Characters',
+    'preview.slide4.label': 'Foreshadow Board',
+    'preview.slide5.label': 'World Settings',
+    'preview.slide6.label': 'Story Timeline',
     'platform.label': '03 · Cross-Platform',
     'platform.title': 'One App, Every Platform',
     'platform.desc': 'macOS, Windows, and Linux — one novel, one experience.',
@@ -1145,7 +1433,7 @@ const i18n = {
     'platform.available': '✓ Available',
     'workflow.label': '04 · Workflow',
     'workflow.title': 'Seven Steps to a Finished Novel',
-    'workflow.desc': 'From first idea to finished book — you set the direction, Mythpen handles the process.',
+    'workflow.desc': 'From first idea to finished book — you set the direction, it handles the process.',
     'workflow.step1': 'Idea',
     'workflow.step2': 'Setting',
     'workflow.step3': 'Outline',
@@ -1179,7 +1467,7 @@ const i18n = {
     'faq.q7': 'Will updates erase my data?',
     'faq.a7': 'No. Project data lives in the .mythpen folder, and updates only replace the app. Still, back up that folder regularly, especially before large setting changes or imports.',
     'cta.title': 'Start Writing Now',
-    'cta.desc': 'Download Mythpen for free and write your first line. Local data, total privacy.',
+    'cta.desc': 'Download Mythpen for free and write your first work. Local data, total privacy.',
     'download.baiduLabel': 'In China? Download via Baidu Netdisk:',
     'download.baiduLink': 'Mythpen (code: n63e)',
     'group.label': 'Questions, or want to talk writing with the author?',
@@ -1193,7 +1481,6 @@ const i18n = {
 let currentLang = localStorage.getItem('mythpen-lang') || 'zh';
 let currentTheme = localStorage.getItem('mythpen-theme') || 'dark';
 let currentSlide = 0;
-const TOTAL_SLIDES = 4;
 let carouselTimer = null;
 // Carousel DOM cache (populated once in DOMContentLoaded)
 let slideEls, dotEls, tabEls;
@@ -1259,8 +1546,21 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.stagger-children').forEach(function(el) {
     observer.observe(el);
   });
-  // Start carousel
-  startCarousel();
+  // Start/stop carousel only while the preview section is visible
+  const previewSection = document.getElementById('preview');
+  if (previewSection) {
+    const carouselObserver = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          startCarousel();
+        } else if (carouselTimer) {
+          clearInterval(carouselTimer);
+          carouselTimer = null;
+        }
+      });
+    }, { threshold: 0.2 });
+    carouselObserver.observe(previewSection);
+  }
   // Typewriter effect for features title
   const featuresTitle = document.getElementById('featuresTitle');
   if (featuresTitle) {
@@ -1362,9 +1662,9 @@ function goToSlide(index) {
 function startCarousel() {
   if (carouselTimer) clearInterval(carouselTimer);
   carouselTimer = setInterval(function() {
-    const next = (currentSlide + 1) % TOTAL_SLIDES;
+    const next = (currentSlide + 1) % slideEls.length;
     goToSlide(next);
-  }, 4500);
+  }, 5200);
 }
 /* ═══ Typewriter Effect ═══ */
 let typewriterTimer = null;
