@@ -1,12 +1,9 @@
-import { BookOpen, FileText, FolderOpen, Trash2, X } from 'lucide-react'
+import { BookOpen, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { ProjectIcon } from '@/components/ProjectIcon'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
-import { openProjectFileFromDialog, projectFileName } from '@/lib/projectFiles'
-import { isTauri } from '@/lib/runtime'
 import { useProjectStore } from '@/stores/useProjectStore'
-import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
 
 function formatDate(dateStr: string): string {
@@ -24,25 +21,18 @@ function formatDate(dateStr: string): string {
 export function ProjectList() {
   const { projects, setCurrentProject, showProjectList, deleteProject } = useProjectStore()
   const { setProjectDialogOpen } = useUIStore()
-  const documentModeEnabled = useSettingsStore((s) => s.settings.experimentalDocumentMode)
   const { t } = useT()
   const totalWords = projects.reduce((s, p) => s + p.wordCount, 0)
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [deleteFile, setDeleteFile] = useState(false)
 
   if (!showProjectList) return null
-
-  const deleteTargetProject = deleteTarget ? projects.find((project) => project.name === deleteTarget) : undefined
-  const deleteTargetIsDocument = deleteTargetProject?.isDocument === true
 
   const handleDelete = async () => {
     if (!deleteTarget) return
     const name = deleteTarget
     setDeleteTarget(null)
-    // Internal projects keep the historical "delete the DB" behaviour;
-    // user documents are removed from the recent list unless opted in.
-    await deleteProject(name, deleteTargetIsDocument ? deleteFile : true)
+    await deleteProject(name)
   }
 
   return (
@@ -57,12 +47,6 @@ export function ProjectList() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {isTauri && documentModeEnabled && (
-                <button className="btn-secondary h-[34px] px-4 gap-1.5" onClick={openProjectFileFromDialog}>
-                  <FolderOpen size={14} />
-                  {t('project.file.open')}
-                </button>
-              )}
               <button className="btn-primary h-[34px] px-5" onClick={() => setProjectDialogOpen(true)}>
                 + {t('project.new')}
               </button>
@@ -89,7 +73,7 @@ export function ProjectList() {
                   className="group relative bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-5 cursor-pointer transition-all hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)] hover:-translate-y-px"
                   onClick={() => {
                     if (p.incompatible) {
-                      useToast.getState().show(t('project.file.incompatible'), 'error', 6000)
+                      useToast.getState().show(t('project.incompatible'), 'error', 6000)
                       return
                     }
                     setCurrentProject(p.name)
@@ -101,7 +85,6 @@ export function ProjectList() {
                     onClick={(e) => {
                       e.stopPropagation()
                       setDeleteTarget(p.name)
-                      setDeleteFile(false)
                     }}
                     title={t('project.deleteTooltip')}
                   >
@@ -112,15 +95,6 @@ export function ProjectList() {
                     <ProjectIcon name={p.iconName} className="w-7 h-7" />
                   </div>
                   <div className="font-display text-lg font-medium text-[var(--ink)] mb-1">{p.name}</div>
-                  {p.isDocument && (
-                    <div
-                      className="flex items-center gap-1 text-[10px] text-[var(--ink-tertiary)] mb-1.5 min-w-0"
-                      title={p.filePath}
-                    >
-                      <FileText size={10} className="shrink-0" />
-                      <span className="truncate">{projectFileName(p.filePath)}</span>
-                    </div>
-                  )}
                   <div className="flex gap-1 flex-wrap mb-2.5">
                     {p.genres.map((g) => (
                       <span
@@ -178,28 +152,11 @@ export function ProjectList() {
                 <X size={16} />
               </button>
             </div>
-            {deleteTargetIsDocument ? (
-              <>
-                <p className="text-[var(--ink-secondary)] text-[14px] leading-relaxed mb-4">
-                  {t('project.file.removeFromListMsg', { name: deleteTarget })}
-                </p>
-                <label className="flex items-start gap-2 text-[12px] text-[var(--ink-tertiary)] mb-6 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 accent-[var(--accent-gold)]"
-                    checked={deleteFile}
-                    onChange={(e) => setDeleteFile(e.target.checked)}
-                  />
-                  <span>{t('project.file.deleteFileHint')}</span>
-                </label>
-              </>
-            ) : (
-              <p className="text-[var(--ink-secondary)] text-[14px] leading-relaxed mb-6">
-                {t('project.confirmDeleteMsg', { name: deleteTarget })}
-                <br />
-                {t('project.permanentDelete')}
-              </p>
-            )}
+            <p className="text-[var(--ink-secondary)] text-[14px] leading-relaxed mb-6">
+              {t('project.confirmDeleteMsg', { name: deleteTarget })}
+              <br />
+              {t('project.permanentDelete')}
+            </p>
             <div className="flex justify-end gap-2">
               <button className="btn-secondary h-[34px] px-4" onClick={() => setDeleteTarget(null)}>
                 {t('project.cancel')}

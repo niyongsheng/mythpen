@@ -188,8 +188,6 @@ export interface AppSettings {
   soundEffect: SoundEffect
   backupEnabled: boolean
   anonymousStats: boolean
-  /** Experimental .mythpen project files (off by default; format may change). */
-  experimentalDocumentMode: boolean
   accentColor: string
   maxOutputTokens: number
   httpTimeout: number

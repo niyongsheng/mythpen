@@ -11,8 +11,7 @@ import { useToast } from '@/hooks/useToast'
 import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { refreshAllData } from '@/lib/dataEvents'
-import { useOpenProjectFiles } from '@/lib/openFiles'
-import { saveProjectNow } from '@/lib/projectFiles'
+import { flushEditorSave } from '@/lib/editorSave'
 import { About } from '@/pages/About'
 import { Characters } from '@/pages/Characters'
 import { ClueBoard } from '@/pages/ClueBoard'
@@ -66,9 +65,6 @@ function App() {
   const autoCheckForUpdates = useUpdateStore((s) => s.autoCheck)
   const { toasts, show: showToast, dismiss: dismissToast } = useToast()
 
-  // Consume .mythpen paths delivered by the OS (double-click / second launch).
-  useOpenProjectFiles()
-
   // Mount a page the first time it is visited, then keep it alive so local
   // state survives navigation. Avoids firing every page's data fetches at launch.
   const [mountedPages, setMountedPages] = useState<Set<string>>(() => new Set([activePage]))
@@ -107,7 +103,7 @@ function App() {
       }
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        void saveProjectNow()
+        void flushEditorSave()
       }
     }
     window.addEventListener('keydown', handleKeyDown)

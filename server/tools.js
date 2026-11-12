@@ -37,15 +37,15 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'create_chapter',
-      description: '创建新章节框架。新建后会自动按全书顺序分配编号（跨卷唯一）；默认与上一章同卷，第一章默认放入第一卷。如需指定编号或卷请传入 chapter_num / volume_id。大纲和正文请用 update_chapter 写入。',
+      description: '创建新章节框架。新建后会自动按全书顺序分配编号（跨卷唯一）。必须指定 volume_id（卷结构里有卷ID）。大纲和正文请用 update_chapter 写入。',
       parameters: {
         type: 'object',
         properties: {
           title: { type: 'string', description: '章节标题' },
           chapter_num: { type: 'number', description: '章节编号（可选）。不传则自动按全书顺序编号；传入则使用指定编号' },
-          volume_id: { type: 'number', description: '所属卷ID，默认为最后一卷' },
+          volume_id: { type: 'number', description: '所属卷ID（必填），见项目上下文「卷结构」' },
         },
-        required: ['title'],
+        required: ['title', 'volume_id'],
       },
     },
   },
@@ -53,7 +53,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'update_chapter',
-      description: '更新章节内容。只传需要修改的字段。status: pending/writing/review/accepted。',
+      description: '更新章节内容。只传需要修改的字段。status: pending/writing/review/accepted。传 volume_id 可把章节移到另一卷（不改正文）。',
       parameters: {
         type: 'object',
         properties: {
@@ -69,6 +69,7 @@ const TOOLS = [
           concrete_mystery: { type: 'string', description: '叙事维度：具体悬念（可选）' },
           interpersonal_tension: { type: 'string', description: '叙事维度：人际张力（可选）' },
           genre_beat: { type: 'string', description: '类型推进：本章在作品类型上的核心推进（可选）' },
+          volume_id: { type: 'number', description: '移动到指定卷ID（可选）。用于修正章节归属的卷，不会改动正文' },
         },
         required: ['chapter_num'],
       },
@@ -878,15 +879,16 @@ const HANDLERS = {
       if (hasText(args.content) || hasText(args.outline)) {
         return { error: 'create_chapter 只创建章节框架，不接收 outline/content。请先创建章节，再用 update_chapter 写入大纲和正文。' };
       }
+      // Never guess the volume: a wrong default silently files chapters under
+      // another volume. The prompt/context provides volume IDs.
+      const volId = args.volume_id;
+      if (volId === undefined || volId === null) {
+        return { error: 'create_chapter 必须指定 volume_id，可先用 list_volumes 查看卷ID' };
+      }
+      if (!pdb.prepare('SELECT id FROM volumes WHERE id = ?').get(volId)) {
+        return { error: `卷 ${volId} 不存在，可先用 list_volumes 查看卷ID` };
+      }
       const num = args.chapter_num !== undefined ? args.chapter_num : db.nextChapterNumber(projectName);
-      // Keep continuation chapters in the previous chapter's volume; chapter 1
-      // belongs to the first volume. Falling back to "last volume" here used to
-      // put the collab mode's first three chapters into the final volume.
-      const previousVolume = num > 1
-        ? pdb.prepare('SELECT volume_id FROM chapters WHERE num = ?').get(num - 1)?.volume_id
-        : null;
-      const firstVolume = pdb.prepare('SELECT id FROM volumes ORDER BY sort_order, id LIMIT 1').get()?.id;
-      const volId = args.volume_id || previousVolume || firstVolume || db.lastVolumeId(projectName);
       pdb.prepare(`INSERT INTO chapters (volume_id, num, title, outline, content, word_count, status, cognitive_frame, emotional_anchor, world_texture, concrete_mystery, interpersonal_tension, genre_beat, created_at, updated_at)
         VALUES (?, ?, ?, '', '', 0, 'pending', ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`)
         .run(volId, num, args.title,
@@ -902,7 +904,11 @@ const HANDLERS = {
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
       const { chapter_num, ...fields } = args;
-      const allowed = ['title', 'content', 'outline', 'status', 'summary', 'cognitive_frame', 'emotional_anchor', 'world_texture', 'concrete_mystery', 'interpersonal_tension', 'genre_beat'];
+      const allowed = ['title', 'content', 'outline', 'status', 'summary', 'cognitive_frame', 'emotional_anchor', 'world_texture', 'concrete_mystery', 'interpersonal_tension', 'genre_beat', 'volume_id'];
+      if (fields.volume_id !== undefined) {
+        const volume = pdb.prepare('SELECT id FROM volumes WHERE id = ?').get(fields.volume_id);
+        if (!volume) return { error: `卷 ${fields.volume_id} 不存在` };
+      }
       const updates = [];
       const params = [];
       if (typeof fields.content === 'string') {

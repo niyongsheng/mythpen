@@ -8,13 +8,7 @@
     "projectMeta": "{words}자 · {chapters}장 · {genres}",
     "settings": "설정",
     "collapseAI": "AI 패널 접기",
-    "expandAI": "AI 패널 펼치기",
-    "file": {
-      "save": "저장",
-      "saveAs": "다른 이름으로 저장…",
-      "reveal": "폴더에서 보기",
-      "open": "프로젝트 파일 열기…"
-    }
+    "expandAI": "AI 패널 펼치기"
   },
   "sidebar": {
     "outline": "개요",
@@ -184,6 +178,7 @@
       "short-story": "단편"
     },
     "deleteFailed": "프로젝트 삭제 실패",
+    "incompatible": "이 파일은 더 새로운 버전의 Mythpen에서 만들어졌습니다. 앱을 업데이트한 후 여세요.",
     "createFailed": "생성 실패",
     "import": {
       "tabBlank": "처음부터 시작",
@@ -233,21 +228,6 @@
       "importFailed": "가져오기 실패",
       "connectionInterrupted": "가져오기 연결이 중단되었습니다",
       "warnings": "안내"
-    },
-    "file": {
-      "open": "프로젝트 파일 열기",
-      "saveHint": ".mythpen 프로젝트 파일로 저장되어 더블클릭하거나 다른 기기로 보내 계속 집필할 수 있습니다.",
-      "browserHint": "브라우저 모드에서는 앱 내 프로젝트를 사용합니다. 데스크톱 버전은 휴대 가능한 .mythpen 파일로 저장합니다.",
-      "openFailed": "프로젝트 파일을 열지 못했습니다",
-      "saveFailed": "프로젝트 저장에 실패했습니다",
-      "saved": "저장됨",
-      "saveAsDone": "새 프로젝트 파일로 저장했습니다",
-      "saveAsFailed": "다른 이름으로 저장 실패",
-      "revealFailed": "폴더에서 보여줄 수 없습니다",
-      "removeFromListMsg": "최근 프로젝트에서 “{name}”을(를) 제거할까요? 프로젝트 파일은 원래 위치에 남습니다.",
-      "deleteFileHint": "프로젝트 파일도 삭제(복구할 수 없음)",
-      "incompatible": "이 파일은 더 새로운 버전의 Mythpen에서 만들어졌습니다. 앱을 업데이트한 후 여세요.",
-      "featureOffHint": "실험 기능이 꺼져 있어 프로젝트가 앱 내부에 저장됩니다. 설정 → 실험 기능에서 프로젝트 파일을 켤 수 있습니다."
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "미리 듣기",
     "soundPiano": "피아노 코드",
     "followSystem": "시스템 설정 따르기",
-    "experimental": "실험 기능",
-    "documentMode": "프로젝트 파일(.mythpen)",
-    "documentModeDesc": "프로젝트를 단일 .mythpen 파일로 저장하여 더블클릭하거나 다른 기기로 보내 계속 집필할 수 있습니다.",
-    "documentModeWarning": "실험 기능: 프로젝트 파일 형식은 향후 호환되지 않게 변경될 수 있습니다. 유일한 백업으로 사용하지 마세요.",
-    "documentModeDisabledHint": "프로젝트 파일 기능이 비활성화되어 있습니다. 설정 → 실험 기능에서 활성화하세요."
+    "experimental": "실험 기능"
   },
   "pages": {
     "characters": "캐릭터 관리",

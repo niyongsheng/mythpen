@@ -50,7 +50,11 @@ export function EditorContent() {
 
   const handleNewChapter = async () => {
     if (!currentProject) return
-    await createChapter(currentProject, t('chapter.defaultTitle'))
+    // Continue in the current (or last) chapter's volume; fall back to the
+    // first volume. The server requires an explicit volume_id.
+    const volumeId = currentChapter?.volumeId ?? allChapters[allChapters.length - 1]?.volumeId ?? volumes[0]?.id
+    if (!volumeId) return
+    await createChapter(currentProject, t('chapter.defaultTitle'), volumeId)
     setActivePage('page-writing')
   }
 

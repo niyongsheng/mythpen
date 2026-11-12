@@ -17,6 +17,7 @@ const {
 const { callJson, processBatches, codedError } = require('./ai-json');
 const { LANGUAGE_CODES, languageName, normalizeLanguageCode, perChapterTokens } = require('../languages');
 const { ALLOWED_STYLES } = require('../styles');
+const { ALLOWED_GENRES } = require('../genres');
 const prompts = require('../prompts/import');
 
 const MAX_TEXT_CHARS = 20_000_000;
@@ -29,19 +30,6 @@ const CHAPTER_EXCERPT_CHARS = 1300;
 const ARCHIVE_CHUNK = 20_000;
 const CANDIDATE_CAP = 3000;
 
-const ALLOWED_GENRES = new Set([
-  'sci-fi',
-  'fantasy',
-  'xianxia',
-  'wuxia',
-  'romance',
-  'history',
-  'urban',
-  'mystery',
-  'game',
-  'biography',
-  'other',
-]);
 const ALLOWED_MODES = new Set(['short-story', 'medium-novel', 'long-novel']);
 const ALLOWED_LANGUAGES = LANGUAGE_CODES;
 const WORLD_CATEGORIES = new Set(['location', 'organization', 'concept', 'event', 'other']);

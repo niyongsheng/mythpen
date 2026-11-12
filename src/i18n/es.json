@@ -8,13 +8,7 @@
     "projectMeta": "{words} palabras · {chapters} capítulos · {genres}",
     "settings": "Ajustes",
     "collapseAI": "Contraer el panel de AI",
-    "expandAI": "Expandir el panel de AI",
-    "file": {
-      "save": "Guardar",
-      "saveAs": "Guardar como…",
-      "reveal": "Mostrar en la carpeta",
-      "open": "Abrir archivo de proyecto…"
-    }
+    "expandAI": "Expandir el panel de AI"
   },
   "sidebar": {
     "outline": "Esquema",
@@ -184,6 +178,7 @@
       "short-story": "Relato corto"
     },
     "deleteFailed": "No se pudo eliminar el proyecto",
+    "incompatible": "Este archivo fue creado por una versión más reciente de Mythpen. Actualiza la app para abrirlo.",
     "createFailed": "No se pudo crear",
     "import": {
       "tabBlank": "Empezar de cero",
@@ -233,21 +228,6 @@
       "importFailed": "Error de importación",
       "connectionInterrupted": "Se interrumpió la conexión durante la importación",
       "warnings": "Avisos"
-    },
-    "file": {
-      "open": "Abrir archivo de proyecto",
-      "saveHint": "Se guarda como archivo de proyecto .mythpen: haz doble clic o envíalo a otro dispositivo para seguir escribiendo.",
-      "browserHint": "El modo navegador usa proyectos internos; la app de escritorio guarda un archivo .mythpen portátil.",
-      "openFailed": "No se pudo abrir el archivo de proyecto",
-      "saveFailed": "No se pudo guardar el proyecto",
-      "saved": "Guardado",
-      "saveAsDone": "Guardado como nuevo archivo de proyecto",
-      "saveAsFailed": "Error al guardar como",
-      "revealFailed": "No se pudo mostrar en la carpeta",
-      "removeFromListMsg": "¿Quitar «{name}» de los proyectos recientes? El archivo del proyecto permanece en su ubicación.",
-      "deleteFileHint": "Eliminar también el archivo del proyecto (no se puede deshacer)",
-      "incompatible": "Este archivo fue creado por una versión más reciente de Mythpen. Actualiza la app para abrirlo.",
-      "featureOffHint": "Los archivos de proyecto experimentales están desactivados; este proyecto se guardará dentro de la app. Actívalos en Ajustes → Experimental."
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "Escuchar",
     "soundPiano": "Acorde de piano",
     "followSystem": "Seguir el sistema",
-    "experimental": "Funciones experimentales",
-    "documentMode": "Archivos de proyecto (.mythpen)",
-    "documentModeDesc": "Guarda un proyecto como un único archivo .mythpen que se abre con doble clic y se puede enviar a otro dispositivo.",
-    "documentModeWarning": "Experimental: el formato de archivo de proyecto puede cambiar de forma incompatible. No lo uses como única copia de seguridad.",
-    "documentModeDisabledHint": "Los archivos de proyecto están desactivados. Actívalos en Ajustes → Experimental."
+    "experimental": "Funciones experimentales"
   },
   "pages": {
     "characters": "Gestión de personajes",

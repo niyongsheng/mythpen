@@ -1,8 +1,6 @@
-const fs = require('fs');
 const express = require('express');
 const Sentry = require('../instrument');
 const db = require('../db');
-const projectFile = require('../project-file');
 const { ALLOWED_STYLES } = require('../styles');
 const { createAIAdapter } = require('../ai-adapter');
 const { getAiConfig } = require('../ai-config');
@@ -70,20 +68,6 @@ router.post('/projects/import-ai', async (req, res) => {
     return fail(res, 409, 'IMPORT_BUSY', `已有导入任务（${activeImport}）正在进行，请稍后再试`);
   }
 
-  // Reserve the destination before the long AI run. The empty SQLite file is
-  // created here and removed if the import fails or is cancelled before persist.
-  let reservedPath = null;
-  if (typeof body.filePath === 'string' && body.filePath.trim()) {
-    if (!db.isDocumentModeEnabled()) {
-      return projectFile.documentModeDisabled(res);
-    }
-    try {
-      reservedPath = projectFile.reserveNewDocument(body.filePath);
-    } catch (err) {
-      return fail(res, err.status || 400, err.code || 'INVALID_PARAMS', err.message);
-    }
-  }
-
   const rawSource = body.source && typeof body.source === 'object' ? body.source : {};
   const source = {
     fileName: cleanString(rawSource.fileName, 200),
@@ -139,7 +123,6 @@ router.post('/projects/import-ai', async (req, res) => {
     if (!clientClosed && !res.writableEnded) res.write(':keepalive\n\n');
   }, 15000);
 
-  let persisted = false;
   try {
     const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     const result = await runImportPipeline({
@@ -163,10 +146,8 @@ router.post('/projects/import-ai', async (req, res) => {
       name,
       options,
       source,
-      filePath: reservedPath,
       model: aiConfig.apiModel,
     });
-    persisted = true;
     send('done', { ...stats, usage: result.usage?.total || null });
   } catch (err) {
     if (clientClosed || err?.code === 'CANCELLED' || err?.name === 'AbortError') {
@@ -180,10 +161,6 @@ router.post('/projects/import-ai', async (req, res) => {
   } finally {
     clearInterval(heartbeat);
     activeImport = null;
-    // The reserved file only survives when persist committed successfully.
-    if (reservedPath && !persisted) {
-      try { fs.unlinkSync(reservedPath); } catch { /* already gone */ }
-    }
     if (!res.writableEnded) res.end();
   }
 });

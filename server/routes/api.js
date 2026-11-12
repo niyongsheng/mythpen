@@ -4,8 +4,8 @@ const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const projectFile = require('../project-file');
 const { saveAuthorNotes } = require('../author-notes');
+const { ALLOWED_GENRES, normalizeGenre } = require('../genres');
 const { ALLOWED_STYLES } = require('../styles');
 const { normalizeLanguageCode } = require('../languages');
 const { chapterHeading, volumeHeading, stripLeadingChapterHeading } = require('../titles');
@@ -69,8 +69,6 @@ router.get('/projects', (req, res) => {
           analyticsId,
           createdAt: meta.created_at || null,
           status: wordCount > 30000 ? 'writing' : wordCount > 5000 ? 'inProgress' : 'new',
-          filePath: r.file_path,
-          isDocument: db.isDocumentPath(r.file_path),
         };
       } catch (e) {
         return {
@@ -86,8 +84,6 @@ router.get('/projects', (req, res) => {
           status: e?.code === 'PROJECT_SCHEMA_TOO_NEW' ? 'incompatible' : 'unknown',
           analyticsId: null,
           createdAt: null,
-          filePath: r.file_path,
-          isDocument: db.isDocumentPath(r.file_path),
           incompatible: e?.code === 'PROJECT_SCHEMA_TOO_NEW',
         };
       }
@@ -104,13 +100,16 @@ router.post('/projects', (req, res) => {
     genres: rawGenres = ['other'],
     styles: rawStyles = [],
     powerFantasy,
-    filePath: requestedFilePath,
   } = req.body || {};
   const genreList = Array.isArray(rawGenres) ? rawGenres : ['other'];
-  // 爽文 is a writing style now; accept the legacy genre/flag values.
-  const genres = genreList.filter((genre) => genre !== 'power-fantasy');
+  // Store canonical slugs only; legacy clients may still send labels.
+  const genres = [...new Set(genreList.map(normalizeGenre).filter((genre) => ALLOWED_GENRES.has(genre)))];
   const styles = [...new Set((Array.isArray(rawStyles) ? rawStyles : []).filter((style) => ALLOWED_STYLES.has(style)))];
-  if ((powerFantasy === true || genreList.includes('power-fantasy')) && !styles.includes('power-fantasy')) {
+  // 爽文 is a writing style now; accept the legacy genre/flag values.
+  const wantsPowerFantasy = powerFantasy === true
+    || genreList.includes('power-fantasy')
+    || genreList.some((genre) => normalizeGenre(genre) === 'power-fantasy');
+  if (wantsPowerFantasy && !styles.includes('power-fantasy')) {
     styles.push('power-fantasy');
   }
   const writingLanguage = normalizeLanguageCode(language);
@@ -123,27 +122,7 @@ router.post('/projects', (req, res) => {
     return res.status(409).json({ error: { code: 'PROJECT_ALREADY_EXISTS', message: `项目"${name}"已存在`, recoverable: true } });
   }
 
-  if (requestedFilePath && !db.isDocumentModeEnabled()) {
-    return projectFile.documentModeDisabled(res);
-  }
-
-  // A document path comes from the native save dialog; otherwise keep the
-  // legacy opaque internal path (browser dev / older clients).
-  let filePath;
-  try {
-    filePath = requestedFilePath ? projectFile.resolveDocumentPath(requestedFilePath) : db.newProjectFilePath();
-    if (requestedFilePath) {
-      projectFile.ensureParentDirectory(filePath);
-      projectFile.ensureTargetAbsent(filePath);
-      if (db.findProjectByPath(filePath)) {
-        throw projectFile.fileError('PROJECT_ALREADY_EXISTS', '该项目文件已在最近项目列表中', 409);
-      }
-    }
-  } catch (err) {
-    return res.status(err.status || 400).json({
-      error: { code: err.code || 'INVALID_PARAMS', message: err.message, recoverable: true },
-    });
-  }
+  const filePath = db.newProjectFilePath();
 
   let pdb;
   try {
@@ -174,8 +153,6 @@ router.post('/projects', (req, res) => {
   const analyticsId = pdb.prepare("SELECT value FROM project_meta WHERE key = 'analytics_id'").get()?.value || null;
   res.json({
     name,
-    filePath,
-    isDocument: db.isDocumentPath(filePath),
     mode,
     language: writingLanguage,
     genres,
@@ -184,167 +161,10 @@ router.post('/projects', (req, res) => {
   });
 });
 
-// Open a user-owned .mythpen document in place. Validation happens before
-// openProjectDb(), so malformed or newer files are never migrated or written.
-router.post('/projects/open-file', (req, res) => {
-  if (!db.isDocumentModeEnabled()) return projectFile.documentModeDisabled(res);
-  const { path: requestedPath } = req.body || {};
-  let info;
-  try {
-    info = projectFile.validateExistingDocument(requestedPath);
-    if (info.schemaVersion !== undefined) projectFile.assertSchemaSupported(info.schemaVersion);
-  } catch (err) {
-    return res.status(err.status || 400).json({
-      error: { code: err.code || 'PROJECT_FILE_INVALID', message: err.message, recoverable: true },
-    });
-  }
-
-  let pdb;
-  try {
-    pdb = db.openProjectDb(info.filePath);
-  } catch (err) {
-    return res.status(err.status || 500).json({
-      error: { code: err.code || 'PROJECT_FILE_INVALID', message: err.message, recoverable: err.recoverable !== false },
-    });
-  }
-
-  let registeredName = null;
-  try {
-    const meta = {};
-    pdb.prepare('SELECT key, value FROM project_meta').all().forEach((m) => { meta[m.key] = m.value; });
-    const wordCount = parseInt(meta.word_count || '0', 10) || 0;
-    const existing = db.findProjectByPath(info.filePath);
-    const preferred = meta.name || path.basename(info.filePath, db.DOCUMENT_EXT);
-    const name = existing ? existing.name : db.registerDocumentProject(info.filePath, preferred, wordCount);
-    if (!existing) registeredName = name;
-
-    // Keep the registry key, exported title and AI context on the same name.
-    if (meta.name !== name) {
-      pdb.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('name', ?)").run(name);
-      meta.name = name;
-    }
-    if (!meta.analytics_id) {
-      meta.analytics_id = randomUUID();
-      pdb.prepare("INSERT OR REPLACE INTO project_meta (key, value) VALUES ('analytics_id', ?)").run(meta.analytics_id);
-    }
-    db.dbExecute('UPDATE recent_projects SET last_opened = ?, word_count = ? WHERE name = ?', [
-      new Date().toISOString(),
-      wordCount,
-      name,
-    ]);
-
-    const genres = pdb.prepare('SELECT genre FROM project_genres').all().map((g) => g.genre);
-    const styles = pdb.prepare('SELECT style FROM project_styles').all().map((s) => s.style);
-    res.json({
-      name,
-      filePath: info.filePath,
-      isDocument: true,
-      mode: meta.mode || 'medium-novel',
-      language: meta.language || 'zh',
-      genres,
-      styles,
-      analyticsId: meta.analytics_id || null,
-      workflowPhase: meta.workflow_phase || 'idea',
-    });
-  } catch (err) {
-    // Do not leave a half-registered project behind if metadata setup failed.
-    if (registeredName) {
-      try { db.unregisterProject(registeredName); } catch { /* ignore */ }
-    }
-    res.status(err.status || 500).json({
-      error: { code: err.code || 'PROJECT_FILE_OPEN_FAILED', message: err.message, recoverable: true },
-    });
-  }
-});
-
-// Explicit save: the editor flush has already reached the DB; this forces the
-// whole SQLite file to disk and surfaces disk errors.
-router.post('/projects/:name/save', (req, res) => {
-  const name = req.params.name;
-  let filePath;
-  try {
-    filePath = db.getProjectDbPath(name);
-  } catch {
-    return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
-  }
-  try {
-    db.getProjectDb(name).flush();
-    db.dbExecute('UPDATE recent_projects SET last_opened = ? WHERE name = ?', [new Date().toISOString(), name]);
-    res.json({ success: true, filePath, savedAt: new Date().toISOString() });
-  } catch (err) {
-    res.status(err.status || 500).json({
-      error: { code: err.code || 'PROJECT_SAVE_FAILED', message: err.message, recoverable: true },
-    });
-  }
-});
-
-// Save As: copy the current DB to a new document, register the copy under a
-// fresh name and switch to it. The original project/file stays untouched.
-router.post('/projects/:name/save-as', (req, res) => {
-  if (!db.isDocumentModeEnabled()) return projectFile.documentModeDisabled(res);
-  const name = req.params.name;
-  const { path: requestedPath, overwrite = false } = req.body || {};
-  let sourcePath;
-  try {
-    sourcePath = db.getProjectDbPath(name);
-  } catch {
-    return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
-  }
-
-  const samePath = (a, b) =>
-    process.platform === 'win32' || process.platform === 'darwin'
-      ? a.toLowerCase() === b.toLowerCase()
-      : a === b;
-
-  let destPath;
-  try {
-    destPath = projectFile.resolveDocumentPath(requestedPath);
-    if (samePath(destPath, sourcePath)) {
-      throw projectFile.fileError('PROJECT_FILE_INVALID', '目标路径与当前项目文件相同');
-    }
-    projectFile.ensureParentDirectory(destPath);
-    const registered = db.findProjectByPath(destPath);
-    if (registered) {
-      throw projectFile.fileError('PROJECT_FILE_EXISTS', `目标文件已属于项目"${registered.name}"`, 409);
-    }
-    if (fs.existsSync(destPath) && overwrite !== true) {
-      throw projectFile.fileError('PROJECT_FILE_EXISTS', '目标文件已存在', 409);
-    }
-  } catch (err) {
-    return res.status(err.status || 400).json({
-      error: { code: err.code || 'PROJECT_FILE_INVALID', message: err.message, recoverable: true },
-    });
-  }
-
-  let newName;
-  try {
-    const sourceDb = db.getProjectDb(name);
-    // Old projects keep the cover outside the DB; pull it in before copying.
-    db.importLegacyCover(name);
-
-    const wordCount = parseInt(db.projectGet(name, "SELECT value FROM project_meta WHERE key = 'word_count'")?.value || '0', 10) || 0;
-    newName = db.allocateProjectName(path.basename(destPath, db.DOCUMENT_EXT), destPath);
-    // Export the in-memory DB instead of copying the source file: this also
-    // works when the original file was moved/deleted (Save As is the recovery
-    // path for PROJECT_FILE_CHANGED). Stamping the new name into the copy
-    // avoids re-reading the file just written; exports/prompts read meta.name.
-    db.writeProjectDocumentCopy(sourceDb, destPath, newName);
-    db.registerRecentProject(newName, destPath, wordCount);
-  } catch (err) {
-    return res.status(err.status || 500).json({
-      error: { code: err.code || 'PROJECT_SAVE_AS_FAILED', message: err.message, recoverable: true },
-    });
-  }
-
-  res.json({ success: true, name: newName, filePath: destPath, isDocument: true });
-});
-
 router.get('/projects/:name', (req, res) => {
   const { name } = req.params;
-  let filePath;
   let pdb;
   try {
-    filePath = db.getProjectDbPath(name);
     pdb = db.getProjectDb(name);
   } catch {
     return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${name}"不存在`, recoverable: true } });
@@ -353,12 +173,11 @@ router.get('/projects/:name', (req, res) => {
   pdb.prepare('SELECT key, value FROM project_meta').all().forEach(m => meta[m.key] = m.value);
   const genres = pdb.prepare('SELECT genre FROM project_genres').all().map(g => g.genre);
   const styles = pdb.prepare('SELECT style FROM project_styles').all().map(s => s.style);
-  res.json({ ...meta, genres, styles, filePath });
+  res.json({ ...meta, genres, styles });
 });
 
 router.delete('/projects/:name', (req, res) => {
   const { name } = req.params;
-  const deleteFile = req.query.deleteFile === '1' || req.query.deleteFile === 'true';
   let filePath;
   try {
     filePath = db.getProjectDbPath(name);
@@ -369,7 +188,10 @@ router.delete('/projects/:name', (req, res) => {
   // Flush/close first so a pending editor write is not lost.
   db.closeProjectDb(filePath);
 
-  if (deleteFile) {
+  // Only delete files the app manages. A project registered at an external
+  // path by an older build is merely removed from the recent list, so the
+  // user's file is never deleted without an explicit choice.
+  if (db.isManagedProjectPath(filePath)) {
     try {
       fs.unlinkSync(filePath);
     } catch (err) {
@@ -383,7 +205,7 @@ router.delete('/projects/:name', (req, res) => {
   }
 
   db.dbExecute('DELETE FROM recent_projects WHERE name = ?', [name]);
-  res.json({ success: true, deletedFile: deleteFile });
+  res.json({ success: true });
 });
 
 // ═══════════════════════════════════════════
@@ -470,9 +292,19 @@ router.post('/:project/chapters', (req, res) => {
   const pn = project(req.params.project);
   const { title, outline = '', status = 'pending', chapter_num } = req.body || {};
 
-  // Default to the last volume so continuation chapters land at the end of
-  // multi-volume (including imported) projects rather than in volume 1.
-  const volumeId = req.body?.volume_id ?? db.lastVolumeId(pn);
+  // A chapter without a volume is exactly the bug that filed new chapters
+  // under the book's last volume. Require the caller to be explicit.
+  const volumeId = req.body?.volume_id;
+  if (volumeId === undefined || volumeId === null) {
+    return res.status(400).json({
+      error: { code: 'INVALID_PARAMS', message: '创建章节必须指定 volume_id', recoverable: true },
+    });
+  }
+  if (!db.projectGet(pn, 'SELECT id FROM volumes WHERE id = ?', [volumeId])) {
+    return res.status(400).json({
+      error: { code: 'INVALID_PARAMS', message: `卷 ${volumeId} 不存在`, recoverable: true },
+    });
+  }
 
   // Global numbering keeps chapter numbers unique across volumes, which the
   // num-only GET/PUT/DELETE chapter endpoints rely on.

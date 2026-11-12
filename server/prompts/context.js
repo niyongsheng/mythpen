@@ -98,7 +98,7 @@ function buildProjectContext(projectName, { toolHints = true } = {}) {
       ORDER BY v.sort_order
     `).all();
     const volumeLines = volumes
-      .map(v => `- ${volumeHeading(v)}（${v.chapter_count} 章）`)
+      .map(v => `- ${volumeHeading(v)}（卷ID ${v.id}，${v.chapter_count} 章）`)
       .join('\n');
 
     const chars = pdb.prepare(

@@ -1,13 +1,13 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { persistProjectFile } from '@/lib/projectFiles'
+import { flushEditorSave } from '@/lib/editorSave'
 import { isTauri } from '@/lib/runtime'
 
 const FLUSH_TIMEOUT_MS = 3000
 
 async function flushWithTimeout(): Promise<void> {
-  const work = persistProjectFile().catch(() => {
+  const work = flushEditorSave().catch(() => {
     /* never trap the exit on a save failure */
   })
   await Promise.race([work, new Promise<void>((resolve) => setTimeout(resolve, FLUSH_TIMEOUT_MS))])

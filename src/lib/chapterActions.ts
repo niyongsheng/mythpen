@@ -9,7 +9,7 @@ import { useProjectStore } from '@/stores/useProjectStore'
 // page subscribed to `useDataRefresh` picks up the change.
 
 /** Create a chapter and invalidate the aggregate counts it feeds. */
-export async function createChapter(project: string, title: string, volumeId?: number): Promise<any> {
+export async function createChapter(project: string, title: string, volumeId: number): Promise<any> {
   const created = await useChapterStore.getState().createChapter(project, title, '', volumeId)
   notifyDataChanged('stats')
   return created

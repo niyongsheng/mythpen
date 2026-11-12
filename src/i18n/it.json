@@ -8,13 +8,7 @@
     "projectMeta": "{words} parole · {chapters} cap. · {genres}",
     "settings": "Impostazioni",
     "collapseAI": "Riduci pannello IA",
-    "expandAI": "Espandi pannello IA",
-    "file": {
-      "save": "Salva",
-      "saveAs": "Salva con nome…",
-      "reveal": "Mostra nella cartella",
-      "open": "Apri file di progetto…"
-    }
+    "expandAI": "Espandi pannello IA"
   },
   "sidebar": {
     "outline": "Scaletta",
@@ -184,6 +178,7 @@
       "short-story": "Racconto breve"
     },
     "deleteFailed": "Eliminazione del progetto non riuscita",
+    "incompatible": "Questo file è stato creato da una versione più recente di Mythpen. Aggiorna l’app per aprirlo.",
     "createFailed": "Creazione non riuscita",
     "import": {
       "tabBlank": "Inizia da zero",
@@ -233,21 +228,6 @@
       "importFailed": "Importazione non riuscita",
       "connectionInterrupted": "Connessione di importazione interrotta",
       "warnings": "Note"
-    },
-    "file": {
-      "open": "Apri file di progetto",
-      "saveHint": "Salvato come file di progetto .mythpen: fai doppio clic o invialo a un altro dispositivo per continuare a scrivere.",
-      "browserHint": "La modalità browser usa progetti interni; l’app desktop salva un file .mythpen portatile.",
-      "openFailed": "Impossibile aprire il file di progetto",
-      "saveFailed": "Impossibile salvare il progetto",
-      "saved": "Salvato",
-      "saveAsDone": "Salvato come nuovo file di progetto",
-      "saveAsFailed": "Salvataggio con nome non riuscito",
-      "revealFailed": "Impossibile mostrare nella cartella",
-      "removeFromListMsg": "Rimuovere «{name}» dai progetti recenti? Il file di progetto resta nella sua posizione.",
-      "deleteFileHint": "Elimina anche il file di progetto (irreversibile)",
-      "incompatible": "Questo file è stato creato da una versione più recente di Mythpen. Aggiorna l’app per aprirlo.",
-      "featureOffHint": "I file di progetto sperimentali sono disattivati; questo progetto sarà salvato nell’app. Attivali in Impostazioni → Sperimentale."
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "Anteprima",
     "soundPiano": "Accordo di pianoforte",
     "followSystem": "Segui il sistema",
-    "experimental": "Funzioni sperimentali",
-    "documentMode": "File di progetto (.mythpen)",
-    "documentModeDesc": "Salva un progetto come singolo file .mythpen, apribile con doppio clic e inviabile a un altro dispositivo.",
-    "documentModeWarning": "Sperimentale: il formato dei file di progetto può cambiare in modo incompatibile. Non usarlo come unico backup.",
-    "documentModeDisabledHint": "I file di progetto sono disattivati. Attivali in Impostazioni → Sperimentale."
+    "experimental": "Funzioni sperimentali"
   },
   "pages": {
     "characters": "Personaggi",

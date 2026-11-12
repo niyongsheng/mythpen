@@ -397,27 +397,14 @@ export function SettingsDrawer() {
             </div>
           </div>
 
-          {/* ── Experimental ── */}
-          <div className="mb-7">
+          {/* ── Experimental ──
+              Hidden for now. The group stays in place so future experimental
+              toggles have a home; add SettingRow entries inside it. */}
+          <div className="mb-7 hidden" aria-hidden="true">
             <div className="text-[11px] font-medium text-[var(--ink-mute)] tracking-[0.06em] uppercase mb-3 flex items-center">
-              <span
-                className="group/experiment relative inline-flex items-center cursor-help focus-visible:outline-none"
-                tabIndex={0}
-                aria-label={t('settings.documentModeWarning')}
-              >
-                <FlaskConical className="w-3.5 h-3.5 mr-1" />
-                <span className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-[280px] rounded-lg border border-[var(--hairline-light)] bg-[var(--canvas-elevated)] px-3 py-2 text-[11px] font-normal normal-case tracking-normal leading-relaxed text-[var(--warning)] opacity-0 shadow-xl transition-opacity duration-150 group-hover/experiment:opacity-100 group-focus/experiment:opacity-100">
-                  {t('settings.documentModeWarning')}
-                </span>
-              </span>
+              <FlaskConical className="w-3.5 h-3.5 mr-1" />
               {t('settings.experimental')}
             </div>
-            <SettingRow label={t('settings.documentMode')} desc={t('settings.documentModeDesc')}>
-              <Toggle
-                checked={settings.experimentalDocumentMode}
-                onChange={() => updateSetting('experimentalDocumentMode', !settings.experimentalDocumentMode)}
-              />
-            </SettingRow>
           </div>
 
           {/* ── Privacy ── */}

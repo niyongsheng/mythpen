@@ -42,7 +42,7 @@ ${context}
 **必须逐一处理完所有非 accepted 章节**，不能只写完一章就停。
 
 **情况 B：全部章节已是 accepted**
-→ 用 create_chapter 创建下一章（**只传 title 和 volume_id，不传 outline 和 content**）
+→ 用 create_chapter 创建下一章（**必须传 volume_id，取自上下文「卷结构」；不传 outline 和 content**）
 
 **情况 C：用户说"新写 X 章"且已有 pending 章节**
 → 这就是"完成已有章节"的意思，直接从编号最小的 pending 章节开始，逐一完成全部 6 步。不需要再次创建或询问用户。

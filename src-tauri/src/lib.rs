@@ -1,5 +1,4 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::net::TcpStream;
@@ -32,95 +31,6 @@ fn track_lifecycle(app_handle: &tauri::AppHandle, event: &str) {
 
 /// Keeps the desktop Sentry client alive; dropping it stops error reporting.
 struct SentryGuard(Mutex<Option<sentry::ClientInitGuard>>);
-
-/// `.mythpen` document paths waiting for the frontend to consume them. Both a
-/// cold launch (argv / macOS Opened) and a second launch land here; the
-/// frontend drains the queue once the sidecar is ready.
-struct PendingOpenFiles(Mutex<Vec<String>>);
-
-const DOCUMENT_EXT: &str = "mythpen";
-
-fn is_document_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.eq_ignore_ascii_case(DOCUMENT_EXT))
-        .unwrap_or(false)
-}
-
-/// Extract existing `.mythpen` files from argv (Windows/Linux cold or warm
-/// start). Relative arguments are resolved against the process cwd.
-fn parse_open_paths<I>(args: I, cwd: &str) -> Vec<String>
-where
-    I: IntoIterator<Item = String>,
-{
-    let mut paths = Vec::new();
-    for arg in args {
-        let raw = PathBuf::from(arg);
-        let absolute = if raw.is_absolute() {
-            raw
-        } else {
-            Path::new(cwd).join(raw)
-        };
-        if is_document_file(&absolute) && absolute.is_file() {
-            paths.push(absolute.to_string_lossy().to_string());
-        }
-    }
-    paths
-}
-
-/// Queue document paths, wake the frontend and bring the window forward.
-fn queue_open_paths(app: &tauri::AppHandle, paths: Vec<String>) {
-    if paths.is_empty() {
-        return;
-    }
-    if let Some(state) = app.try_state::<PendingOpenFiles>() {
-        if let Ok(mut pending) = state.0.lock() {
-            for path in paths {
-                if !pending.contains(&path) {
-                    pending.push(path);
-                }
-            }
-        }
-    }
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-    let _ = app.emit("mythpen://open-files", ());
-}
-
-/// Called by the frontend after the server is ready; returns and clears the
-/// pending queue. The event only wakes the webview, so no path is lost.
-#[tauri::command]
-fn take_pending_open_files(state: tauri::State<PendingOpenFiles>) -> Vec<String> {
-    let mut pending = state.0.lock().unwrap();
-    std::mem::take(&mut *pending)
-}
-
-/// Reveal a project file in the OS file manager.
-#[tauri::command]
-fn reveal_in_folder(path: String) -> Result<(), String> {
-    let file = Path::new(&path);
-    if !file.exists() {
-        return Err("文件不存在".into());
-    }
-
-    #[cfg(target_os = "macos")]
-    let result = std::process::Command::new("open").arg("-R").arg(file).spawn();
-
-    #[cfg(target_os = "windows")]
-    let result = std::process::Command::new("explorer")
-        .arg(format!("/select,{}", file.display()))
-        .spawn();
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let result = std::process::Command::new("xdg-open")
-        .arg(file.parent().unwrap_or_else(|| Path::new(".")))
-        .spawn();
-
-    result.map(|_| ()).map_err(|err| err.to_string())
-}
 
 const SENTRY_DSN: &str = "https://40e635de6482f1da9dabef83edabbec3@o4512410989428736.ingest.us.sentry.io/4512410999455744";
 
@@ -248,32 +158,13 @@ fn request_graceful_shutdown(port: u16) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        // Single-instance must be the first plugin: a second launch (e.g. the
-        // user double-clicks another .mythpen) forwards argv to this process.
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            queue_open_paths(app, parse_open_paths(argv, &cwd));
-        }))
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_aptabase::Builder::new("A-US-9460803259").build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(ExitState(AtomicBool::new(false)))
-        .manage(PendingOpenFiles(Mutex::new(Vec::new())))
-        .invoke_handler(tauri::generate_handler![
-            finish_exit,
-            set_anonymous_stats,
-            take_pending_open_files,
-            reveal_in_folder
-        ])
+        .invoke_handler(tauri::generate_handler![finish_exit, set_anonymous_stats])
         .setup(|app| {
-            // Cold start with a document argument (Windows/Linux, or
-            // `pnpm tauri dev -- /path/book.mythpen`).
-            let cwd = std::env::current_dir()
-                .map(|dir| dir.to_string_lossy().to_string())
-                .unwrap_or_default();
-            queue_open_paths(app.handle(), parse_open_paths(std::env::args(), &cwd));
-
             // Privacy: restore the opt-out before Sentry starts and before the
             // native Aptabase lifecycle events fire. The guard lives in app
             // state for the whole lifetime; debug builds stay local.
@@ -368,9 +259,8 @@ pub fn run() {
                             // server flushes SQLite and closes its sockets.
                             request_graceful_shutdown(3001);
 
-                            // Step 2: Short grace period. Documents may need
-                            // to flush the whole SQLite file; 1s covers normal
-                            // projects without making the close button hang.
+                            // Step 2: Short grace period for the server to
+                            // flush SQLite without making the close button hang.
                             std::thread::sleep(Duration::from_millis(1000));
 
                             // Step 3: Force kill as safety net
@@ -378,18 +268,6 @@ pub fn run() {
                         }
                     }
                 }
-            }
-            // macOS "Open With" / Finder double-click. Cold and warm launches
-            // both arrive here; the queue survives until the frontend is ready.
-            #[cfg(any(target_os = "macos", target_os = "ios"))]
-            tauri::RunEvent::Opened { urls } => {
-                let paths = urls
-                    .into_iter()
-                    .filter_map(|url| url.to_file_path().ok())
-                    .filter(|path| is_document_file(path) && path.is_file())
-                    .map(|path| path.to_string_lossy().to_string())
-                    .collect();
-                queue_open_paths(app_handle, paths);
             }
             _ => {}
         });

@@ -8,13 +8,7 @@
     "projectMeta": "{words} Wörter · {chapters} Kap. · {genres}",
     "settings": "Einstellungen",
     "collapseAI": "KI-Bereich einklappen",
-    "expandAI": "KI-Bereich ausklappen",
-    "file": {
-      "save": "Speichern",
-      "saveAs": "Speichern unter…",
-      "reveal": "Im Ordner anzeigen",
-      "open": "Projektdatei öffnen…"
-    }
+    "expandAI": "KI-Bereich ausklappen"
   },
   "sidebar": {
     "outline": "Gliederung",
@@ -184,6 +178,7 @@
       "short-story": "Kurzgeschichte"
     },
     "deleteFailed": "Projekt konnte nicht gelöscht werden",
+    "incompatible": "Diese Datei wurde von einer neueren Mythpen-Version erstellt. Bitte aktualisiere die App, um sie zu öffnen.",
     "createFailed": "Erstellung fehlgeschlagen",
     "import": {
       "tabBlank": "Neu beginnen",
@@ -233,21 +228,6 @@
       "importFailed": "Import fehlgeschlagen",
       "connectionInterrupted": "Importverbindung unterbrochen",
       "warnings": "Hinweise"
-    },
-    "file": {
-      "open": "Projektdatei öffnen",
-      "saveHint": "Wird als .mythpen-Projektdatei gespeichert – zum Weiterarbeiten doppelklicken oder auf ein anderes Gerät senden.",
-      "browserHint": "Im Browser-Modus werden interne Projekte verwendet; die Desktop-App speichert eine portable .mythpen-Datei.",
-      "openFailed": "Projektdatei konnte nicht geöffnet werden",
-      "saveFailed": "Projekt konnte nicht gespeichert werden",
-      "saved": "Gespeichert",
-      "saveAsDone": "Als neue Projektdatei gespeichert",
-      "saveAsFailed": "Speichern unter fehlgeschlagen",
-      "revealFailed": "Datei konnte nicht im Ordner angezeigt werden",
-      "removeFromListMsg": "„{name}“ aus den letzten Projekten entfernen? Die Projektdatei bleibt am Speicherort.",
-      "deleteFileHint": "Projektdatei ebenfalls löschen (nicht rückgängig zu machen)",
-      "incompatible": "Diese Datei wurde von einer neueren Mythpen-Version erstellt. Bitte aktualisiere die App, um sie zu öffnen.",
-      "featureOffHint": "Experimentelle Projektdateien sind deaktiviert; dieses Projekt wird in der App gespeichert. Aktiviere sie unter Einstellungen → Experimentell."
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "Vorschau",
     "soundPiano": "Klavierakkord",
     "followSystem": "Systemsprache verwenden",
-    "experimental": "Experimentelle Funktionen",
-    "documentMode": "Projektdateien (.mythpen)",
-    "documentModeDesc": "Speichere ein Projekt als einzelne .mythpen-Datei, die per Doppelklick geöffnet und auf ein anderes Gerät gesendet werden kann.",
-    "documentModeWarning": "Experimentell: Das Projektdateiformat kann sich inkompatibel ändern. Nutze es nicht als einzige Sicherung.",
-    "documentModeDisabledHint": "Projektdateien sind deaktiviert. Aktiviere sie unter Einstellungen → Experimentell."
+    "experimental": "Experimentelle Funktionen"
   },
   "pages": {
     "characters": "Figuren",

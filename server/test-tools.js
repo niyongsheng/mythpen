@@ -519,6 +519,28 @@ async function run() {
   r = executeTool(PROJECT, 'delete_volume', { volume_id: testVolumeId, force: true });
   assert('delete_volume force deletes and recalculates', r.deleted === true && r.deleted_chapters === 1, JSON.stringify(r));
 
+  // ── REST chapter creation requires an explicit volume ──
+  const noVolume = await api('POST', `/${e(PROJECT)}/chapters`, { title: '无卷章节' });
+  assert('Reject chapter without volume_id', noVolume.status === 400, `expected 400 got ${noVolume.status}`);
+  const badVolume = await api('POST', `/${e(PROJECT)}/chapters`, { title: '错卷章节', volume_id: 999999 });
+  assert('Reject chapter with unknown volume_id', badVolume.status === 400, `expected 400 got ${badVolume.status}`);
+  const toolNoVolume = executeTool(PROJECT, 'create_chapter', { title: '工具无卷章节' });
+  assert('create_chapter requires volume_id', typeof toolNoVolume.error === 'string', JSON.stringify(toolNoVolume));
+
+  // ── update_chapter can move a chapter between volumes ──
+  r = executeTool(PROJECT, 'create_volume', { title: '搬家目标卷' });
+  const moveVolumeId = r.volume_id;
+  executeTool(PROJECT, 'create_chapter', { title: '搬家测试章', chapter_num: 46, volume_id: 1 });
+  r = executeTool(PROJECT, 'update_chapter', { chapter_num: 46, volume_id: moveVolumeId });
+  assert('update_chapter accepts volume_id', r.updated === true, JSON.stringify(r));
+  r = executeTool(PROJECT, 'list_chapters', {});
+  const movedChapter = r.chapters.find((c) => c.num === 46);
+  assert('update_chapter persists volume move', movedChapter?.volume_id === moveVolumeId, JSON.stringify(movedChapter));
+  r = executeTool(PROJECT, 'update_chapter', { chapter_num: 46, volume_id: 999999 });
+  assert('update_chapter rejects unknown volume', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'delete_volume', { volume_id: moveVolumeId, force: true });
+  assert('delete_volume cleans up moved chapter', r.deleted === true && r.deleted_chapters === 1, JSON.stringify(r));
+
   // ── Tool-level deletion ──
   r = executeTool(PROJECT, 'delete_science_entry', { id: dbg.sciId });
   assert('executeTool delete_science_entry', r && r.deleted === true, JSON.stringify(r));

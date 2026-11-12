@@ -94,15 +94,13 @@ function createProjectFromImport(input) {
     usage = null,
     warnings = [],
     model = '',
-    filePath: requestedFilePath = null,
   } = input;
 
   if (db.dbGet('SELECT 1 AS x FROM recent_projects WHERE name = ?', [name])) {
     throw Object.assign(new Error(`项目"${name}"已存在`), { code: 'PROJECT_ALREADY_EXISTS' });
   }
 
-  // User-selected .mythpen path (reserved by the route) or legacy internal path.
-  const filePath = requestedFilePath || db.newProjectFilePath();
+  const filePath = db.newProjectFilePath();
   try {
     db.openProjectDb(filePath);
     db.registerRecentProject(name, filePath, 0);

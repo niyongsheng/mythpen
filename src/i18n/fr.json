@@ -8,13 +8,7 @@
     "projectMeta": "{words} mots · {chapters} chap. · {genres}",
     "settings": "Paramètres",
     "collapseAI": "Réduire le panneau AI",
-    "expandAI": "Développer le panneau AI",
-    "file": {
-      "save": "Enregistrer",
-      "saveAs": "Enregistrer sous…",
-      "reveal": "Afficher dans le dossier",
-      "open": "Ouvrir un fichier de projet…"
-    }
+    "expandAI": "Développer le panneau AI"
   },
   "sidebar": {
     "outline": "Plan",
@@ -184,6 +178,7 @@
       "short-story": "Nouvelle"
     },
     "deleteFailed": "Échec de la suppression du projet",
+    "incompatible": "Ce fichier a été créé par une version plus récente de Mythpen. Mettez l’application à jour pour l’ouvrir.",
     "createFailed": "Échec de la création",
     "import": {
       "tabBlank": "Partir de zéro",
@@ -233,21 +228,6 @@
       "importFailed": "Échec de l’import",
       "connectionInterrupted": "Connexion d’import interrompue",
       "warnings": "Remarques"
-    },
-    "file": {
-      "open": "Ouvrir un fichier de projet",
-      "saveHint": "Enregistré comme fichier de projet .mythpen — double-cliquez dessus ou envoyez-le sur un autre appareil pour continuer à écrire.",
-      "browserHint": "Le mode navigateur utilise des projets internes ; l’application de bureau enregistre un fichier .mythpen portable.",
-      "openFailed": "Impossible d’ouvrir le fichier de projet",
-      "saveFailed": "Échec de l’enregistrement du projet",
-      "saved": "Enregistré",
-      "saveAsDone": "Enregistré comme nouveau fichier de projet",
-      "saveAsFailed": "Échec de l’enregistrement sous…",
-      "revealFailed": "Impossible d’afficher le fichier dans le dossier",
-      "removeFromListMsg": "Retirer « {name} » des projets récents ? Le fichier de projet reste à son emplacement.",
-      "deleteFileHint": "Supprimer aussi le fichier de projet (irréversible)",
-      "incompatible": "Ce fichier a été créé par une version plus récente de Mythpen. Mettez l’application à jour pour l’ouvrir.",
-      "featureOffHint": "Les fichiers de projet expérimentaux sont désactivés ; ce projet sera stocké dans l’application. Activez-les dans Paramètres → Expérimental."
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "Écouter",
     "soundPiano": "Accord de piano",
     "followSystem": "Suivre le système",
-    "experimental": "Fonctionnalités expérimentales",
-    "documentMode": "Fichiers de projet (.mythpen)",
-    "documentModeDesc": "Enregistrez un projet dans un seul fichier .mythpen, ouvrable par double-clic et envoyable sur un autre appareil.",
-    "documentModeWarning": "Expérimental : le format des fichiers de projet peut évoluer de façon incompatible. Ne l’utilisez pas comme unique sauvegarde.",
-    "documentModeDisabledHint": "Les fichiers de projet sont désactivés. Activez-les dans Paramètres → Expérimental."
+    "experimental": "Fonctionnalités expérimentales"
   },
   "pages": {
     "characters": "Personnages",

@@ -24,9 +24,6 @@ interface ProjectSummary {
   /** Opaque analytics id; never the project name. */
   analyticsId?: string
   createdAt?: string | null
-  /** Absolute path for user-owned .mythpen documents; internal DB path otherwise. */
-  filePath?: string
-  isDocument?: boolean
   incompatible?: boolean
 }
 
@@ -64,16 +61,16 @@ interface ProjectState {
   setPhase: (project: string, phase: WorkflowPhase) => Promise<void>
   createProject: (
     name: string,
-    opts?: { mode?: string; language?: WritingLanguage; genres?: string[]; styles?: string[]; filePath?: string },
+    opts?: { mode?: string; language?: WritingLanguage; genres?: string[]; styles?: string[] },
   ) => Promise<void>
   importProject: (
     name: string,
-    opts: { mode?: string; language?: WritingLanguage; genres?: string[]; styles?: string[]; filePath?: string },
+    opts: { mode?: string; language?: WritingLanguage; genres?: string[]; styles?: string[] },
     source: ImportSource,
     handlers?: ImportSseHandlers,
     signal?: AbortSignal,
   ) => Promise<ImportResult | null>
-  deleteProject: (name: string, deleteFile?: boolean) => Promise<void>
+  deleteProject: (name: string) => Promise<void>
 }
 
 /** Shared post-create flow: refresh the list, select, load chapters, navigate. */
@@ -114,8 +111,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       const projects = await projectsApi.list()
       // Restore the last selected project. If a project was selected while this
-      // request was in flight (e.g. the OS opened a .mythpen), keep it instead
-      // of letting the stale response undo the selection.
+      // request was in flight, keep it instead of letting the stale response
+      // undo the selection.
       const saved = localStorage.getItem('mythpen-current-project')
       const inFlightSelection = get().currentProject
       const currentProject =
@@ -165,15 +162,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createProject: async (name, opts = {}) => {
-    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [], filePath } = opts
+    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [] } = opts
     set({ loading: true, error: null })
     try {
-      // 1. Create the project (a .mythpen document when the desktop passed a path)
-      const created = await projectsApi.create({ name, mode, language, genres, styles, filePath })
+      // 1. Create the project in the local database
+      const created = await projectsApi.create({ name, mode, language, genres, styles })
       const key = created?.analyticsId as string | undefined
 
-      // 2. Auto-create Chapter 1 so user can start writing immediately
-      await chaptersApi.create(name, { title: t('chapter.firstChapterTitle') })
+      // 2. Auto-create Chapter 1 so user can start writing immediately. The
+      // server always creates the default volume with id 1 on project creation.
+      await chaptersApi.create(name, { title: t('chapter.firstChapterTitle'), volume_id: 1 })
 
       // 3. Reload project list, select it, load chapters & navigate to Writing
       await activateProject(name, 'idea')
@@ -185,7 +183,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         styles: styles.join(','),
         ...(key ? { project_key: key } : {}),
       })
-      if (filePath) track('project_file_created', { mode })
       // The first chapter is created here, not through the chapter store, so
       // it needs its own event — otherwise the create → chapter funnel is wrong.
       track('chapter_created', { source: 'auto', ...(key ? { project_key: key } : {}) })
@@ -198,7 +195,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   importProject: async (name, opts, source, handlers, signal) => {
-    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [], filePath } = opts
+    const { mode = 'medium-novel', language = 'zh', genres = ['sci-fi', 'romance'], styles = [] } = opts
     const startedAt = Date.now()
     const sizeBucket = bucketWords(source.text?.length || 0)
     let lastStage = 'start'
@@ -231,7 +228,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             language: source.language,
           },
           text: source.text,
-          filePath,
         },
         wrappedHandlers,
         signal,
@@ -251,7 +247,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ...(key ? { project_key: key } : {}),
       })
       trackMilestone('first_import', key)
-      if (filePath) track('project_file_created', { mode, source: 'import' })
       return result as ImportResult
     } catch (err: any) {
       // A user-initiated cancel closes the SSE stream; no project was created.
@@ -285,10 +280,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  deleteProject: async (name, deleteFile = false) => {
+  deleteProject: async (name) => {
     set({ loading: true, error: null })
     try {
-      await projectsApi.delete(name, deleteFile)
+      await projectsApi.delete(name)
       await useProjectStore.getState().loadProjects()
       // If the deleted project was current, clear or pick another
       const state = useProjectStore.getState()

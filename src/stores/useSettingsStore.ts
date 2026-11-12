@@ -28,7 +28,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   soundEffect: 'chime',
   backupEnabled: true,
   anonymousStats: true,
-  experimentalDocumentMode: false,
   accentColor: '#c9a96e',
   maxOutputTokens: 8192,
   httpTimeout: 300,
@@ -98,9 +97,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       merged.soundEffect = get().settings.soundEffect
       // Anonymous statistics is also a per-device choice; local state wins.
       merged.anonymousStats = get().settings.anonymousStats
-      // Experimental document mode is server-authoritative (the server also
-      // gates the file endpoints); default off.
-      merged.experimentalDocumentMode = serverSettings.experimental_document_mode === 'true'
       // Push the local choice to the server so backend crash reporting agrees.
       if (serverSettings.anonymous_stats !== String(merged.anonymousStats)) {
         settingsApi.update('anonymous_stats', String(merged.anonymousStats)).catch(() => {})
@@ -146,7 +142,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         backupEnabled: 'backup_enabled',
         accentColor: 'accent_color',
         anonymousStats: 'anonymous_stats',
-        experimentalDocumentMode: 'experimental_document_mode',
       }
       const dbKey = keyMap[key]
       if (dbKey) {

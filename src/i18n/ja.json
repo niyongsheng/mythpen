@@ -8,13 +8,7 @@
     "projectMeta": "{words}文字 · {chapters}章 · {genres}",
     "settings": "設定",
     "collapseAI": "AIパネルを折りたたむ",
-    "expandAI": "AIパネルを展開",
-    "file": {
-      "save": "保存",
-      "saveAs": "名前を付けて保存…",
-      "reveal": "フォルダーに表示",
-      "open": "プロジェクトファイルを開く…"
-    }
+    "expandAI": "AIパネルを展開"
   },
   "sidebar": {
     "outline": "アウトライン",
@@ -184,6 +178,7 @@
       "short-story": "短編"
     },
     "deleteFailed": "プロジェクトの削除に失敗しました",
+    "incompatible": "このファイルは新しいバージョンの Mythpen で作成されました。アプリを更新してから開いてください。",
     "createFailed": "作成に失敗しました",
     "import": {
       "tabBlank": "ゼロから開始",
@@ -233,21 +228,6 @@
       "importFailed": "インポートに失敗しました",
       "connectionInterrupted": "インポート接続が中断されました",
       "warnings": "注意"
-    },
-    "file": {
-      "open": "プロジェクトファイルを開く",
-      "saveHint": ".mythpen プロジェクトファイルとして保存され、ダブルクリックや他の端末への送信で続きを書けます。",
-      "browserHint": "ブラウザモードではアプリ内プロジェクトを使用します。デスクトップ版は持ち運べる .mythpen ファイルとして保存します。",
-      "openFailed": "プロジェクトファイルを開けませんでした",
-      "saveFailed": "プロジェクトの保存に失敗しました",
-      "saved": "保存しました",
-      "saveAsDone": "新しいプロジェクトファイルとして保存しました",
-      "saveAsFailed": "名前を付けて保存に失敗しました",
-      "revealFailed": "フォルダーに表示できませんでした",
-      "removeFromListMsg": "「{name}」を最近のプロジェクトから削除しますか？プロジェクトファイルは元の場所に残ります。",
-      "deleteFileHint": "プロジェクトファイルも削除する（元に戻せません）",
-      "incompatible": "このファイルは新しいバージョンの Mythpen で作成されました。アプリを更新してから開いてください。",
-      "featureOffHint": "実験的機能が無効のため、プロジェクトはアプリ内に保存されます。設定 → 実験的機能 で有効にできます。"
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "試聴",
     "soundPiano": "ピアノコード",
     "followSystem": "システムに従う",
-    "experimental": "実験的機能",
-    "documentMode": "プロジェクトファイル（.mythpen）",
-    "documentModeDesc": "プロジェクトを単一の .mythpen ファイルとして保存し、ダブルクリックや別端末への送信で続きを書けます。",
-    "documentModeWarning": "実験的機能：プロジェクトファイル形式は将来破壊的に変更される可能性があります。唯一のバックアップにしないでください。",
-    "documentModeDisabledHint": "プロジェクトファイル機能は無効です。設定 → 実験的機能 で有効にしてください。"
+    "experimental": "実験的機能"
   },
   "pages": {
     "characters": "キャラクター管理",

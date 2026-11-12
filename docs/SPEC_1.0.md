@@ -325,8 +325,6 @@ event: task_error\ndata: {"error":"..."}          # 任务异常结束
 └── backups/                             # 自动备份目录（功能预留）
 ```
 
-**用户项目文件（v0.0.22+，实验功能，默认关闭）**：在设置 → 实验功能中开启后，新项目在桌面端保存为单个 `.mythpen` 文件（用户选定路径），文件本身就是完整 SQLite 项目库（含 `assets` 封面）。项目文件可双击打开、原地保存、跨设备发送；格式规范见 `docs/PROJECT_FILE.md`。开关键为 `experimental_document_mode`；关闭时新项目仍保存为应用内项目，文件入口隐藏，服务端文件端点返回 `FEATURE_DISABLED`，已有 `.mythpen` 项目仍可打开保存。应用内旧项目继续兼容，可通过“另存为项目文件”转换。`config.db.recent_projects.file_path` 同时登记内部路径与用户文件路径。
-
 ### 4.2 配置数据库 Schema (config.db)
 
 ```sql

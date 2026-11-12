@@ -19,17 +19,6 @@
 
 ---
 
-## 项目文件（`.mythpen`，类 .doc，实验功能）
-
-- **默认关闭**：设置 → 实验功能 → 项目文件（`experimental_document_mode`，默认 `false`）。关闭时新项目走应用内项目，文件入口隐藏，服务端文件端点返回 `FEATURE_DISABLED`；已有 `.mythpen` 项目仍可打开/保存。格式后续可能破坏性变更。
-- 单个 `.mythpen` 文件就是完整项目（SQLite，`PRAGMA application_id=0x4D595448`，`assets` 表存封面）；双击打开、原地保存、跨设备发送。
-- 校验/打开/保存/另存为：`server/project-file.js`、`server/routes/api.js`（`/projects/open-file`、`/:name/save`、`/:name/save-as`）；写盘用临时文件 + rename 原子替换。
-- 格式规范见 `docs/PROJECT_FILE.md`；回归测试 `node --test server/test-project-file.js`。
-- Tauri：`bundle.fileAssociations` + `tauri-plugin-single-instance` + `RunEvent::Opened` 队列；前端 `src/lib/projectFiles.ts` / `openFiles.ts`，原生对话框来自 `@tauri-apps/plugin-dialog`。
-- 旧内部项目保持兼容，通过“另存为项目文件”按需转换；服务端只监听 `127.0.0.1`，CORS 仅允许 Tauri/Vite 来源。
-
----
-
 ## 数据统计（Aptabase）
 
 免费额度 **2 万事件/月（所有安装共享）**，统计范围由构建期档位控制，默认 `basic`：

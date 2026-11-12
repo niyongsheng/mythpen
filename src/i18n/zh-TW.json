@@ -8,13 +8,7 @@
     "projectMeta": "{words} 字 · {chapters} 章 · {genres}",
     "settings": "設定",
     "collapseAI": "收合 AI 面板",
-    "expandAI": "展開 AI 面板",
-    "file": {
-      "save": "儲存",
-      "saveAs": "另存為…",
-      "reveal": "在資料夾中顯示",
-      "open": "開啟專案檔案…"
-    }
+    "expandAI": "展開 AI 面板"
   },
   "sidebar": {
     "outline": "大綱",
@@ -184,6 +178,7 @@
       "short-story": "短篇"
     },
     "deleteFailed": "刪除專案失敗",
+    "incompatible": "該檔案由更新版本的 Mythpen 建立，請升級應用程式後再開啟。",
     "createFailed": "建立失敗",
     "import": {
       "tabBlank": "從零開始",
@@ -233,21 +228,6 @@
       "importFailed": "匯入失敗",
       "connectionInterrupted": "匯入連線中斷",
       "warnings": "提示"
-    },
-    "file": {
-      "open": "開啟專案檔案",
-      "saveHint": "將儲存為 .mythpen 專案檔案，可隨時雙擊開啟或傳送到其他裝置繼續創作。",
-      "browserHint": "瀏覽器模式使用應用內專案；桌面版會儲存為可攜帶的 .mythpen 檔案。",
-      "openFailed": "開啟專案檔案失敗",
-      "saveFailed": "儲存專案失敗",
-      "saved": "已儲存",
-      "saveAsDone": "已另存為新的專案檔案",
-      "saveAsFailed": "另存為失敗",
-      "revealFailed": "無法在資料夾中顯示",
-      "removeFromListMsg": "將「{name}」從最近專案列表中移除？專案檔案會保留在原位置。",
-      "deleteFileHint": "同時刪除專案檔案（無法復原）",
-      "incompatible": "該檔案由更新版本的 Mythpen 建立，請升級應用程式後再開啟。",
-      "featureOffHint": "實驗功能未開啟，專案將儲存在應用程式內。可在 設定 → 實驗功能 中開啟專案檔案。"
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "試聽",
     "soundPiano": "鋼琴和弦",
     "followSystem": "跟隨系統",
-    "experimental": "實驗功能",
-    "documentMode": "專案檔案（.mythpen）",
-    "documentModeDesc": "將專案儲存為單一 .mythpen 檔案，可雙擊開啟、傳送到其他裝置繼續創作。",
-    "documentModeWarning": "實驗功能：專案檔案格式後續可能發生破壞性變更，請避免作為唯一備份。",
-    "documentModeDisabledHint": "專案檔案功能未啟用。請在 設定 → 實驗功能 中開啟。"
+    "experimental": "實驗功能"
   },
   "pages": {
     "characters": "角色管理",

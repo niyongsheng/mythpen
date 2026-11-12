@@ -107,12 +107,7 @@ export const projectsApi = {
           reject(error)
         })
     }),
-  openFile: (path: string) => request('/projects/open-file', { method: 'POST', body: { path } }),
-  save: (name: string) => request(`/projects/${encodeURIComponent(name)}/save`, { method: 'POST' }),
-  saveAs: (name: string, path: string, overwrite = false) =>
-    request(`/projects/${encodeURIComponent(name)}/save-as`, { method: 'POST', body: { path, overwrite } }),
-  delete: (name: string, deleteFile = false) =>
-    request(`/projects/${encodeURIComponent(name)}${deleteFile ? '?deleteFile=1' : ''}`, { method: 'DELETE' }),
+  delete: (name: string) => request(`/projects/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   getMeta: (name: string) => request(`/${encodeURIComponent(name)}/meta`),
   updateAuthorNotes: (name: string, authorNotes: string) =>
     request(`/${encodeURIComponent(name)}/author-notes`, { method: 'PUT', body: { authorNotes } }),

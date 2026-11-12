@@ -8,13 +8,7 @@
     "projectMeta": "{words} 字 · {chapters} 章 · {genres}",
     "settings": "设置",
     "collapseAI": "收起 AI 面板",
-    "expandAI": "展开 AI 面板",
-    "file": {
-      "save": "保存",
-      "saveAs": "另存为…",
-      "reveal": "在文件夹中显示",
-      "open": "打开项目文件…"
-    }
+    "expandAI": "展开 AI 面板"
   },
   "sidebar": {
     "outline": "大纲",
@@ -184,6 +178,7 @@
       "short-story": "短篇"
     },
     "deleteFailed": "删除项目失败",
+    "incompatible": "该文件由更新版本的 Mythpen 创建，请升级应用后再打开。",
     "createFailed": "创建失败",
     "import": {
       "tabBlank": "从零开始",
@@ -233,21 +228,6 @@
       "importFailed": "导入失败",
       "connectionInterrupted": "导入连接中断",
       "warnings": "提示"
-    },
-    "file": {
-      "open": "打开项目文件",
-      "saveHint": "将保存为 .mythpen 项目文件，可随时双击打开或发送到其他设备继续创作。",
-      "browserHint": "浏览器模式使用应用内项目；桌面版会保存为可携带的 .mythpen 文件。",
-      "openFailed": "打开项目文件失败",
-      "saveFailed": "保存项目失败",
-      "saved": "已保存",
-      "saveAsDone": "已另存为新的项目文件",
-      "saveAsFailed": "另存为失败",
-      "revealFailed": "无法在文件夹中显示",
-      "removeFromListMsg": "将“{name}”从最近项目列表中移除？项目文件会保留在原位置。",
-      "deleteFileHint": "同时删除项目文件（不可恢复）",
-      "incompatible": "该文件由更新版本的 Mythpen 创建，请升级应用后再打开。",
-      "featureOffHint": "实验功能未开启，项目将保存在应用内。可在 设置 → 实验功能 中开启项目文件。"
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "试听",
     "soundPiano": "钢琴和弦",
     "followSystem": "跟随系统",
-    "experimental": "实验功能",
-    "documentMode": "项目文件（.mythpen）",
-    "documentModeDesc": "将项目保存为单个 .mythpen 文件，可双击打开、发送到其他设备继续创作。",
-    "documentModeWarning": "实验功能：项目文件格式后续可能发生破坏性变更，请避免作为唯一备份。",
-    "documentModeDisabledHint": "项目文件功能未启用。请在 设置 → 实验功能 中开启。"
+    "experimental": "实验功能"
   },
   "pages": {
     "characters": "角色管理",

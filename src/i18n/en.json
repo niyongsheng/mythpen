@@ -8,13 +8,7 @@
     "projectMeta": "{words} words · {chapters} ch · {genres}",
     "settings": "Settings",
     "collapseAI": "Collapse AI Panel",
-    "expandAI": "Expand AI Panel",
-    "file": {
-      "save": "Save",
-      "saveAs": "Save As…",
-      "reveal": "Show in Folder",
-      "open": "Open Project File…"
-    }
+    "expandAI": "Expand AI Panel"
   },
   "sidebar": {
     "outline": "Outline",
@@ -184,6 +178,7 @@
       "short-story": "Short Story"
     },
     "deleteFailed": "Failed to delete project",
+    "incompatible": "This file was created by a newer version of Mythpen. Please update the app to open it.",
     "createFailed": "Create failed",
     "import": {
       "tabBlank": "Start Fresh",
@@ -233,21 +228,6 @@
       "importFailed": "Import failed",
       "connectionInterrupted": "Import connection interrupted",
       "warnings": "Notes"
-    },
-    "file": {
-      "open": "Open Project File",
-      "saveHint": "Saved as a .mythpen project file — double-click it or send it to another device to keep writing.",
-      "browserHint": "Browser mode uses in-app projects; the desktop app saves a portable .mythpen file.",
-      "openFailed": "Failed to open project file",
-      "saveFailed": "Failed to save project",
-      "saved": "Saved",
-      "saveAsDone": "Saved as a new project file",
-      "saveAsFailed": "Save As failed",
-      "revealFailed": "Could not reveal the file",
-      "removeFromListMsg": "Remove “{name}” from Recent Projects? The project file stays where it is.",
-      "deleteFileHint": "Also delete the project file (cannot be undone)",
-      "incompatible": "This file was created by a newer version of Mythpen. Please update the app to open it.",
-      "featureOffHint": "Experimental project files are off, so this project is stored inside the app. Enable them in Settings → Experimental."
     }
   },
   "settings": {
@@ -306,11 +286,7 @@
     "previewSound": "Preview",
     "soundPiano": "Piano Chord",
     "followSystem": "Follow system",
-    "experimental": "Experimental",
-    "documentMode": "Project Files (.mythpen)",
-    "documentModeDesc": "Save a project as a single .mythpen file that can be opened by double-click and sent to another device.",
-    "documentModeWarning": "Experimental: the project file format may change in a breaking way. Do not rely on it as your only backup.",
-    "documentModeDisabledHint": "Project files are disabled. Enable them in Settings → Experimental."
+    "experimental": "Experimental"
   },
   "pages": {
     "characters": "Characters",

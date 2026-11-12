@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { chaptersApi, volumesApi } from '@/lib/api'
 import { toChapter } from '@/lib/dto'
@@ -20,7 +19,7 @@ interface ChapterState {
   loadChapters: (project: string) => Promise<void>
   loadChapterContent: (project: string, num: number, volumeId?: number) => Promise<void>
   updateChapter: (project: string, num: number, data: Partial<Chapter>) => Promise<void>
-  createChapter: (project: string, title?: string, outline?: string, volumeId?: number) => Promise<any>
+  createChapter: (project: string, title: string, outline: string, volumeId: number) => Promise<any>
 }
 
 const EMPTY_VOLUMES: Volume[] = []
@@ -176,7 +175,7 @@ export const useChapterStore = create<ChapterState>((set, get) => ({
     }
   },
 
-  createChapter: async (project, title = t('chapter.defaultTitle'), outline = '', volumeId?: number) => {
+  createChapter: async (project, title, outline, volumeId) => {
     try {
       const created = await chaptersApi.create(project, { title, outline, volume_id: volumeId })
       track('chapter_created', { source: 'manual', ...projectProps(project) })

@@ -50,9 +50,14 @@ export function Outline() {
 
   const activeChapter = volumes.flatMap((v) => v.chapters).find((c) => c.id === activeChapterId)
   const projectGenres = currentProject ? (projects.find((p) => p.name === currentProject)?.genres ?? []) : []
-  const genreBeatPlaceholder = projectGenres.length
-    ? projectGenres.map((genre) => t(`outline.genreBeatFocus.${genre}`)).join('；')
-    : t('outline.genreBeatHint')
+  // Hints are keyed by canonical genre slug. Skip unknown/legacy values so a
+  // missing translation can never leak a raw i18n key into the placeholder.
+  const genreHints = projectGenres.flatMap((genre) => {
+    const key = `outline.genreBeatFocus.${genre}`
+    const hint = t(key)
+    return hint === key ? [] : [hint]
+  })
+  const genreBeatPlaceholder = genreHints.length ? genreHints.join('；') : t('outline.genreBeatHint')
 
   // Select first chapter on mount or when volumes change
   useEffect(() => {

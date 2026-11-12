@@ -1,34 +1,14 @@
-import { Copy, FolderOpen, PanelRightClose, PanelRightOpen, Save, Settings } from 'lucide-react'
+import { PanelRightClose, PanelRightOpen, Settings } from 'lucide-react'
 import { ProjectIcon } from '@/components/ProjectIcon'
 import { useT } from '@/hooks/useT'
-import {
-  openProjectFileFromDialog,
-  projectFileName,
-  revealCurrentProjectFile,
-  saveProjectAs,
-  saveProjectNow,
-} from '@/lib/projectFiles'
-import { isTauri } from '@/lib/runtime'
 import { useProjectStore } from '@/stores/useProjectStore'
-import { useSettingsStore } from '@/stores/useSettingsStore'
 import { useUIStore } from '@/stores/useUIStore'
-
-const FILE_ACTIONS = [
-  { icon: Save, labelKey: 'titlebar.file.save', run: saveProjectNow, documentOnly: false },
-  { icon: Copy, labelKey: 'titlebar.file.saveAs', run: saveProjectAs, documentOnly: false },
-  { icon: FolderOpen, labelKey: 'titlebar.file.reveal', run: revealCurrentProjectFile, documentOnly: true },
-  { icon: FolderOpen, labelKey: 'titlebar.file.open', run: openProjectFileFromDialog, documentOnly: false },
-]
 
 export function Titlebar() {
   const { currentProject, projects, showProjectListFn } = useProjectStore()
   const { toggleSettings, projectSwitcherOpen, setProjectSwitcherOpen, rightPanelVisible, toggleRightPanel } =
     useUIStore()
   const { t } = useT()
-  const documentModeEnabled = useSettingsStore((s) => s.settings.experimentalDocumentMode)
-  const currentProjectSummary = projects.find((project) => project.name === currentProject)
-  const currentFilePath = currentProjectSummary?.filePath
-  const currentFileName = currentProjectSummary?.isDocument ? projectFileName(currentFilePath) : undefined
 
   return (
     <div className="flex items-center h-[var(--titlebar-h)] bg-[var(--canvas-soft)] border-b border-[var(--hairline)] px-4 gap-3 select-none shrink-0">
@@ -49,12 +29,8 @@ export function Titlebar() {
             className="flex items-center gap-1 cursor-pointer"
             onClick={() => setProjectSwitcherOpen(!projectSwitcherOpen)}
           >
-            <span className="text-[var(--ink-secondary)] text-[13px]" title={currentFilePath}>
-              {currentProject}
-            </span>
-            <span className="text-[var(--ink-mute)] text-[12px]">
-              {currentFileName ? `· ${currentFileName}` : `· ${t('titlebar.firstVolume')}`}
-            </span>
+            <span className="text-[var(--ink-secondary)] text-[13px]">{currentProject}</span>
+            <span className="text-[var(--ink-mute)] text-[12px]">· {t('titlebar.firstVolume')}</span>
           </div>
 
           {projectSwitcherOpen && (
@@ -83,25 +59,6 @@ export function Titlebar() {
                     </div>
                   </div>
                 ))}
-                {isTauri && documentModeEnabled && (
-                  <div className="border-t border-[var(--hairline)] mt-1 pt-1">
-                    {FILE_ACTIONS.map(({ icon: Icon, labelKey, run, documentOnly }) =>
-                      documentOnly && !currentProjectSummary?.isDocument ? null : (
-                        <button
-                          key={labelKey}
-                          type="button"
-                          className="w-full flex items-center gap-2 px-2.5 py-2 rounded-sm text-left text-[13px] text-[var(--ink-secondary)] hover:bg-[var(--canvas-mid)] bg-transparent border-none cursor-pointer"
-                          onClick={() => {
-                            setProjectSwitcherOpen(false)
-                            void run()
-                          }}
-                        >
-                          <Icon size={14} /> {t(labelKey)}
-                        </button>
-                      ),
-                    )}
-                  </div>
-                )}
                 <div
                   className="flex items-center gap-2 px-2.5 py-2 rounded-sm cursor-pointer text-[var(--accent-gold)] text-[13px] border-t border-[var(--hairline)] mt-1 pt-2.5 hover:bg-[var(--canvas-mid)]"
                   onClick={() => {
