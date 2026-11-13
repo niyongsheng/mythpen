@@ -111,22 +111,74 @@ function apiError(status, text) {
   });
 }
 
+// ─── Output-token parameter ───
+// OpenAI's newer models (GPT-5+, o-series) reject the legacy `max_tokens`
+// parameter with HTTP 400 and require `max_completion_tokens`. Other
+// OpenAI-compatible services still expect `max_tokens`. Pick per endpoint and
+// learn from 400s at runtime, so Azure OpenAI and proxies heal without an
+// extra setting.
+
+// Official host always requires `max_completion_tokens`; other endpoints are
+// learned per origin at runtime (host+port, so local servers on different
+// ports do not interfere with each other).
+const MAX_COMPLETION_TOKENS_HOSTS = new Set(['api.openai.com']);
+const MAX_COMPLETION_TOKENS_ORIGINS = new Set();
+
+function chatEndpoint(apiConfig) {
+  try {
+    const url = new URL(apiConfig.chatUrl || apiConfig.apiBaseUrl || '');
+    return { host: url.hostname.toLowerCase(), origin: url.origin };
+  } catch {
+    return { host: '', origin: '' };
+  }
+}
+
+/** Name of the output-budget parameter this endpoint accepts. */
+function outputLimitField(apiConfig) {
+  const { host, origin } = chatEndpoint(apiConfig);
+  return MAX_COMPLETION_TOKENS_HOSTS.has(host) || MAX_COMPLETION_TOKENS_ORIGINS.has(origin)
+    ? 'max_completion_tokens'
+    : 'max_tokens';
+}
+
+/** Official OpenAI host, which accepts OpenAI-only extensions such as `stream_options`. */
+function isOfficialOpenAI(apiConfig) {
+  return chatEndpoint(apiConfig).host === 'api.openai.com';
+}
+
 /**
  * POST to an OpenAI-compatible endpoint.
  *
  * `temperature` is deliberately never sent: newer models (e.g. Claude Opus 5,
  * Kimi K3) reject it with HTTP 400, and the provider default is a good fit for
  * the writing workflow.
+ *
+ * When the endpoint rejects the legacy `max_tokens` parameter (newer OpenAI
+ * models do), retry once with `max_completion_tokens` and remember the origin
+ * so later requests go straight to the accepted form.
  */
 async function postOpenAI(apiConfig, body, signal) {
-  const response = await fetch(apiConfig.chatUrl, {
+  const post = (payload) => fetch(apiConfig.chatUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiConfig.apiKey}` },
-    body: JSON.stringify(body),
+    body: JSON.stringify(payload),
     signal,
   });
+
+  let response = await post(body);
   if (response.ok) return response;
-  throw apiError(response.status, await response.text());
+
+  let text = await response.text();
+  if (response.status === 400 && 'max_tokens' in body && /max_completion_tokens/i.test(text)) {
+    const { origin } = chatEndpoint(apiConfig);
+    if (origin) MAX_COMPLETION_TOKENS_ORIGINS.add(origin);
+    const retried = { ...body, max_completion_tokens: body.max_tokens };
+    delete retried.max_tokens;
+    response = await post(retried);
+    if (response.ok) return response;
+    text = await response.text();
+  }
+  throw apiError(response.status, text);
 }
 
 /** Error signalling that a tool call was cut off by the output budget. */
@@ -218,7 +270,7 @@ class OpenAIProvider {
             ...nonSystemMessages(messages),
           ],
           tools: tools || undefined,
-          max_tokens: maxTokens,
+          [outputLimitField(apiConfig)]: maxTokens,
           stream: false,
         };
 
@@ -252,9 +304,13 @@ class OpenAIProvider {
         { role: 'system', content: mergeSystemPrompt(systemPrompt, messages) },
         ...nonSystemMessages(messages),
       ],
-      max_tokens: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
+      [outputLimitField(apiConfig)]: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       stream: true,
     };
+    // Official OpenAI omits `usage` from streamed chunks unless asked for it.
+    if (isOfficialOpenAI(apiConfig)) {
+      body.stream_options = { include_usage: true };
+    }
 
     const response = await postOpenAI(apiConfig, body);
 
