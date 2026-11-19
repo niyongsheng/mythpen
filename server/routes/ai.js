@@ -3,7 +3,7 @@ const Sentry = require('../instrument');
 const db = require('../db');
 const { TOOL_REGISTRY, getToolsForRequest, executeTool } = require('../tools');
 const { createAIAdapter } = require('../ai-adapter');
-const { getAiConfig } = require('../ai-config');
+const { getAiConfig, needsApiKey } = require('../ai-config');
 const { buildWritingPrompt, buildContinuePrompt } = require('../prompts/writing');
 const { buildTaskPrompt } = require('../prompts/task');
 const { stripToolMarkup } = require('../tool-markup');
@@ -11,6 +11,45 @@ const { buildCollabPrompt } = require('../prompts/collab');
 const { stripLeadingChapterHeading } = require('../titles');
 
 const router = express.Router();
+
+const NOT_CONFIGURED = {
+  code: 'AI_NOT_CONFIGURED',
+  message: '请先在设置中配置 API Key',
+  recoverable: true,
+};
+
+// Provider failures used to reach the author as a bare "API Error: 401",
+// which says nothing about what to do. Map the common ones to actionable
+// text and keep the provider's own message for diagnosis.
+function describeAIError(err) {
+  const status = err?.status;
+  let detail = String(err?.detail || '').replace(/\s+/g, ' ').trim();
+  // OpenAI-compatible providers return a JSON error envelope as the body;
+  // show the human-readable message instead of the raw JSON on one line.
+  try {
+    const parsed = JSON.parse(detail);
+    detail = String(parsed?.error?.message || parsed?.message || detail);
+  } catch {
+    /* plain text or empty */
+  }
+  detail = detail.slice(0, 200);
+  const suffix = detail ? `：${detail}` : '';
+  switch (status) {
+    case 401:
+      return `API Key 无效或已过期，请在设置中检查${suffix}（HTTP 401）`;
+    case 402:
+      return `API 账户余额不足，请充值后重试${suffix}（HTTP 402）`;
+    case 403:
+      return `API 访问被拒绝，请检查 Key 的权限${suffix}（HTTP 403）`;
+    case 404:
+      return `模型或接口不存在，请检查设置中的模型名和 Base URL${suffix}（HTTP 404）`;
+    case 429:
+      return '请求过于频繁，请稍后重试（HTTP 429）';
+    default:
+      if (status >= 500) return `AI 服务商暂时不可用（HTTP ${status}），请稍后重试`;
+      return err?.message || 'AI 请求失败';
+  }
+}
 
 // ─── AI Chat Completion (non-streaming) ───
 router.post('/ai/chat', async (req, res) => {
@@ -34,6 +73,9 @@ router.post('/ai/chat', async (req, res) => {
     }
     if (req.body.apiModel !== undefined) {
       aiConfig.apiModel = req.body.apiModel;
+    }
+    if (needsApiKey(aiConfig)) {
+      return res.status(400).json({ error: NOT_CONFIGURED });
     }
     const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     // Page-level AI calls send their task contract as a system message; the
@@ -71,6 +113,9 @@ router.post('/ai/chat/stream', async (req, res) => {
     }
 
     const aiConfig = getAiConfig();
+    if (needsApiKey(aiConfig)) {
+      return res.status(400).json({ error: NOT_CONFIGURED });
+    }
     const adapter = createAIAdapter(aiConfig.apiModel, aiConfig, aiConfig.apiType);
     const systemPrompt = mode === 'collab' ? buildCollabPrompt(project) : buildWritingPrompt(project);
 
@@ -122,11 +167,7 @@ router.post('/ai/chat/stream', async (req, res) => {
             error_code: err.code || (err.status ? 'api_error' : 'unknown'),
           },
         });
-        if (err.status) {
-          send('error', { error: `API Error: ${err.status}`, detail: err.detail });
-        } else {
-          send('error', { error: err.message });
-        }
+        send('error', { error: describeAIError(err), detail: err.detail });
         if (!clientClosed) res.end();
         return;
       }
@@ -231,6 +272,9 @@ router.post('/ai/continue', async (req, res) => {
     const chapter = db.projectGet(project, 'SELECT * FROM chapters WHERE num = ?', [chapterNum]);
 
     const aiConfig = getAiConfig();
+    if (needsApiKey(aiConfig)) {
+      return res.status(400).json({ error: NOT_CONFIGURED });
+    }
 
     if (polishing) {
       if (!chapter?.content?.trim()) {
@@ -289,7 +333,7 @@ router.post('/ai/continue', async (req, res) => {
     } catch (err) {
       console.error('Continue stream error:', err);
       Sentry.captureException(err, { tags: { area: polishing ? 'ai_polish' : 'ai_continue' } });
-      res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+      res.write(`event: error\ndata: ${JSON.stringify({ error: describeAIError(err) })}\n\n`);
       res.end();
       return;
     }

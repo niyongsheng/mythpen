@@ -324,9 +324,23 @@ async function readSSEStream(response: Response, handlers: Record<string, (paylo
   }
 }
 
+// Server errors arrive as `{ error: { code, message } }`; turn them into an
+// Error whose message the caller can show verbatim (e.g. missing API key).
+async function aiErrorFromResponse(response: Response): Promise<Error> {
+  const body = await response.json().catch(() => null)
+  const message = typeof body?.error === 'string' ? body.error : body?.error?.message || `HTTP ${response.status}`
+  const error = new Error(message)
+  ;(error as any).code = body?.error?.code
+  ;(error as any).status = response.status
+  return error
+}
+
 export const aiApi = {
-  chat: (messages: any[], project: string) =>
-    aiRequest('/ai/chat', { method: 'POST', body: { messages, project } }).then((r) => r.json()),
+  chat: async (messages: any[], project: string) => {
+    const response = await aiRequest('/ai/chat', { method: 'POST', body: { messages, project } })
+    if (!response.ok) throw await aiErrorFromResponse(response)
+    return response.json()
+  },
 
   chatStream: (
     messages: any[],
@@ -345,6 +359,13 @@ export const aiApi = {
       signal: controller.signal,
     })
       .then(async (response) => {
+        // A pre-stream rejection (missing API key, bad params) is JSON, not
+        // SSE — surface it instead of silently ending the run.
+        if (!response.ok) {
+          const error = await aiErrorFromResponse(response)
+          onError({ error: error.message })
+          return
+        }
         let gotError = false
         let endData: any
         await readSSEStream(response, {
@@ -390,6 +411,12 @@ export const aiApi = {
       signal: controller.signal,
     })
       .then(async (response) => {
+        if (!response.ok) {
+          const error = await aiErrorFromResponse(response)
+          finished = true
+          onError({ error: error.message })
+          return
+        }
         await readSSEStream(response, {
           content_chunk: (data) => onChunk(data.text || ''),
           task_end: (data) => {

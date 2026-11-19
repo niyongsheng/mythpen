@@ -408,7 +408,9 @@ function normalizeSetting(key, value) {
   if (schema.type === 'enum') {
     return schema.values.includes(value) ? String(value) : undefined;
   }
-  return String(value ?? '');
+  // Pasted API keys/model names often carry a trailing newline or space,
+  // which providers reject with confusing auth-header errors.
+  return String(value ?? '').trim();
 }
 
 const configMigrations = [

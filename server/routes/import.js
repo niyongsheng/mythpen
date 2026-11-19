@@ -3,7 +3,7 @@ const Sentry = require('../instrument');
 const db = require('../db');
 const { ALLOWED_STYLES } = require('../styles');
 const { createAIAdapter } = require('../ai-adapter');
-const { getAiConfig } = require('../ai-config');
+const { getAiConfig, needsApiKey } = require('../ai-config');
 const {
   runImportPipeline,
   MAX_TEXT_CHARS,
@@ -52,7 +52,7 @@ router.post('/projects/import-ai', async (req, res) => {
   }
 
   const aiConfig = getAiConfig();
-  if (!aiConfig.apiKey) {
+  if (needsApiKey(aiConfig)) {
     return fail(res, 400, 'AI_NOT_CONFIGURED', '请先在设置中配置 API Key');
   }
 
