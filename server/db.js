@@ -29,7 +29,7 @@ let configDb;    // wrapped config database
 // ═══════════════════════════════════════════════════════════════
 
 const CONFIG_SCHEMA_VERSION = 3;
-const PROJECT_SCHEMA_VERSION = 13;
+const PROJECT_SCHEMA_VERSION = 14;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -953,6 +953,12 @@ const projectMigrations = [
       }
       db.prepare('DELETE FROM project_genres WHERE genre = ?').run(genre);
     }
+  },
+  // v13 → v14: repair project databases whose schema version advanced while
+  // `project_styles` was missing (seen on a dev build). A healthy project is
+  // untouched; `CREATE TABLE IF NOT EXISTS` makes this a no-op.
+  (db) => {
+    db.exec('CREATE TABLE IF NOT EXISTS project_styles (style TEXT PRIMARY KEY)');
   },
 ];
 
