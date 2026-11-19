@@ -323,7 +323,7 @@ async function run() {
   // separate process sees the project registration written above.
   await new Promise((resolve) => setTimeout(resolve, 500));
   const { executeTool, getToolsForRequest, TOOLS } = require('./tools');
-  const { initDatabase } = require('./db');
+  const { initDatabase, projectExecute, projectGet } = require('./db');
   await initDatabase();
 
   // ── Per-request tool selection (fixed token overhead) ──
@@ -334,6 +334,7 @@ async function run() {
   assert('writing tool set hides destructive tools', !writingTools.some((tool) => tool.function.name === 'delete_chapter'));
   assert('delete intent exposes destructive tools', deleteTools.some((tool) => tool.function.name === 'delete_chapter'));
   assert('collab tool set can create volumes', collabTools.some((tool) => tool.function.name === 'create_volume'));
+  assert('writing tool set includes move_chapter', writingTools.some((tool) => tool.function.name === 'move_chapter'));
   const notesTools = getToolsForRequest(PROJECT, 'writing', [{ role: 'user', content: '记住我的偏好：每章 3000 字' }]);
   assert('notes intent exposes update_author_notes', notesTools.some((tool) => tool.function.name === 'update_author_notes'));
   assert('notes tool hidden without intent', !writingTools.some((tool) => tool.function.name === 'update_author_notes'));
@@ -540,6 +541,139 @@ async function run() {
   assert('update_chapter rejects unknown volume', typeof r.error === 'string', JSON.stringify(r));
   r = executeTool(PROJECT, 'delete_volume', { volume_id: moveVolumeId, force: true });
   assert('delete_volume cleans up moved chapter', r.deleted === true && r.deleted_chapters === 1, JSON.stringify(r));
+
+  // ── move_chapter: reorder, reference remap, ID refs, volume sync ──
+  r = executeTool(PROJECT, 'create_volume', { title: '章序测试卷' });
+  const reorderVolumeId = r.volume_id;
+  r = executeTool(PROJECT, 'create_volume', { title: '章序目标卷' });
+  const reorderTargetVolumeId = r.volume_id;
+  assert(
+    'create volumes for move_chapter tests',
+    Number.isInteger(reorderVolumeId) && Number.isInteger(reorderTargetVolumeId),
+    JSON.stringify({ reorderVolumeId, reorderTargetVolumeId }),
+  );
+
+  for (const [num, title] of [[101, '章序 A'], [102, '章序 B'], [103, '章序 C'], [104, '章序 D']]) {
+    r = executeTool(PROJECT, 'create_chapter', { title, chapter_num: num, volume_id: reorderVolumeId });
+    assert(`create reorder chapter ${num}`, r.created === true, JSON.stringify(r));
+  }
+
+  // Duplicate explicit numbers must point the model at move_chapter.
+  r = executeTool(PROJECT, 'create_chapter', { title: '重复编号章', chapter_num: 101, volume_id: reorderVolumeId });
+  assert(
+    'create_chapter rejects duplicate num and suggests move_chapter',
+    typeof r.error === 'string' && r.error.includes('move_chapter'),
+    JSON.stringify(r),
+  );
+
+  const reorderTitles = () => executeTool(PROJECT, 'list_chapters', { limit: 1000 }).chapters
+    .filter((c) => c.num >= 101 && c.num <= 104)
+    .map((c) => c.title);
+
+  // Numeric references (foreshadow expected chapter; payoff setup/payoff) are
+  // remapped inside the same transaction; ID-based ones follow their chapter.
+  const fInRange = executeTool(PROJECT, 'create_foreshadow', {
+    title: '重映射伏笔-范围内', priority: 'normal', expected_resolve_chapter: 102,
+  });
+  const fMoved = executeTool(PROJECT, 'create_foreshadow', {
+    title: '重映射伏笔-被移动章', priority: 'normal', expected_resolve_chapter: 101,
+  });
+  const fOutside = executeTool(PROJECT, 'create_foreshadow', {
+    title: '重映射伏笔-范围外', priority: 'normal', expected_resolve_chapter: 104,
+  });
+  // Payoff tools are gated to power-fantasy projects, so seed the rows directly.
+  projectExecute(PROJECT,
+    "INSERT INTO payoff_points (id, title, type, description, status, intensity, setup_chapter, payoff_chapter) VALUES (?, ?, 'other', '', 'planned', 3, ?, ?)",
+    ['test-payoff-remap', '重映射爽点', 102, 103],
+  );
+  const memReorder = executeTool(PROJECT, 'create_memory', {
+    category: 'event', content: '章序 ID 引用测试', source_chapter_num: 102,
+  });
+
+  // Forward move: 101 → 103. B and C shift back one, A takes 103.
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 101, position: 103 });
+  assert('move_chapter forward returns new num', r.moved === true && r.chapter_num === 103, JSON.stringify(r));
+  assert(
+    'move_chapter forward shifts intervening chapters',
+    JSON.stringify(reorderTitles()) === JSON.stringify(['章序 B', '章序 C', '章序 A', '章序 D']),
+    JSON.stringify(reorderTitles()),
+  );
+
+  let foreshadowsAfter = executeTool(PROJECT, 'list_foreshadows', {});
+  const expectedOf = (id) => foreshadowsAfter.find((item) => item.id === id)?.expected_resolve_chapter;
+  assert('move_chapter remaps in-range foreshadow reference', expectedOf(fInRange.id) === 101, JSON.stringify(foreshadowsAfter));
+  assert('move_chapter remaps reference to the moved chapter', expectedOf(fMoved.id) === 103, JSON.stringify(foreshadowsAfter));
+  assert('move_chapter leaves out-of-range foreshadow reference', expectedOf(fOutside.id) === 104, JSON.stringify(foreshadowsAfter));
+
+  let payoffsAfter = executeTool(PROJECT, 'list_payoffs', {});
+  const payoffRow = payoffsAfter.find((item) => item.id === 'test-payoff-remap');
+  assert(
+    'move_chapter remaps payoff setup/payoff chapters',
+    payoffRow && payoffRow.setup_chapter === 101 && payoffRow.payoff_chapter === 102,
+    JSON.stringify(payoffRow),
+  );
+
+  const memoriesAfter = executeTool(PROJECT, 'list_memories', { query: '章序 ID 引用测试' });
+  const reorderMemory = memoriesAfter.find((item) => item.id === memReorder.id);
+  const chapterBId = projectGet(PROJECT, 'SELECT id FROM chapters WHERE num = 101').id;
+  assert(
+    'ID-based memory reference follows the moved chapter',
+    reorderMemory && reorderMemory.source_chapter_id === chapterBId && reorderMemory.source_chapter_num === 101,
+    JSON.stringify(reorderMemory),
+  );
+
+  // Backward move restores the original order and the original references.
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 103, position: 101 });
+  assert(
+    'move_chapter backward restores order',
+    r.moved === true && JSON.stringify(reorderTitles()) === JSON.stringify(['章序 A', '章序 B', '章序 C', '章序 D']),
+    JSON.stringify({ result: r, order: reorderTitles() }),
+  );
+  foreshadowsAfter = executeTool(PROJECT, 'list_foreshadows', {});
+  assert(
+    'move_chapter backward remaps foreshadow references back',
+    expectedOf(fInRange.id) === 102 && expectedOf(fMoved.id) === 101 && expectedOf(fOutside.id) === 104,
+    JSON.stringify(foreshadowsAfter),
+  );
+  payoffsAfter = executeTool(PROJECT, 'list_payoffs', {});
+  const payoffRowBack = payoffsAfter.find((item) => item.id === 'test-payoff-remap');
+  assert(
+    'move_chapter backward remaps payoff chapters back',
+    payoffRowBack && payoffRowBack.setup_chapter === 102 && payoffRowBack.payoff_chapter === 103,
+    JSON.stringify(payoffRowBack),
+  );
+
+  // Optional volume_id moves the chapter across volumes in the same call.
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 104, position: 101, volume_id: reorderTargetVolumeId });
+  assert('move_chapter can change volume', r.moved === true && r.volume_id === reorderTargetVolumeId, JSON.stringify(r));
+  const reorderedChapters = executeTool(PROJECT, 'list_chapters', { limit: 1000 }).chapters;
+  const chapterD = reorderedChapters.find((c) => c.title === '章序 D');
+  assert(
+    'move_chapter persists target volume',
+    chapterD && chapterD.num === 101 && chapterD.volume_id === reorderTargetVolumeId,
+    JSON.stringify(chapterD),
+  );
+
+  // ── Error paths ──
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 999, position: 101 });
+  assert('move_chapter rejects unknown chapter', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 101, position: 0 });
+  assert('move_chapter rejects position below 1', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 101, position: 999 });
+  assert('move_chapter rejects position beyond last chapter', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 101, position: 102, volume_id: 999999 });
+  assert('move_chapter rejects unknown volume', typeof r.error === 'string', JSON.stringify(r));
+  r = executeTool(PROJECT, 'move_chapter', { chapter_num: 101.5, position: 102 });
+  assert('move_chapter rejects non-integer chapter_num', typeof r.error === 'string', JSON.stringify(r));
+
+  // Cleanup: D sits in the target volume, A/B/C remain in the source volume.
+  r = executeTool(PROJECT, 'delete_volume', { volume_id: reorderTargetVolumeId, force: true });
+  assert('delete target volume cleans moved chapter', r.deleted === true && r.deleted_chapters === 1, JSON.stringify(r));
+  r = executeTool(PROJECT, 'delete_volume', { volume_id: reorderVolumeId, force: true });
+  assert('delete reorder volume cleans chapters', r.deleted === true && r.deleted_chapters === 3, JSON.stringify(r));
+  for (const f of [fInRange, fMoved, fOutside]) executeTool(PROJECT, 'delete_foreshadow', { id: f.id });
+  executeTool(PROJECT, 'delete_memory', { id: memReorder.id });
+  projectExecute(PROJECT, 'DELETE FROM payoff_points WHERE id = ?', ['test-payoff-remap']);
 
   // ── Tool-level deletion ──
   r = executeTool(PROJECT, 'delete_science_entry', { id: dbg.sciId });

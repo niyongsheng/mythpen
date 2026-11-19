@@ -893,7 +893,7 @@ POST `/api/ai/continue`：
 
 | 类别 | 工具 | 数量 |
 |---|---|---|
-| **章节** | list/get/create/update/delete_chapter | 5 |
+| **章节** | list/get/create/update/move/delete_chapter | 6 |
 | **卷** | list/create/update/delete_volume | 4 |
 | **角色** | list/get/create/update/delete_character | 5 |
 | **世界观** | list/create/update/delete_world_entry | 4 |
