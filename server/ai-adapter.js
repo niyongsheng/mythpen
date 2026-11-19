@@ -354,7 +354,12 @@ class ClaudeProvider {
   }
 
   /**
-   * Non-streaming chat completion (supports tools).
+   * Chat completion (supports tools).
+   *
+   * Always uses the streaming API under the hood: the SDK refuses a
+   * non-streaming request whose `max_tokens` implies more than 10 minutes of
+   * work (`max_tokens > 21333`), and settings allow up to 131072. Streaming
+   * has no such cap; `finalMessage()` returns the same assembled Message.
    */
   async complete(systemPrompt, messages, tools, options = {}) {
     const { apiConfig, client } = this;
@@ -387,10 +392,9 @@ class ClaudeProvider {
           params.tools = claudeTools;
         }
 
-        const response = await client.messages.create(
-          params,
-          options.signal ? { signal: options.signal } : undefined,
-        );
+        const response = await client.messages
+          .stream(params, options.signal ? { signal: options.signal } : undefined)
+          .finalMessage();
         const toolCalls = [];
         let content = '';
 
