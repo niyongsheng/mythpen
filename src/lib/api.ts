@@ -388,7 +388,9 @@ export const aiApi = {
       })
       .catch((e) => {
         // A user-initiated stop aborts the fetch; that is not an AI failure.
-        if (e?.name === 'AbortError') return
+        // WebKit reports an aborted stream read as `TypeError: network error`
+        // rather than AbortError, so check the controller as well.
+        if (controller.signal.aborted || e?.name === 'AbortError') return
         onError(e)
       })
     return controller
@@ -434,7 +436,12 @@ export const aiApi = {
         })
         if (!finished) onEnd()
       })
-      .catch((e) => onError(e))
+      .catch((e) => {
+        // Stopping a run aborts the request; see chatStream for why the
+        // controller has to be checked in addition to AbortError.
+        if (controller.signal.aborted || e?.name === 'AbortError') return
+        onError(e)
+      })
     return controller
   },
 }
