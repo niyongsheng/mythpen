@@ -421,6 +421,7 @@
     "backend": "백엔드"
   },
   "serverStatus": {
+    "sidecarExited": "로컬 서비스가 중지되었습니다. Mythpen을 다시 시작하세요.",
     "timeout": "연결 시간 초과",
     "startFailed": "서버 시작 실패",
     "starting": "시작 중",

@@ -7,11 +7,13 @@ import { useT } from '@/hooks/useT'
 import { isAnonymousStatsEnabled, syncAnonymousStatsToShell } from '@/lib/anonymousStats'
 import { registerExitFlush } from '@/lib/exitFlush'
 import { initSentry } from '@/lib/sentry'
+import { registerSidecarMonitor } from '@/lib/sidecarMonitor'
 import App from './App'
 
 initSentry()
 syncAnonymousStatsToShell(isAnonymousStatsEnabled())
 registerExitFlush()
+registerSidecarMonitor()
 
 function CrashFallback() {
   const { t } = useT()

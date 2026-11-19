@@ -421,6 +421,7 @@
     "backend": "バックエンド"
   },
   "serverStatus": {
+    "sidecarExited": "ローカルサービスが停止しました。Mythpen を再起動してください。",
     "timeout": "接続タイムアウト",
     "startFailed": "サーバーの起動に失敗しました",
     "starting": "起動中",

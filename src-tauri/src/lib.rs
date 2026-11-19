@@ -6,7 +6,7 @@ use std::time::Duration;
 use tauri::{Emitter, Manager};
 use tauri_plugin_aptabase::EventTracker;
 use tauri_plugin_shell::ShellExt;
-use tauri_plugin_shell::process::CommandChild;
+use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 
 /// Managed state holding the sidecar child process handle.
 /// Stored so we can kill the Express server on app exit.
@@ -158,6 +158,15 @@ fn request_graceful_shutdown(port: u16) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be registered before the other plugins: a second launch focuses
+        // the existing window instead of starting a second sidecar, which
+        // would fail to bind port 3001 and leave that window unusable.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.webview_windows().values().next() {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_aptabase::Builder::new("A-US-9460803259").build())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -192,11 +201,35 @@ pub fn run() {
                     },
                 )
                 .env("MYTHPEN_VERSION", app.package_info().version.to_string());
-            let (_rx, child) = sidecar.spawn().expect("Failed to spawn mythpen-server sidecar");
+            let (mut rx, child) = sidecar.spawn().expect("Failed to spawn mythpen-server sidecar");
 
             // Store child handle in app state so it lives for the app's lifetime
             // and can be killed on exit (fixes Windows "file in use" on upgrade)
             app.manage(SidecarProcess(Mutex::new(Some(child))));
+
+            // Watch for unexpected sidecar exits (crash, antivirus, port
+            // stolen). Without this every later request fails with a bare
+            // network error and the user has no idea the local server died.
+            let exit_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                while let Some(event) = rx.blocking_recv() {
+                    if let CommandEvent::Terminated(payload) = event {
+                        // The exit path kills the sidecar on purpose; only a
+                        // death while the app is still running is a failure.
+                        let exiting = exit_handle
+                            .try_state::<ExitState>()
+                            .is_some_and(|state| state.0.load(Ordering::SeqCst));
+                        if !exiting {
+                            eprintln!(
+                                "mythpen-server exited unexpectedly (code={:?}, signal={:?})",
+                                payload.code, payload.signal
+                            );
+                            let _ = exit_handle.emit("mythpen://sidecar-exited", payload.code);
+                        }
+                        break;
+                    }
+                }
+            });
 
             // Wait for server in background thread — don't block setup().
             // The frontend's ServerStatusGate will poll independently, so the

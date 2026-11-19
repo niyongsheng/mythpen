@@ -421,6 +421,7 @@
     "backend": "Backend"
   },
   "serverStatus": {
+    "sidecarExited": "O serviço local parou. Reinicie o Mythpen.",
     "timeout": "A conexão expirou",
     "startFailed": "Falha ao iniciar o servidor",
     "starting": "Iniciando",

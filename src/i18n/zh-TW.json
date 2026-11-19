@@ -421,6 +421,7 @@
     "backend": "後端"
   },
   "serverStatus": {
+    "sidecarExited": "本機服務已停止，請重新啟動 Mythpen",
     "timeout": "連線逾時",
     "startFailed": "伺服器啟動失敗",
     "starting": "正在啟動",
