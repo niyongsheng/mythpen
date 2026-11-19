@@ -3,6 +3,7 @@ const router = express.Router();
 const { randomUUID } = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const db = require('../db');
 const { saveAuthorNotes } = require('../author-notes');
 const { ALLOWED_GENRES, normalizeGenre } = require('../genres');
@@ -1297,6 +1298,10 @@ router.get('/:project/export', async (req, res) => {
       publisher: 'Mythpen',
       cover: coverPath || undefined,
       output: epubPath,
+      // epub-gen defaults to `<bundle>/../tempDir`, which after `bun build
+      // --compile` lives in the read-only virtual FS (`B:/~BUN/root` on
+      // Windows) and fails with ENOENT. Point it at the real OS temp dir.
+      tempDir: path.join(os.tmpdir(), 'mythpen-epub'),
       content,
     };
     await new EpubGen(epubOptions).promise;
