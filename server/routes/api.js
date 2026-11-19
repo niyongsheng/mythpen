@@ -409,6 +409,14 @@ router.post('/:project/characters', (req, res) => {
   if (!CHARACTER_ROLES.includes(role)) {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '无效的角色定位', recoverable: true } });
   }
+  // characters.name is UNIQUE; answer with an actionable message instead of
+  // letting the raw SQLite constraint escape as a 500.
+  const duplicate = db.projectGet(project(req.params.project), 'SELECT id FROM characters WHERE name = ?', [name]);
+  if (duplicate) {
+    return res.status(409).json({
+      error: { code: 'CHARACTER_NAME_EXISTS', message: `角色名「${name}」已存在`, recoverable: true },
+    });
+  }
   const id = randomUUID();
   db.projectExecute(project(req.params.project),
     'INSERT INTO characters (id, name, age, gender, species, appearance, personality, background, motivation, arc, notes, role, ext_markers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -421,6 +429,18 @@ router.put('/:project/characters/:id', (req, res) => {
   const { id } = req.params;
   if (req.body.role !== undefined && !CHARACTER_ROLES.includes(req.body.role)) {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: '无效的角色定位', recoverable: true } });
+  }
+  if (req.body.name !== undefined) {
+    const duplicate = db.projectGet(
+      project(req.params.project),
+      'SELECT id FROM characters WHERE name = ? AND id <> ?',
+      [req.body.name, id],
+    );
+    if (duplicate) {
+      return res.status(409).json({
+        error: { code: 'CHARACTER_NAME_EXISTS', message: `角色名「${req.body.name}」已存在`, recoverable: true },
+      });
+    }
   }
   const fields = []; const params = [];
   for (const key of ['name', 'age', 'gender', 'species', 'appearance', 'personality', 'background', 'motivation', 'arc', 'ext_markers', 'notes', 'role']) {

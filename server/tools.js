@@ -1053,6 +1053,12 @@ const HANDLERS = {
     category: '设定构建',
     run(ctx) {
       const { pdb, args, db, projectName, updateById, deleteById } = ctx;
+      // Return an actionable message rather than throwing the raw UNIQUE
+      // constraint; the model can then switch to update_character.
+      const existing = pdb.prepare('SELECT id FROM characters WHERE name = ?').get(args.name);
+      if (existing) {
+        return { error: `角色「${args.name}」已存在（id: ${existing.id}），如需修改请用 update_character` };
+      }
       const id = randomUUID();
       pdb.prepare(`INSERT INTO characters (id, name, species, age, gender, appearance, personality, background, motivation, arc, role, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
