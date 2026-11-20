@@ -294,6 +294,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # git describe / git log need the full tag history for the release notes.
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -321,11 +324,41 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
 
+      # Mirror the Copycraft release layout: a download table first, then the
+      # feat/fix/perf commits since the previous tag.
+      - name: Compose release body
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          PREV_TAG=$(git describe --tags --abbrev=0 --exclude "$TAG" HEAD 2>/dev/null || true)
+          {
+            echo "## Download"
+            echo
+            echo "| Platform | Installer |"
+            echo "| --- | --- |"
+            echo "| macOS (Apple Silicon) | [Mythpen_${VERSION}_aarch64.pkg](${BASE}/Mythpen_${VERSION}_aarch64.pkg) |"
+            echo "| Windows (x64) | [Mythpen_${VERSION}_x64-setup.exe](${BASE}/Mythpen_${VERSION}_x64-setup.exe) |"
+            echo "| Linux (x64) | [Mythpen_${VERSION}_amd64.AppImage](${BASE}/Mythpen_${VERSION}_amd64.AppImage) |"
+            if [ -n "$PREV_TAG" ]; then
+              CHANGES=$(git log --no-merges --reverse --format='- %s (%h)' "${PREV_TAG}..HEAD" | grep -E '^- (feat|fix|perf)(\(|:)' || true)
+              echo
+              echo "## What's Changed"
+              echo
+              if [ -n "$CHANGES" ]; then
+                echo "$CHANGES"
+                echo
+              fi
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${TAG}"
+            fi
+          } > release-body.md
+          cat release-body.md
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: Mythpen ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: release-body.md
           fail_on_unmatched_files: true
           files: |
             Mythpen-macOS-ARM/dmg/*.dmg
