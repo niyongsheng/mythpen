@@ -123,9 +123,11 @@ gh release view vX.Y.Z --json name,tagName,isDraft,isPrerelease,publishedAt,asse
 
 预期资产：
 
-- macOS：`Mythpen_X.Y.Z_aarch64.dmg`、`Mythpen.app.tar.gz` + `.sig`
+- macOS：`Mythpen_X.Y.Z_aarch64.dmg`、`Mythpen_X.Y.Z_aarch64.pkg`、`Mythpen.app.tar.gz` + `.sig`
+  - `.pkg` 由 CI 在 `pnpm tauri build` 后用 `scripts/macos/build-pkg.sh` 封装，postinstall 会自动清除 `com.apple.quarantine`
 - Windows：`Mythpen_X.Y.Z_x64-setup.exe` + `.sig`（只发布 NSIS exe，不发布 msi）
 - Linux：`.deb`、`.rpm`、`.AppImage` + `.sig`
+- 稳定命名别名（落地页直链用，`releases/latest/download/<name>`）：`Mythpen-macOS-aarch64.pkg`、`Mythpen-Windows-x64-setup.exe`、`Mythpen-Linux-x86_64.AppImage`
 - `latest.json`
 
 校验自动更新清单：

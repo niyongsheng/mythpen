@@ -1,0 +1,18 @@
+#!/bin/bash
+# Runs as root after the installer copies Mythpen.app into /Applications.
+#
+# Browsers mark downloaded .pkg files with com.apple.quarantine. Gatekeeper then
+# refuses the ad-hoc signed bundle on first launch ("Mythpen is damaged"). Strip
+# the attribute from the installed app so .pkg installs open without the
+# Terminal workaround needed by the .dmg build.
+set -u
+
+TARGET_VOLUME="${3:-/}"
+APP="${TARGET_VOLUME%/}/Applications/Mythpen.app"
+
+if [ -d "$APP" ]; then
+  /usr/bin/xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+fi
+
+# Never fail the install because of a best-effort cleanup.
+exit 0

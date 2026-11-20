@@ -585,7 +585,7 @@ to { opacity: 1; transform: scale(1); }
           "name": "macOS 提示应用已损坏，无法打开？",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "这是 Gatekeeper 拦截未签名构建的提示，不是文件损坏。把应用拖入「应用程序」后，在终端执行下面的命令：xattr -dr com.apple.quarantine /Applications/Mythpen.app 即可正常打开。"
+            "text": "这是 Gatekeeper 拦截未签名构建的提示，不是文件损坏。推荐下载 .pkg 安装包：安装脚本会自动清除隔离标记，装好即可打开。若 .pkg 本身被拦截，请在「系统设置 → 隐私与安全性」中点击「仍要打开」。使用 .dmg 时，把应用拖入「应用程序」后终端执行：xattr -dr com.apple.quarantine /Applications/Mythpen.app"
           }
         },
         {
@@ -681,21 +681,21 @@ to { opacity: 1; transform: scale(1); }
       <p class="hero-tagline" data-i18n="hero.tagline">把灵感，写成一部完整的小说。</p>
       <p class="hero-desc" data-i18n="hero.desc">Mythpen 是一款面向写作者的 AI 辅助创作工具。让 AI 成为你的协作伙伴，在角色管理、世界观构建、情节设计中提供智能支持。本地优先，隐私安全。</p>
       <div class="download-buttons">
-        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-primary" target="_blank" rel="noopener">
+        <a href="https://github.com/niyongsheng/mythpen/releases/latest/download/Mythpen-macOS-aarch64.pkg" class="btn-download btn-download-primary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-macos"/></svg>
           <span class="btn-label">
             <span class="btn-os">macOS</span>
-            <span class="btn-arch">Apple Silicon</span>
+            <span class="btn-arch">Apple Silicon · .pkg</span>
           </span>
         </a>
-        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+        <a href="https://github.com/niyongsheng/mythpen/releases/latest/download/Mythpen-Windows-x64-setup.exe" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-windows"/></svg>
           <span class="btn-label">
             <span class="btn-os">Windows</span>
             <span class="btn-arch">.exe</span>
           </span>
         </a>
-        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+        <a href="https://github.com/niyongsheng/mythpen/releases/latest/download/Mythpen-Linux-x86_64.AppImage" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-linux"/></svg>
           <span class="btn-label">
             <span class="btn-os">Linux</span>
@@ -1210,7 +1210,7 @@ to { opacity: 1; transform: scale(1); }
       </details>
       <details name="faq">
         <summary data-i18n="faq.q5">macOS 提示应用已损坏，无法打开？</summary>
-        <p data-i18n="faq.a5">这是 Gatekeeper 拦截未签名构建的提示，不是文件损坏。把应用拖入「应用程序」后，在终端执行下面的命令：xattr -dr com.apple.quarantine /Applications/Mythpen.app 即可正常打开。</p>
+        <p data-i18n="faq.a5">这是 Gatekeeper 拦截未签名构建的提示，不是文件损坏。推荐下载 .pkg 安装包：安装脚本会自动清除隔离标记，装好即可打开。若 .pkg 本身被拦截，请在「系统设置 → 隐私与安全性」中点击「仍要打开」。使用 .dmg 时，把应用拖入「应用程序」后终端执行：xattr -dr com.apple.quarantine /Applications/Mythpen.app</p>
       </details>
       <details name="faq">
         <summary data-i18n="faq.q6">Windows 提示「已保护你的电脑」或「未知发布者」怎么办？</summary>
@@ -1229,21 +1229,21 @@ to { opacity: 1; transform: scale(1); }
       <h2 class="section-title" id="downloadTitle" data-i18n="cta.title">即刻动笔</h2>
       <p class="cta-desc" data-i18n="cta.desc">免费下载 Mythpen，写下你的第一部作品。本地数据，隐私无忧。</p>
       <div class="download-buttons">
-        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-primary" target="_blank" rel="noopener">
+        <a href="https://github.com/niyongsheng/mythpen/releases/latest/download/Mythpen-macOS-aarch64.pkg" class="btn-download btn-download-primary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-macos"/></svg>
           <span class="btn-label">
             <span class="btn-os">Download for macOS</span>
-            <span class="btn-arch">macOS 11+ · Apple Silicon</span>
+            <span class="btn-arch">macOS 11+ · Apple Silicon · .pkg</span>
           </span>
         </a>
-        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+        <a href="https://github.com/niyongsheng/mythpen/releases/latest/download/Mythpen-Windows-x64-setup.exe" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-windows"/></svg>
           <span class="btn-label">
             <span class="btn-os">Download for Windows</span>
             <span class="btn-arch">Windows 10+ · .exe installer</span>
           </span>
         </a>
-        <a href="https://github.com/niyongsheng/mythpen/releases" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
+        <a href="https://github.com/niyongsheng/mythpen/releases/latest/download/Mythpen-Linux-x86_64.AppImage" class="btn-download btn-download-secondary" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="currentColor"><use href="#icon-linux"/></svg>
           <span class="btn-label">
             <span class="btn-os">Download for Linux</span>
@@ -1367,7 +1367,7 @@ const i18n = {
     'faq.q4': '能导入旧书吗？可以导出哪些格式？',
     'faq.a4': '支持导入 TXT 和 EPUB。导入时会用 AI 识别卷章结构、作品信息和章节档案；失败或取消不会留下半成品项目。导出支持 EPUB、HTML、Markdown 和 TXT。',
     'faq.q5': 'macOS 提示应用已损坏，无法打开？',
-    'faq.a5': '这是 Gatekeeper 拦截未签名构建的提示，不是文件损坏。把应用拖入「应用程序」后，在终端执行下面的命令：xattr -dr com.apple.quarantine /Applications/Mythpen.app 即可正常打开。',
+    'faq.a5': '这是 Gatekeeper 拦截未签名构建的提示，不是文件损坏。推荐下载 .pkg 安装包：安装脚本会自动清除隔离标记，装好即可打开。若 .pkg 本身被拦截，请在「系统设置 → 隐私与安全性」中点击「仍要打开」。使用 .dmg 时，把应用拖入「应用程序」后终端执行：xattr -dr com.apple.quarantine /Applications/Mythpen.app',
     'faq.q6': 'Windows 提示「已保护你的电脑」或「未知发布者」怎么办？',
     'faq.a6': '这是 Windows 对未签名安装包的拦截，不代表文件损坏。点击「更多信息 → 仍要运行」即可；如果被智能应用控制拦截，请在 Windows 安全中心 → 应用和浏览器控制 → 智能应用控制中关闭后再安装。',
     'faq.q7': '升级会丢数据吗？',
@@ -1461,7 +1461,7 @@ const i18n = {
     'faq.q4': 'Can I import old books? What can I export?',
     'faq.a4': 'Import TXT and EPUB files. AI detects the volume and chapter structure, metadata, and chapter profiles; a failed or cancelled import leaves no partial project. Export to EPUB, HTML, Markdown, or TXT.',
     'faq.q5': 'macOS says the app is damaged and will not open?',
-    'faq.a5': 'Gatekeeper is blocking an unsigned build; the file itself is fine. Drag the app into Applications, then run this command in Terminal: xattr -dr com.apple.quarantine /Applications/Mythpen.app The app will open normally.',
+    'faq.a5': 'Gatekeeper is blocking an unsigned build; the file itself is fine. Prefer the .pkg installer: its postinstall script clears the quarantine flag, so the app opens right after installing. If the .pkg itself is blocked, allow it under System Settings → Privacy & Security → Open Anyway. If you use the .dmg, drag the app into Applications and run: xattr -dr com.apple.quarantine /Applications/Mythpen.app',
     'faq.q6': 'Windows says “Windows protected your PC” or “Unknown publisher”?',
     'faq.a6': 'Windows is blocking an unsigned installer; the file itself is fine. Click More info → Run anyway. If Smart App Control blocks it, turn it off under Windows Security → App & browser control → Smart App Control, then install.',
     'faq.q7': 'Will updates erase my data?',
