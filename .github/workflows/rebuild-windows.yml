@@ -1,0 +1,143 @@
+# Rebuild the Windows NSIS installer for an existing release tag without
+# cutting a new version. Used to replace v0.1.3's installer with the sidecar
+# lifecycle fix while keeping the release "as-is" otherwise.
+#
+# The workflow re-signs the updater artifact with TAURI_SIGNING_PRIVATE_KEY and
+# rewrites latest.json so installed 0.1.2 clients still pass signature checks.
+# Clients already on the same version will not auto-update (version unchanged);
+# only fresh downloads get the rebuilt installer.
+name: Rebuild Windows installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to replace (e.g. v0.1.3)'
+        required: true
+        type: string
+      ref:
+        description: 'Git ref to build from'
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  # Match the analytics tier baked into the original release.
+  VITE_ANALYTICS_LEVEL: basic
+  TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+jobs:
+  windows:
+    name: Rebuild (Windows x86_64)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Verify version matches tag
+        shell: bash
+        run: node scripts/check-release-version.mjs "${{ inputs.tag }}"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-deps
+          cache-on-failure: "true"
+
+      - name: Install bun (for sidecar)
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Embed WASM into JS
+        run: node scripts/embed-wasm.mjs
+
+      - name: Build sidecar (Express server)
+        shell: bash
+        run: |
+          bun build --compile ./server/index.js --outfile src-tauri/binaries/mythpen-server
+          mv src-tauri/binaries/mythpen-server src-tauri/binaries/mythpen-server-x86_64-pc-windows-msvc.exe
+
+      - name: Build Tauri app (NSIS)
+        run: pnpm tauri build --bundles nsis
+
+      - name: Verify sidecar fix is compiled in
+        shell: bash
+        run: |
+          # lib.rs passes the desktop PID as MYTHPEN_PARENT_PID; its presence in
+          # the app binary proves the rebuilt installer carries the fix.
+          grep -a -q 'MYTHPEN_PARENT_PID' src-tauri/target/release/mythpen.exe
+
+      - name: Replace release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          VERSION="${TAG#v}"
+          EXE="src-tauri/target/release/bundle/nsis/Mythpen_${VERSION}_x64-setup.exe"
+          SIG="${EXE}.sig"
+          test -f "$EXE"
+          test -f "$SIG"
+          cp "$EXE" "Mythpen-Windows-x64-setup.exe"
+
+          # Upload the installer and its signature first, then swap the manifest
+          # signature so the window with a mismatched pair is as short as possible.
+          gh release upload "$TAG" "$EXE" "$SIG" "Mythpen-Windows-x64-setup.exe" --clobber
+          gh release download "$TAG" --pattern latest.json --dir . --clobber
+          node -e '
+            const fs = require("node:fs");
+            const signature = fs.readFileSync(process.argv[1], "utf8").trim();
+            const manifest = JSON.parse(fs.readFileSync("latest.json", "utf8"));
+            if (!manifest.platforms || !manifest.platforms["windows-x86_64"]) {
+              throw new Error("latest.json has no windows-x86_64 entry");
+            }
+            manifest.platforms["windows-x86_64"].signature = signature;
+            fs.writeFileSync("latest.json", `${JSON.stringify(manifest, null, 2)}\n`);
+          ' "$SIG"
+          gh release upload "$TAG" latest.json --clobber
+
+      - name: Verify latest.json signature
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ inputs.tag }}"
+          mkdir -p verify
+          gh release download "$TAG" --pattern latest.json --dir verify --clobber
+          gh release download "$TAG" --pattern 'Mythpen_*_x64-setup.exe.sig' --dir verify --clobber
+          SIG_FILE=$(ls verify/Mythpen_*_x64-setup.exe.sig | head -1)
+          node -e '
+            const fs = require("node:fs");
+            const signature = fs.readFileSync(process.argv[1], "utf8").trim();
+            const manifest = JSON.parse(fs.readFileSync("verify/latest.json", "utf8"));
+            if (manifest.platforms["windows-x86_64"].signature !== signature) {
+              throw new Error("latest.json signature does not match the uploaded .sig");
+            }
+            console.log("latest.json signature matches the new installer");
+          ' "$SIG_FILE"
