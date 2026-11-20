@@ -59,6 +59,14 @@ VITE_ANALYTICS_LEVEL=basic pnpm tauri build   # minimal | basic | standard | ful
 
 ---
 
+## 桌面 sidecar
+
+- Tauri 启动 `mythpen-server` 时传入 `MYTHPEN_PARENT_PID`；sidecar 每秒检查父进程，父进程消失后自行优雅退出。
+- 原因：Windows 自动更新由 `tauri-plugin-updater` 调 `std::process::exit(0)`，不会触发 `RunEvent::Exit`，旧 sidecar 会变成孤儿并占住 3001 端口。
+- 绑定 3001 失败（EADDRINUSE）时每 500ms 重试，最多 20 次，吸收新旧 sidecar 交替的竞态。
+
+---
+
 ## 编辑器落库
 
 - 输入后按 `auto_save_interval`（默认 30s，0 = 关闭）自动保存；失焦、⌘S、章节状态变更、删章前也会 flush。

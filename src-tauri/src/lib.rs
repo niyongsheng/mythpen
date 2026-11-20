@@ -200,7 +200,11 @@ pub fn run() {
                         "production"
                     },
                 )
-                .env("MYTHPEN_VERSION", app.package_info().version.to_string());
+                .env("MYTHPEN_VERSION", app.package_info().version.to_string())
+                // The updater exits with std::process::exit(0) on Windows,
+                // skipping RunEvent::Exit, so the sidecar watches this PID and
+                // shuts itself down instead of holding port 3001.
+                .env("MYTHPEN_PARENT_PID", std::process::id().to_string());
             let (mut rx, child) = sidecar.spawn().expect("Failed to spawn mythpen-server sidecar");
 
             // Store child handle in app state so it lives for the app's lifetime

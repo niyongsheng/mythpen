@@ -106,8 +106,12 @@ app.use((err, req, res, next) => {
 // ─── Graceful shutdown ───
 // Called by Tauri on app exit to avoid antivirus flagging SIGKILL/TerminateProcess
 let serverInstance = null;
+let shuttingDown = false;
 
 function gracefulShutdown() {
+  // The watchdog and signal handlers can fire together.
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log('\n  🛑 Shutting down Mythpen API Server gracefully...');
   // Flush pending SQLite writes before the process exits.
   try {
@@ -140,6 +144,30 @@ function gracefulShutdown() {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
+// ─── Parent process watchdog ───
+// Tauri passes the desktop app's PID. On Windows the in-app updater exits with
+// `std::process::exit(0)`, which skips Tauri's RunEvent::Exit and the graceful
+// shutdown it normally triggers. Without this watchdog the orphaned sidecar keeps
+// port 3001, the relaunched app spawns a sidecar that cannot bind, and the UI
+// shows "本机服务已停止" until the machine is rebooted. Dev mode runs without
+// MYTHPEN_PARENT_PID and is unaffected.
+const parentPid = Number(process.env.MYTHPEN_PARENT_PID || 0);
+if (Number.isInteger(parentPid) && parentPid > 0) {
+  const parentWatchdog = setInterval(() => {
+    try {
+      process.kill(parentPid, 0);
+    } catch (err) {
+      // ESRCH means the parent is gone; other errors (EPERM) mean it exists.
+      if (err.code === 'ESRCH') {
+        console.log('[Server] Desktop process exited, shutting down the sidecar.');
+        gracefulShutdown();
+      }
+    }
+  }, 1000);
+  // Do not keep the process alive on its own; the HTTP server does that.
+  parentWatchdog.unref();
+}
+
 // Share cache invalidation with routes (settings updates clear the cache)
 db.invalidateAiConfigCache = invalidateAiConfigCache;
 
@@ -148,6 +176,52 @@ const { initDatabase } = db;
 const serverStartTime = Date.now();
 console.log('[Server] Mythpen API Server starting...');
 console.log('[Server] Port:', PORT);
+
+// Port 3001 can still be held by the previous sidecar: the user relaunched
+// quickly, or an in-app update is replacing the app while the old server is
+// shutting down. Retry briefly instead of crashing, since a dead sidecar shows
+// the "本机服务已停止" toast even when the port frees up moments later.
+const LISTEN_RETRY_LIMIT = 20;
+const LISTEN_RETRY_DELAY_MS = 500;
+let listenAttempt = 0;
+
+function startListening() {
+  // A shutdown can land between retry attempts.
+  if (shuttingDown) return;
+
+  const server = app.listen(PORT, '127.0.0.1');
+  serverInstance = server;
+
+  // Use the explicit event instead of Express's listen callback: Express 5
+  // also invokes that callback on 'error', which would log a bogus "Ready"
+  // for every failed bind attempt.
+  server.on('listening', () => {
+    const cfg = getAiConfig();
+    const elapsed = Date.now() - serverStartTime;
+    console.log(`\n  🖋️  Mythpen API Server`);
+    console.log(`  ─────────────────────`);
+    console.log(`  Local:   http://localhost:${PORT}`);
+    console.log(`  Health:  http://localhost:${PORT}/api/health`);
+    console.log(`  AI:      ${cfg.apiModel} @ ${cfg.apiBaseUrl}`);
+    console.log(`  Startup: ${elapsed}ms`);
+    console.log(`\n  Ready.\n`);
+  });
+
+  server.on('error', err => {
+    if (err.code === 'EADDRINUSE' && listenAttempt < LISTEN_RETRY_LIMIT) {
+      listenAttempt += 1;
+      console.warn(`[Server] Port ${PORT} is busy, retrying (${listenAttempt}/${LISTEN_RETRY_LIMIT})...`);
+      setTimeout(() => {
+        if (!shuttingDown) startListening();
+      }, LISTEN_RETRY_DELAY_MS);
+      return;
+    }
+    console.error('❌ Failed to start the API server:', err);
+    Sentry.captureException(err);
+    Sentry.flush(2000).finally(() => process.exit(1));
+  });
+}
+
 initDatabase()
   .then(() => {
     // Privacy: restore the anonymous-statistics opt-out before serving errors.
@@ -159,17 +233,7 @@ initDatabase()
     }
     // Bind loopback only: the API can read/write project files and must never
     // be reachable from the LAN.
-    serverInstance = app.listen(PORT, '127.0.0.1', () => {
-      const cfg = getAiConfig();
-      const elapsed = Date.now() - serverStartTime;
-      console.log(`\n  🖋️  Mythpen API Server`);
-      console.log(`  ─────────────────────`);
-      console.log(`  Local:   http://localhost:${PORT}`);
-      console.log(`  Health:  http://localhost:${PORT}/api/health`);
-      console.log(`  AI:      ${cfg.apiModel} @ ${cfg.apiBaseUrl}`);
-      console.log(`  Startup: ${elapsed}ms`);
-      console.log(`\n  Ready.\n`);
-    });
+    startListening();
   })
   .catch(err => {
     console.error('❌ Failed to initialise database:', err);
