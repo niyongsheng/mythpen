@@ -1,6 +1,7 @@
-import { BookOpen, Trash2, X } from 'lucide-react'
+import { BookOpen, Pencil, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { ProjectIcon } from '@/components/ProjectIcon'
+import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useT } from '@/hooks/useT'
 import { useToast } from '@/hooks/useToast'
 import { useProjectStore } from '@/stores/useProjectStore'
@@ -19,12 +20,13 @@ function formatDate(dateStr: string): string {
 }
 
 export function ProjectList() {
-  const { projects, setCurrentProject, showProjectList, deleteProject } = useProjectStore()
+  const { projects, setCurrentProject, showProjectList, deleteProject, renameProject } = useProjectStore()
   const { setProjectDialogOpen } = useUIStore()
   const { t } = useT()
   const totalWords = projects.reduce((s, p) => s + p.wordCount, 0)
 
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [renameTarget, setRenameTarget] = useState<string | null>(null)
 
   if (!showProjectList) return null
 
@@ -79,17 +81,29 @@ export function ProjectList() {
                     setCurrentProject(p.name)
                   }}
                 >
-                  {/* Delete button — visible on hover */}
-                  <button
-                    className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-md opacity-0 group-hover:opacity-100 hover:bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] hover:text-red-500 transition-all"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeleteTarget(p.name)
-                    }}
-                    title={t('project.deleteTooltip')}
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {/* Rename / delete actions — visible on hover */}
+                  <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] hover:text-[var(--accent-gold)] transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setRenameTarget(p.name)
+                      }}
+                      title={t('project.renameTooltip')}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] hover:text-red-500 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteTarget(p.name)
+                      }}
+                      title={t('project.deleteTooltip')}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
 
                   <div className="mb-2.5">
                     <ProjectIcon name={p.iconName} className="w-7 h-7" />
@@ -132,6 +146,29 @@ export function ProjectList() {
           )}
         </div>
       </div>
+
+      {renameTarget && (
+        <SimpleCreateDialog
+          title={t('project.renameTitle')}
+          fields={[
+            {
+              key: 'name',
+              label: t('project.nameLabel'),
+              required: true,
+              placeholder: t('project.namePlaceholder'),
+            },
+          ]}
+          initialValues={{ name: renameTarget }}
+          submitLabel={t('common.save')}
+          onSubmit={async (vals) => {
+            const next = vals.name.trim()
+            if (next === renameTarget) return
+            const renamed = await renameProject(renameTarget, next)
+            useToast.getState().show(t('project.renamed', { name: renamed }), 'success')
+          }}
+          onClose={() => setRenameTarget(null)}
+        />
+      )}
 
       {/* Delete confirmation dialog */}
       {deleteTarget && (

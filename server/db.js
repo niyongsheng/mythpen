@@ -1117,6 +1117,48 @@ function registerRecentProject(name, filePath, wordCount = 0) {
   return id;
 }
 
+/**
+ * Rename a project without touching the database file.
+ *
+ * The name is the registry key for every `/api/:project/...` route, so both
+ * `recent_projects.name` and `project_meta.name` (export title, AI context)
+ * must move together. The stable `{uuid}.mythpen.db` path stays unchanged.
+ */
+function renameProject(oldName, newName) {
+  const row = dbGet('SELECT id FROM recent_projects WHERE name = ?', [oldName]);
+  if (!row) throw projectNotFound(oldName);
+  if (oldName === newName) return { name: newName, changed: false };
+  if (dbGet('SELECT 1 AS x FROM recent_projects WHERE name = ?', [newName])) {
+    const err = new Error(`项目"${newName}"已存在`);
+    err.status = 409;
+    err.code = 'PROJECT_ALREADY_EXISTS';
+    err.recoverable = true;
+    throw err;
+  }
+
+  const pdb = getProjectDb(oldName);
+  // Resolve the connection before updating the registry: after the UPDATE the
+  // old name no longer maps to a file, and any failure must leave both stores
+  // consistent.
+  dbExecute('UPDATE recent_projects SET name = ? WHERE id = ?', [newName, row.id]);
+  try {
+    const setMeta = pdb.prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)');
+    setMeta.run('name', newName);
+    setMeta.run('updated_at', new Date().toISOString());
+    pdb.flush();
+  } catch (err) {
+    // Roll both stores back so a failed flush cannot strand the project.
+    dbExecute('UPDATE recent_projects SET name = ? WHERE id = ?', [oldName, row.id]);
+    try {
+      pdb.prepare('INSERT OR REPLACE INTO project_meta (key, value) VALUES (?, ?)').run('name', oldName);
+    } catch {
+      /* best effort: the registry is the source of truth for routing */
+    }
+    throw err;
+  }
+  return { name: newName, changed: true };
+}
+
 /** Globally unique chapter number used by the num-only chapter APIs. */
 function nextChapterNumber(projectName) {
   return (projectGet(projectName, 'SELECT MAX(num) as mx FROM chapters')?.mx || 0) + 1;
@@ -1324,6 +1366,7 @@ module.exports = {
   initProjectStyles,
   validateProjectName,
   registerRecentProject,
+  renameProject,
   nextChapterNumber,
   moveChapter,
   getCoverDir,

@@ -177,6 +177,32 @@ router.get('/projects/:name', (req, res) => {
   res.json({ ...meta, genres, styles });
 });
 
+// Rename a project. The database file (and its UUID path) never changes, so
+// only the registry key plus the exported/AI-visible title move.
+router.put('/projects/:name', (req, res) => {
+  const oldName = req.params.name;
+  const newName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const nameError = db.validateProjectName(newName);
+  if (nameError) {
+    return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: nameError, recoverable: true } });
+  }
+  if (!db.dbGet('SELECT 1 AS x FROM recent_projects WHERE name = ?', [oldName])) {
+    return res.status(404).json({ error: { code: 'PROJECT_NOT_FOUND', message: `项目"${oldName}"不存在`, recoverable: true } });
+  }
+  try {
+    const result = db.renameProject(oldName, newName);
+    res.json(result);
+  } catch (err) {
+    if (err.code === 'PROJECT_ALREADY_EXISTS') {
+      return res.status(409).json({ error: { code: err.code, message: err.message, recoverable: true } });
+    }
+    if (err.code === 'PROJECT_NOT_FOUND') {
+      return res.status(404).json({ error: { code: err.code, message: err.message, recoverable: true } });
+    }
+    throw err;
+  }
+});
+
 router.delete('/projects/:name', (req, res) => {
   const { name } = req.params;
   let filePath;

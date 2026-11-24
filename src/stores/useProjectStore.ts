@@ -3,6 +3,7 @@ import { t } from '@/i18n'
 import { track } from '@/lib/analytics'
 import { ageDays, bucketCount, bucketWords } from '@/lib/analyticsBuckets'
 import { chaptersApi, type ImportSseHandlers, projectsApi } from '@/lib/api'
+import { flushEditorSave } from '@/lib/editorSave'
 import type { ImportResult, ImportSource } from '@/lib/import/types'
 import { trackMilestone } from '@/lib/milestones'
 import { captureError } from '@/lib/sentry'
@@ -71,6 +72,8 @@ interface ProjectState {
     signal?: AbortSignal,
   ) => Promise<ImportResult | null>
   deleteProject: (name: string) => Promise<void>
+  /** Rename a project; the database file and its chapters stay untouched. */
+  renameProject: (name: string, newName: string) => Promise<string>
 }
 
 /** Shared post-create flow: refresh the list, select, load chapters, navigate. */
@@ -294,6 +297,55 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       set({ loading: false })
     } catch (err) {
       set({ error: (err as any).message || t('project.deleteFailed'), loading: false })
+    }
+  },
+
+  renameProject: async (name, newName) => {
+    set({ loading: true, error: null })
+    try {
+      // Background AI runs keep routing requests by the old project name;
+      // renaming underneath them would strand the run.
+      const { useAgentStore } = await import('@/stores/useAgentStore')
+      const hasRunning = Object.values(useAgentStore.getState().runs[name] || {}).some(
+        (run) => run.status === 'running',
+      )
+      if (hasRunning) {
+        const busy = new Error(t('project.renameBusy'))
+        set({ error: busy.message, loading: false })
+        throw busy
+      }
+      // Persist any pending editor write under the old name before switching.
+      await flushEditorSave()
+      const result = await projectsApi.rename(name, newName)
+      const wasCurrent = get().currentProject === name
+      const wasShowingList = get().showProjectList
+      if (wasCurrent) {
+        // Keep the project open under its new registry key without closing the
+        // project list the author is working in.
+        set({ currentProject: result.name })
+        localStorage.setItem('mythpen-current-project', result.name)
+      }
+      await get().loadProjects()
+      // loadProjects() closes the list for the normal restore flow; stay on it
+      // when the author renamed from there.
+      if (wasShowingList) set({ showProjectList: true })
+      if (wasCurrent) {
+        // Let loadChapters keep the current chapter by id rather than treating
+        // this as a project switch.
+        useChapterStore.setState({ projectName: result.name })
+        await useChapterStore.getState().loadChapters(result.name)
+      }
+      set({ loading: false })
+      return result.name
+    } catch (err: any) {
+      const message =
+        err?.code === 'PROJECT_ALREADY_EXISTS'
+          ? t('project.nameTaken', { name: newName })
+          : err?.message || t('project.renameFailed')
+      const error = err instanceof Error ? err : new Error(message)
+      error.message = message
+      set({ error: message, loading: false })
+      throw error
     }
   },
 }))

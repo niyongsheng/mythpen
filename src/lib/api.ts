@@ -107,6 +107,8 @@ export const projectsApi = {
           reject(error)
         })
     }),
+  rename: (name: string, newName: string) =>
+    request(`/projects/${encodeURIComponent(name)}`, { method: 'PUT', body: { name: newName } }),
   delete: (name: string) => request(`/projects/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   getMeta: (name: string) => request(`/${encodeURIComponent(name)}/meta`),
   updateAuthorNotes: (name: string, authorNotes: string) =>
