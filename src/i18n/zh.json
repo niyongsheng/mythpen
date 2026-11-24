@@ -94,6 +94,8 @@
     "params": "参数：",
     "result": "结果：",
     "generatingTitle": "AI 生成中...",
+    "thinking": "思考中…",
+    "thinkingTitle": "思考过程",
     "placeholderCollab": "请输入你的想法…",
     "placeholderWriting": "请输入续写指令…",
     "deleteSessionTitle": "删除会话",

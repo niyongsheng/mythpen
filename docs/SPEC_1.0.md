@@ -280,7 +280,7 @@ src/
   fetch('/api/:project/chapters')        → REST JSON CRUD
 
 前端 → 后端（流式 AI）:
-  POST /api/ai/chat/stream              → SSE 事件流（content_chunk / tool_call / tool_result / task_end）
+  POST /api/ai/chat/stream              → SSE 事件流（thinking_chunk / content_chunk / tool_call / tool_result / task_end）
   POST /api/ai/continue                 → SSE 事件流（content_chunk / task_end）
 
 前端 → 后端（设置同步）:
@@ -293,10 +293,12 @@ Vite Dev Proxy:
 #### 3.3.1 SSE 事件格式
 
 ```
+event: thinking_chunk\ndata: {"text":"..."}       # 思考模型 reasoning 增量
+event: thinking_reset\ndata: {"keep":0}           # 本轮重试，保留前 keep 个字符
 event: content_chunk\ndata: {"text":"..."}       # AI 生成文本片段
 event: tool_call\ndata: {"id":"...","name":"...","arguments":{}}  # AI 调用工具
 event: tool_result\ndata: {"id":"...","name":"...","result":{}}   # 工具执行结果
-event: task_end\ndata: {"success":true,"content":"...","inputTokens":0,"outputTokens":0}  # 任务结束
+event: task_end\ndata: {"success":true,"content":"...","inputTokens":0,"outputTokens":0,"reasoning":"..."}  # 任务结束
 event: error\ndata: {"error":"..."}               # 错误事件
 event: task_error\ndata: {"error":"..."}          # 任务异常结束
 ```
@@ -691,6 +693,7 @@ CREATE TABLE chat_messages (
     role       TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
     content    TEXT NOT NULL,
     tool_calls TEXT DEFAULT '[]',         -- JSON 数组
+    reasoning  TEXT NOT NULL DEFAULT '',  -- 思考模型的 reasoning
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```

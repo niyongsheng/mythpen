@@ -1602,13 +1602,14 @@ router.get('/:project/chat/messages', (req, res) => {
     role: r.role,
     content: r.content,
     toolCalls: JSON.parse(r.tool_calls || '[]'),
+    reasoning: r.reasoning || '',
     createdAt: r.created_at,
   }));
   res.json(messages);
 });
 
 router.post('/:project/chat/messages', (req, res) => {
-  const { role, content, toolCalls, session_id } = req.body || {};
+  const { role, content, toolCalls, reasoning = '', session_id } = req.body || {};
   if (!role || !content || !session_id) {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: 'role, content and session_id are required', recoverable: true } });
   }
@@ -1616,15 +1617,24 @@ router.post('/:project/chat/messages', (req, res) => {
     return res.status(400).json({ error: { code: 'INVALID_PARAMS', message: 'role must be user/ai/system', recoverable: true } });
   }
   const id = randomUUID();
+  const reasoningText = typeof reasoning === 'string' ? reasoning : '';
   db.projectExecute(project(req.params.project),
-    'INSERT INTO chat_messages (id, session_id, role, content, tool_calls) VALUES (?, ?, ?, ?, ?)',
-    [id, session_id, role, content, JSON.stringify(toolCalls || [])]
+    'INSERT INTO chat_messages (id, session_id, role, content, tool_calls, reasoning) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, session_id, role, content, JSON.stringify(toolCalls || []), reasoningText]
   );
   // Update session's updated_at
   db.projectExecute(project(req.params.project),
     "UPDATE chat_sessions SET updated_at = datetime('now') WHERE id = ?", [session_id]
   );
-  res.status(201).json({ id, role, content, toolCalls: toolCalls || [], session_id, createdAt: new Date().toISOString() });
+  res.status(201).json({
+    id,
+    role,
+    content,
+    toolCalls: toolCalls || [],
+    reasoning: reasoningText,
+    session_id,
+    createdAt: new Date().toISOString(),
+  });
 });
 
 module.exports = router;

@@ -94,6 +94,8 @@
     "params": "パラメータ：",
     "result": "結果：",
     "generatingTitle": "AI生成中...",
+    "thinking": "思考中…",
+    "thinkingTitle": "思考プロセス",
     "placeholderCollab": "アイデアを入力してください…",
     "placeholderWriting": "続きの指示を入力してください…",
     "deleteSessionTitle": "セッションを削除",

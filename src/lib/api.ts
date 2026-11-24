@@ -353,6 +353,8 @@ export const aiApi = {
     mode = 'writing',
     onToolCall?: (tc: any) => void,
     onToolResult?: (tr: any) => void,
+    onThinking?: (text: string) => void,
+    onThinkingReset?: (keep: number) => void,
   ) => {
     const controller = new AbortController()
     aiRequest('/ai/chat/stream', {
@@ -374,6 +376,10 @@ export const aiApi = {
           content_chunk: (data) => onChunk(data.text || ''),
           tool_call: (data) => onToolCall?.(data),
           tool_result: (data) => onToolResult?.(data),
+          thinking_chunk: (data) => onThinking?.(data.text || ''),
+          // A retried round must drop only that round's reasoning; `keep` is
+          // the length of the text produced by earlier rounds.
+          thinking_reset: (data) => onThinkingReset?.(Number(data?.keep) || 0),
           task_end: (data) => {
             endData = data
           },

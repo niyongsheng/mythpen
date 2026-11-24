@@ -141,9 +141,26 @@ function outputLimitField(apiConfig) {
     : 'max_tokens';
 }
 
-/** Official OpenAI host, which accepts OpenAI-only extensions such as `stream_options`. */
-function isOfficialOpenAI(apiConfig) {
-  return chatEndpoint(apiConfig).host === 'api.openai.com';
+/** Hosts known to accept `stream_options.include_usage` for streamed usage. */
+function supportsStreamOptions(apiConfig) {
+  const { host } = chatEndpoint(apiConfig);
+  return host === 'api.openai.com' || host === 'api.deepseek.com';
+}
+
+/**
+ * GLM / Zhipu interleaved thinking requires the assistant's reasoning_content
+ * to be echoed back between tool rounds. DeepSeek reasoner and most other
+ * OpenAI-compatible endpoints reject unknown assistant fields, so keep this
+ * provider-specific.
+ */
+function requiresReasoningEcho(apiConfig) {
+  const model = String(apiConfig?.apiModel || '').trim().toLowerCase();
+  if (/^glm/i.test(model)) return true;
+  try {
+    return new URL(apiConfig?.apiBaseUrl || '').hostname.toLowerCase().endsWith('bigmodel.cn');
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -179,6 +196,131 @@ async function postOpenAI(apiConfig, body, signal) {
     text = await response.text();
   }
   throw apiError(response.status, text);
+}
+
+/** Expand one SSE `data:` line into zero or more stream events. */
+function* parseOpenAIEventLine(line) {
+  if (!line.startsWith('data:')) return;
+  const payload = line.slice(5).trim();
+  if (!payload || payload === '[DONE]') return;
+  let parsed;
+  try {
+    parsed = JSON.parse(payload);
+  } catch {
+    return; // malformed keep-alive or provider noise
+  }
+  const choice = parsed.choices?.[0];
+  const delta = choice?.delta;
+  if (delta) {
+    // Some providers use `reasoning` instead of `reasoning_content`.
+    const reasoning = delta.reasoning_content ?? delta.reasoning;
+    if (typeof reasoning === 'string' && reasoning) {
+      yield { type: 'reasoning', text: reasoning };
+    }
+    if (typeof delta.content === 'string' && delta.content) {
+      yield { type: 'content', text: delta.content };
+    }
+    if (Array.isArray(delta.tool_calls)) {
+      for (const tc of delta.tool_calls) {
+        yield {
+          type: 'tool_call',
+          index: Number.isInteger(tc.index) ? tc.index : Number(tc.index) || 0,
+          id: typeof tc.id === 'string' ? tc.id : '',
+          name: typeof tc.function?.name === 'string' ? tc.function.name : '',
+          arguments: typeof tc.function?.arguments === 'string' ? tc.function.arguments : '',
+        };
+      }
+    }
+  }
+  if (choice?.finish_reason) {
+    yield { type: 'finish', reason: choice.finish_reason };
+  }
+  if (parsed.usage) {
+    yield {
+      type: 'usage',
+      inputTokens: parsed.usage.prompt_tokens ?? parsed.usage.input_tokens ?? 0,
+      outputTokens: parsed.usage.completion_tokens ?? parsed.usage.output_tokens ?? 0,
+    };
+  }
+}
+
+/**
+ * Parse an OpenAI-compatible SSE response into incremental events.
+ *
+ * Yields `content`, `reasoning` (DeepSeek/GLM-style `reasoning_content`),
+ * `tool_call` fragments, `finish` reasons and `usage`. Both the streaming
+ * helper and the tool-call completion consume this one parser so the two
+ * request paths cannot drift.
+ */
+async function* parseOpenAIStream(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+    for (const line of lines) {
+      yield* parseOpenAIEventLine(line);
+    }
+  }
+  // Providers normally terminate with a newline, but do not drop a final
+  // unterminated `data:` line.
+  if (buffer.trim()) {
+    yield* parseOpenAIEventLine(buffer);
+  }
+}
+
+/**
+ * POST a completion, healing two compatibility quirks:
+ * - endpoints that reject `stream_options` are retried without it;
+ * - endpoints that reject `stream: true` with tools fall back to a
+ *   non-streaming JSON response (that provider simply has no live reasoning).
+ */
+async function requestOpenAICompletion(apiConfig, body, signal) {
+  let current = body;
+  try {
+    return { mode: 'stream', response: await postOpenAI(apiConfig, current, signal) };
+  } catch (err) {
+    if (err?.status === 400 && current.stream_options) {
+      const withoutOptions = { ...current };
+      delete withoutOptions.stream_options;
+      current = withoutOptions;
+      try {
+        return { mode: 'stream', response: await postOpenAI(apiConfig, current, signal) };
+      } catch (retryErr) {
+        err = retryErr;
+      }
+    }
+    if (err?.status === 400 && current.stream && /stream/i.test(String(err.detail || ''))) {
+      const rest = { ...current, stream: false };
+      delete rest.stream_options;
+      return { mode: 'json', response: await postOpenAI(apiConfig, rest, signal) };
+    }
+    throw err;
+  }
+}
+
+/** Map a legacy non-streaming chat.completions payload to the unified shape. */
+function openAIResponseFromData(data) {
+  const choice = data.choices?.[0];
+  const msg = choice?.message;
+  const finishReason = choice?.finish_reason;
+  const toolCalls = (msg?.tool_calls || []).map((tc) => ({
+    id: tc.id || 'call_unknown',
+    name: tc.function?.name || 'unknown',
+    args: parseToolArguments(tc, finishReason),
+  }));
+  return makeResponse(
+    msg?.content || null,
+    toolCalls,
+    data.usage?.prompt_tokens ?? data.usage?.input_tokens ?? 0,
+    data.usage?.completion_tokens ?? data.usage?.output_tokens ?? 0,
+    finishReason,
+  );
 }
 
 /** Error signalling that a tool call was cut off by the output budget. */
@@ -264,15 +406,23 @@ class OpenAIProvider {
   }
 
   /**
-   * Non-streaming chat completion (supports tools).
-   * Used by the tool-call loop in /api/ai/chat/stream.
+   * Chat completion with tools.
+   *
+   * Streams the response so reasoning models can show their thinking while it
+   * happens. Tool-call deltas are accumulated by index and parsed once the
+   * stream ends. When `options.onEvent` is present it receives
+   * `{ type:'reasoning', text }` and `{ type:'reset' }` (before a retry).
    */
   async complete(systemPrompt, messages, tools, options = {}) {
     const { apiConfig } = this;
+    let attempt = 0;
 
     return completeWithOutputRetry(
       apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       async (maxTokens) => {
+        // A retry restarts the round; already-streamed reasoning is stale.
+        if (attempt++ > 0) options.onEvent?.({ type: 'reset' });
+
         const body = {
           model: apiConfig.apiModel,
           messages: [
@@ -281,23 +431,61 @@ class OpenAIProvider {
           ],
           tools: tools || undefined,
           [outputLimitField(apiConfig)]: maxTokens,
-          stream: false,
+          stream: true,
         };
+        if (supportsStreamOptions(apiConfig)) {
+          body.stream_options = { include_usage: true };
+        }
 
-        const response = await postOpenAI(apiConfig, body, options.signal);
-        const data = await response.json();
-        const choice = data.choices?.[0];
-        const msg = choice?.message;
-        const finishReason = choice?.finish_reason;
-        const inputTokens = data.usage?.prompt_tokens || 0;
-        const outputTokens = data.usage?.completion_tokens || 0;
+        const { mode, response } = await requestOpenAICompletion(apiConfig, body, options.signal);
+        if (mode === 'json') {
+          return openAIResponseFromData(await response.json());
+        }
+        // Some proxies ignore `stream: true` and return a JSON body anyway.
+        if (/application\/json/i.test(response.headers.get('content-type') || '')) {
+          return openAIResponseFromData(await response.json());
+        }
 
-        const toolCalls = (msg?.tool_calls || []).map(tc => ({
-          id: tc.id,
-          name: tc.function.name,
-          args: parseToolArguments(tc, finishReason),
-        }));
-        return makeResponse(msg?.content || null, toolCalls, inputTokens, outputTokens, finishReason);
+        const content = [];
+        const toolCalls = new Map();
+        let inputTokens = 0;
+        let outputTokens = 0;
+        let finishReason = null;
+
+        for await (const event of parseOpenAIStream(response)) {
+          if (event.type === 'content') {
+            content.push(event.text);
+          } else if (event.type === 'reasoning') {
+            options.onEvent?.({ type: 'reasoning', text: event.text });
+          } else if (event.type === 'tool_call') {
+            let entry = toolCalls.get(event.index);
+            if (!entry) {
+              entry = { index: event.index, id: '', name: '', arguments: '' };
+              toolCalls.set(event.index, entry);
+            }
+            if (!entry.id && event.id) entry.id = event.id;
+            if (!entry.name && event.name) entry.name = event.name;
+            if (event.arguments) entry.arguments += event.arguments;
+          } else if (event.type === 'finish') {
+            finishReason = event.reason;
+          } else if (event.type === 'usage') {
+            if (event.inputTokens) inputTokens = event.inputTokens;
+            if (event.outputTokens) outputTokens = event.outputTokens;
+          }
+        }
+
+        const parsedCalls = [...toolCalls.values()]
+          .sort((a, b) => a.index - b.index)
+          .map((tc) => {
+            const name = tc.name || 'unknown';
+            return {
+              id: tc.id || `call_${tc.index}`,
+              name,
+              args: parseToolArguments({ function: { name, arguments: tc.arguments } }, finishReason),
+            };
+          });
+
+        return makeResponse(content.join('') || null, parsedCalls, inputTokens, outputTokens, finishReason);
       },
     );
   }
@@ -317,38 +505,21 @@ class OpenAIProvider {
       [outputLimitField(apiConfig)]: apiConfig.maxOutputTokens || DEFAULT_MAX_OUTPUT_TOKENS,
       stream: true,
     };
-    // Official OpenAI omits `usage` from streamed chunks unless asked for it.
-    if (isOfficialOpenAI(apiConfig)) {
+    // Official OpenAI only returns usage in streamed chunks when asked for it;
+    // DeepSeek accepts the same extension.
+    if (supportsStreamOptions(apiConfig)) {
       body.stream_options = { include_usage: true };
     }
 
     const response = await postOpenAI(apiConfig, body);
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.slice(6).trim();
-        if (payload === '[DONE]') continue;
-        try {
-          const parsed = JSON.parse(payload);
-          const delta = parsed.choices?.[0]?.delta;
-          if (delta?.content) {
-            yield { type: 'chunk', text: delta.content };
-          }
-          if (parsed.usage) {
-            yield { type: 'usage', inputTokens: parsed.usage.prompt_tokens || 0, outputTokens: parsed.usage.completion_tokens || 0 };
-          }
-        } catch { /* skip parse errors */ }
+    for await (const event of parseOpenAIStream(response)) {
+      if (event.type === 'content') {
+        yield { type: 'chunk', text: event.text };
+      } else if (event.type === 'usage') {
+        yield { type: 'usage', inputTokens: event.inputTokens, outputTokens: event.outputTokens };
       }
+      // Reasoning is ignored on the continue/polish path.
     }
   }
 }
@@ -494,4 +665,10 @@ function createAIAdapter(model, apiConfig, apiType) {
   }
 }
 
-module.exports = { createAIAdapter, OpenAIProvider, ClaudeProvider, detectProvider };
+module.exports = {
+  createAIAdapter,
+  OpenAIProvider,
+  ClaudeProvider,
+  detectProvider,
+  requiresReasoningEcho,
+};

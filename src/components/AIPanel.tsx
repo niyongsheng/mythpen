@@ -2,6 +2,7 @@ import { Gamepad2, Joystick, Lightbulb, MessageSquare, Plus, SendHorizonal, Shie
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { SessionSelect } from '@/components/SessionSelect'
+import { ThinkingBlock } from '@/components/ThinkingBlock'
 import { ToastContainer } from '@/components/ToastContainer'
 import { useMountTransition } from '@/hooks/useMountTransition'
 import { useT } from '@/hooks/useT'
@@ -192,6 +193,7 @@ function AIPanelContent() {
   const activeRun = project && currentSessionId ? runs[project]?.[currentSessionId] : undefined
   const isRunning = activeRun?.status === 'running'
   const streamText = activeRun?.streamText ?? ''
+  const reasoningText = activeRun?.reasoningText ?? ''
   const toolCalls = activeRun?.toolCalls ?? EMPTY_TOOL_CALLS
 
   // Drop pending progressive-refresh timers when the panel unmounts.
@@ -269,7 +271,12 @@ function AIPanelContent() {
   const nextMsgId = () => `${Date.now()}-${++msgIdCounter.current}`
 
   // Helper: save message scoped to current session
-  const saveMsg = (data: { role: 'user' | 'ai' | 'system'; content: string }) => {
+  const saveMsg = (data: {
+    role: 'user' | 'ai' | 'system'
+    content: string
+    toolCalls?: any[]
+    reasoning?: string
+  }) => {
     if (!currentSessionId) {
       console.warn('[AIPanel] No session to save message to')
       return Promise.resolve()
@@ -285,7 +292,7 @@ function AIPanelContent() {
       // Use direct scrollTop for reliable scrolling (scrollIntoView can fail in nested scroll contexts)
       scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
     }
-  }, [messages, streamText, toolCalls])
+  }, [messages, streamText, toolCalls, reasoningText])
 
   // Load sessions and messages when project changes, auto-create session if none exists
   useEffect(() => {
@@ -373,6 +380,7 @@ function AIPanelContent() {
         role: 'ai' as const,
         content: partial,
         toolCalls: run.toolCalls.length > 0 ? run.toolCalls : undefined,
+        reasoning: run.reasoningText.trim() || undefined,
       }
       addMessage({ id: nextMsgId(), ...aiMsg })
       saveMsg(aiMsg).catch(() => {})
@@ -466,10 +474,14 @@ function AIPanelContent() {
         })
         trackMilestone('first_ai', projectKey(runProject))
         const defaultMsg = isChat ? t('ai.dialogComplete') : t('ai.execComplete')
+        // The server's task_end carries the authoritative full reasoning; the
+        // streamed run text is the fallback for older servers.
+        const runReasoning = (endData?.reasoning || run.reasoningText || '').trim()
         const aiMsg = {
           role: 'ai' as const,
           content: fullText || defaultMsg,
           toolCalls: runToolCalls.length > 0 ? runToolCalls : undefined,
+          reasoning: runReasoning || undefined,
         }
         const visible = isRunVisible()
         if (visible) addMessage({ id: nextMsgId(), ...aiMsg })
@@ -569,6 +581,20 @@ function AIPanelContent() {
           toolCalls: run.toolCalls.map((tc) => (tc.id === tr.id ? { ...tc, result: tr.result, status: 'done' } : tc)),
         })
       },
+      // Thinking chunks must not count as answer tokens or set firstTokenAt.
+      (text: string) => {
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return
+        updateRun(runProject, runSessionId, { reasoningText: run.reasoningText + text })
+      },
+      // A retried round only drops the text produced since `keep`.
+      (keep: number) => {
+        const run = useAgentStore.getState().runs[runProject]?.[runSessionId]
+        if (!run) return
+        updateRun(runProject, runSessionId, {
+          reasoningText: run.reasoningText.slice(0, Math.max(0, keep)),
+        })
+      },
     )
     abortControllers.set(key, controller)
   }
@@ -610,7 +636,11 @@ function AIPanelContent() {
                     : { boxShadow: '0 0 0 2px rgba(76,175,125,0.2)' }
                 }
               />
-              {isRunning ? t('ai.generating') : project || t('ai.idle')}
+              {isRunning
+                ? !streamText && reasoningText
+                  ? t('ai.thinking')
+                  : t('ai.generating')
+                : project || t('ai.idle')}
             </span>
           </div>
           {/* Mode toggle — sliding highlight instead of swapping backgrounds */}
@@ -703,7 +733,7 @@ function AIPanelContent() {
 
         {/* Messages */}
         <div className="px-4">
-          {messages.length === 0 && !streamText && (
+          {messages.length === 0 && !streamText && !reasoningText && (
             <div className="text-[13px] text-[var(--ink-tertiary)] leading-[1.6] mb-2 p-3 rounded-lg bg-[var(--canvas-card)]">
               <Lightbulb className="w-3.5 h-3.5 inline-block mr-1" />
               {t('ai.welcomeMessage')}
@@ -718,10 +748,11 @@ function AIPanelContent() {
                   </div>
                 </div>
               )}
-              {msg.role === 'ai' && msg.content && (
+              {msg.role === 'ai' && (msg.content || msg.reasoning) && (
                 <div
-                  className={`p-2.5 rounded-lg text-[13px] leading-[1.6] mb-2 ${mutedMessagePrefixes.some((prefix) => prefix && msg.content.startsWith(prefix)) ? 'text-[var(--ink-secondary)]' : 'bg-[var(--canvas-card)] text-[var(--ink-secondary)]'}`}
+                  className={`p-2.5 rounded-lg text-[13px] leading-[1.6] mb-2 ${mutedMessagePrefixes.some((prefix) => prefix && (msg.content || '').startsWith(prefix)) ? 'text-[var(--ink-secondary)]' : 'bg-[var(--canvas-card)] text-[var(--ink-secondary)]'}`}
                 >
+                  {msg.reasoning && <ThinkingBlock text={msg.reasoning} />}
                   {/* Inline tool calls */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div className="mb-1.5 space-y-[2px]">
@@ -795,6 +826,11 @@ function AIPanelContent() {
                 </details>
               ))}
             </div>
+          )}
+
+          {/* Live thinking — persists after the run as part of the saved message */}
+          {reasoningText && (
+            <ThinkingBlock text={reasoningText} live={isRunning} defaultOpen={isRunning && !streamText} />
           )}
 
           {/* Streaming content */}

@@ -94,6 +94,8 @@
     "params": "매개변수:",
     "result": "결과:",
     "generatingTitle": "AI 생성 중...",
+    "thinking": "생각 중…",
+    "thinkingTitle": "사고 과정",
     "placeholderCollab": "아이디어를 입력하세요…",
     "placeholderWriting": "이어 쓰기 지시를 입력하세요…",
     "deleteSessionTitle": "세션 삭제",

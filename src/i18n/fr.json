@@ -94,6 +94,8 @@
     "params": "Paramètres :",
     "result": "Résultat :",
     "generatingTitle": "Génération par l’AI…",
+    "thinking": "Réflexion…",
+    "thinkingTitle": "Processus de réflexion",
     "placeholderCollab": "Saisissez votre idée…",
     "placeholderWriting": "Saisissez une consigne de continuation…",
     "deleteSessionTitle": "Supprimer la session",

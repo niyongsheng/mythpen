@@ -94,6 +94,8 @@
     "params": "Parameter:",
     "result": "Ergebnis:",
     "generatingTitle": "KI generiert...",
+    "thinking": "Denkt nach…",
+    "thinkingTitle": "Denkprozess",
     "placeholderCollab": "Geben Sie Ihre Idee ein…",
     "placeholderWriting": "Geben Sie eine Fortsetzungsanweisung ein…",
     "deleteSessionTitle": "Sitzung löschen",

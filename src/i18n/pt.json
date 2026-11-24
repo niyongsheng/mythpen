@@ -94,6 +94,8 @@
     "params": "Parâmetros:",
     "result": "Resultado:",
     "generatingTitle": "IA gerando...",
+    "thinking": "Pensando…",
+    "thinkingTitle": "Processo de raciocínio",
     "placeholderCollab": "Digite sua ideia…",
     "placeholderWriting": "Digite um comando de continuação…",
     "deleteSessionTitle": "Excluir sessão",

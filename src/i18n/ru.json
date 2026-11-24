@@ -94,6 +94,8 @@
     "params": "Параметры:",
     "result": "Результат:",
     "generatingTitle": "AI генерирует...",
+    "thinking": "Размышление…",
+    "thinkingTitle": "Процесс размышления",
     "placeholderCollab": "Введите вашу идею…",
     "placeholderWriting": "Введите запрос для продолжения…",
     "deleteSessionTitle": "Удалить сеанс",

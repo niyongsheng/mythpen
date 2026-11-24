@@ -29,7 +29,7 @@ let configDb;    // wrapped config database
 // ═══════════════════════════════════════════════════════════════
 
 const CONFIG_SCHEMA_VERSION = 3;
-const PROJECT_SCHEMA_VERSION = 14;
+const PROJECT_SCHEMA_VERSION = 15;
 
 // ═══════════════════════════════════════════════════════════════
 // sql.js wrapper — provides a better-sqlite3-compatible API
@@ -772,6 +772,7 @@ const projectMigrations = [
         role        TEXT NOT NULL CHECK (role IN ('user', 'ai', 'system')),
         content     TEXT NOT NULL,
         tool_calls  TEXT DEFAULT '[]',
+        reasoning   TEXT NOT NULL DEFAULT '',
         created_at  TEXT NOT NULL DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_chapters_status ON chapters(status);
@@ -964,6 +965,15 @@ const projectMigrations = [
   // untouched; `CREATE TABLE IF NOT EXISTS` makes this a no-op.
   (db) => {
     db.exec('CREATE TABLE IF NOT EXISTS project_styles (style TEXT PRIMARY KEY)');
+  },
+  // v14 → v15: keep the model's thinking content alongside the chat message so
+  // it survives reloads. Existing rows default to an empty string.
+  (db) => {
+    try {
+      db.exec("ALTER TABLE chat_messages ADD COLUMN reasoning TEXT NOT NULL DEFAULT ''");
+    } catch (e) {
+      // column already exists — ignore
+    }
   },
 ];
 

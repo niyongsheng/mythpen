@@ -17,6 +17,8 @@ export interface ChatRun {
   sessionId: string
   taskName: string
   streamText: string
+  /** Reasoning content streamed by thinking models, shown live in the panel. */
+  reasoningText: string
   genTokens: number
   toolCalls: any[]
   status: 'running' | 'completed' | 'error'
@@ -144,6 +146,7 @@ export const useAgentStore = create<AgentState>((set, get) => ({
             sessionId,
             taskName,
             streamText: '',
+            reasoningText: '',
             genTokens: 0,
             toolCalls: [],
             status: 'running',

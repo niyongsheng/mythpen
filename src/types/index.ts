@@ -159,6 +159,8 @@ export interface ChatMessage {
   role: 'user' | 'ai' | 'system'
   content: string
   toolCalls?: { id: string; name: string; arguments: any; status?: string; result?: any }[]
+  /** Model thinking content, persisted for AI messages only. */
+  reasoning?: string
 }
 
 // ─── Language ───

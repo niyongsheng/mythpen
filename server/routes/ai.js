@@ -2,7 +2,7 @@ const express = require('express');
 const Sentry = require('../instrument');
 const db = require('../db');
 const { TOOL_REGISTRY, getToolsForRequest, executeTool } = require('../tools');
-const { createAIAdapter } = require('../ai-adapter');
+const { createAIAdapter, requiresReasoningEcho } = require('../ai-adapter');
 const { getAiConfig, needsApiKey } = require('../ai-config');
 const { buildWritingPrompt, buildContinuePrompt } = require('../prompts/writing');
 const { buildTaskPrompt } = require('../prompts/task');
@@ -163,17 +163,34 @@ router.post('/ai/chat/stream', async (req, res) => {
     const tools = getToolsForRequest(project, mode, conversation);
     console.log(`[AI Stream] tools: ${tools.length}`);
     let fullContent = '';
+    let totalReasoning = '';
     let inputTokens = 0;
     let outputTokens = 0;
+    const echoReasoning = requiresReasoningEcho(aiConfig);
     const MAX_TOOL_ROUNDS = 120;
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
       if (clientClosed) break;
       console.log(`[AI Stream] Round ${round}, messages: ${conversation.length}`);
 
+      const roundStart = totalReasoning.length;
+      let roundReasoning = '';
       let result;
       try {
-        result = await adapter.complete(systemPrompt, conversation, tools);
+        result = await adapter.complete(systemPrompt, conversation, tools, {
+          onEvent: (event) => {
+            if (event.type === 'reasoning') {
+              roundReasoning += event.text;
+              totalReasoning += event.text;
+              send('thinking_chunk', { text: event.text });
+            } else if (event.type === 'reset') {
+              // A retry restarts this round; keep earlier rounds' reasoning.
+              roundReasoning = '';
+              totalReasoning = totalReasoning.slice(0, roundStart);
+              send('thinking_reset', { keep: roundStart });
+            }
+          },
+        });
       } catch (err) {
         Sentry.captureException(err, {
           tags: {
@@ -219,16 +236,22 @@ router.post('/ai/chat/stream', async (req, res) => {
       });
 
       if (result.toolCalls.length > 0) {
-        // Add assistant message with tool calls to conversation
-        conversation.push({
+        // Add assistant message with tool calls to conversation. GLM/Zhipu
+        // require the reasoning of this round to be echoed for interleaved
+        // thinking; other providers reject the unknown field.
+        const assistantMessage = {
           role: 'assistant',
-          content: result.content,
+          content: result.content || '',
           tool_calls: result.toolCalls.map(tc => ({
             id: tc.id,
             type: 'function',
             function: { name: tc.name, arguments: JSON.stringify(tc.args) },
           })),
-        });
+        };
+        if (echoReasoning && roundReasoning) {
+          assistantMessage.reasoning_content = roundReasoning;
+        }
+        conversation.push(assistantMessage);
 
         // Execute each tool
         for (const tc of result.toolCalls) {
@@ -280,7 +303,13 @@ router.post('/ai/chat/stream', async (req, res) => {
     db.recordTokenUsage(project, 'stream_chat', { inputTokens, outputTokens }, aiConfig.apiModel);
 
     if (!clientClosed) {
-      send('task_end', { success: true, content: fullContent, inputTokens, outputTokens });
+      send('task_end', {
+        success: true,
+        content: fullContent,
+        inputTokens,
+        outputTokens,
+        reasoning: totalReasoning,
+      });
       res.end();
     }
 
