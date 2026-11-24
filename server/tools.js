@@ -847,6 +847,9 @@ const TOOLS = [
 ];
 const { randomUUID } = require('crypto');
 
+// Mirrors the CHECK constraint on science_entries.label.
+const SCIENCE_LABELS = new Set(['known', 'extrapolation', 'hypothesis']);
+
 // Each tool entry owns its handler, client entity and prompt category.
 const HANDLERS = {
   // ── Chapters ──
@@ -1475,6 +1478,9 @@ const HANDLERS = {
       const { pdb, args } = ctx;
       const gate = genreGate(pdb, SETTING_PAGE_GENRES, '设定体系');
       if (gate) return gate;
+      const name = typeof args.name === 'string' ? args.name.trim() : '';
+      if (!name) return { error: '缺少设定名称（name），请补充后重试。' };
+      const label = SCIENCE_LABELS.has(args.label) ? args.label : 'known';
       const id = randomUUID();
       const category = resolveScienceCategory(
         pdb,
@@ -1484,14 +1490,14 @@ const HANDLERS = {
         VALUES (?, ?, ?, ?, ?, ?, ?)`)
         .run(
           id,
-          args.label || 'known',
-          args.name,
-          args.description,
-          args.references || '',
+          label,
+          name,
+          typeof args.description === 'string' ? args.description : '',
+          typeof args.references === 'string' ? args.references : '',
           category,
           Number(args.sort_order) || 0,
         );
-      return { created: true, id, label: args.label || 'known', category, name: args.name };
+      return { created: true, id, label, category, name };
     },
   },
   update_science_entry: {
@@ -1502,10 +1508,23 @@ const HANDLERS = {
       const existing = pdb.prepare('SELECT id FROM science_entries WHERE id = ?').get(args.id);
       if (!existing) return { error: `设定条目 ${args.id} 不存在` };
       const fields = {};
-      if (args.label !== undefined) fields.label = args.label;
-      if (args.name !== undefined) fields.name = args.name;
-      if (args.description !== undefined) fields.description = args.description;
-      if (args.references !== undefined) fields.references = args.references;
+      if (args.label !== undefined) {
+        if (!SCIENCE_LABELS.has(args.label)) {
+          return { error: 'label 必须是 known、extrapolation 或 hypothesis' };
+        }
+        fields.label = args.label;
+      }
+      if (args.name !== undefined) {
+        const name = typeof args.name === 'string' ? args.name.trim() : '';
+        if (!name) return { error: '设定名称（name）不能为空' };
+        fields.name = name;
+      }
+      if (args.description !== undefined) {
+        fields.description = typeof args.description === 'string' ? args.description : '';
+      }
+      if (args.references !== undefined) {
+        fields.references = typeof args.references === 'string' ? args.references : '';
+      }
       if (args.sort_order !== undefined) fields.sort_order = Number(args.sort_order) || 0;
       if (args.category !== undefined) {
         fields.category = resolveScienceCategory(

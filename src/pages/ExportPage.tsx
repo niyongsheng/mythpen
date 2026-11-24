@@ -99,8 +99,12 @@ export function ExportPage() {
       // not merely that a download link was clicked.
       const res = await fetch(apiUrl(`/${encodeURIComponent(project)}/export?format=${fmt}&download=1`))
       if (!res.ok) {
-        const e: any = new Error(`HTTP ${res.status}`)
-        e.code = `HTTP_${res.status}`
+        // Export failures answer JSON `{ error: { code, message } }`; showing
+        // the server's message ("没有可导出的章节") is far more useful than
+        // the bare status code.
+        const payload = await res.json().catch(() => null)
+        const e: any = new Error(payload?.error?.message || `HTTP ${res.status}`)
+        e.code = payload?.error?.code || `HTTP_${res.status}`
         throw e
       }
       const blob = await res.blob()

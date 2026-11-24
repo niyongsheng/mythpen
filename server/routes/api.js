@@ -1,4 +1,5 @@
 const express = require('express');
+const Sentry = require('../instrument');
 const router = express.Router();
 const { randomUUID } = require('crypto');
 const path = require('path');
@@ -537,6 +538,14 @@ function normalizeScienceCategory(value) {
 
 router.post('/:project/science', (req, res) => {
   const { label = 'known', name, description = '', references = '', category = '', sort_order = 0 } = req.body || {};
+  // `name` is NOT NULL. Validate it here instead of letting SQLite raise a
+  // raw constraint error that reaches the user as "HTTP 500" (MYTHPEN-APP-C).
+  const trimmedName = typeof name === 'string' ? name.trim() : '';
+  if (!trimmedName) {
+    return res.status(400).json({
+      error: { code: 'INVALID_PARAMS', message: '设定名称不能为空', recoverable: true },
+    });
+  }
   const id = randomUUID();
   db.projectExecute(project(req.params.project),
     `INSERT INTO science_entries (id, label, name, description, "references", category, sort_order)
@@ -544,18 +553,26 @@ router.post('/:project/science', (req, res) => {
     [
       id,
       label,
-      name,
+      trimmedName,
       description,
       references,
       normalizeScienceCategory(category),
       Number(sort_order) || 0,
     ]
   );
-  res.status(201).json({ id, name });
+  res.status(201).json({ id, name: trimmedName });
 });
 
 router.put('/:project/science/:id', (req, res) => {
   const body = { ...(req.body || {}) };
+  if (body.name !== undefined) {
+    body.name = typeof body.name === 'string' ? body.name.trim() : '';
+    if (!body.name) {
+      return res.status(400).json({
+        error: { code: 'INVALID_PARAMS', message: '设定名称不能为空', recoverable: true },
+      });
+    }
+  }
   if (body.category !== undefined) body.category = normalizeScienceCategory(body.category);
   if (body.sort_order !== undefined) body.sort_order = Number(body.sort_order) || 0;
   const changes = updateRecord(
@@ -1317,6 +1334,14 @@ router.get('/:project/export', async (req, res) => {
     mime = 'application/epub+zip';
     filename = `${pn}.epub`;
 
+    // epub-gen rejects an empty content array with "Title and content are
+    // both required", which used to surface as a bare "HTTP 500".
+    if (chapters.length === 0) {
+      return res.status(400).json({
+        error: { code: 'EXPORT_EMPTY', message: '没有可导出的章节', recoverable: true },
+      });
+    }
+
     const EpubGen = require('epub-gen');
 
     // Build content grouped by volume
@@ -1350,7 +1375,14 @@ router.get('/:project/export', async (req, res) => {
       tempDir: path.join(os.tmpdir(), 'mythpen-epub'),
       content,
     };
-    await new EpubGen(epubOptions).promise;
+    try {
+      await new EpubGen(epubOptions).promise;
+    } catch (err) {
+      Sentry.captureException(err, { tags: { area: 'export', format: 'epub' } });
+      return res.status(500).json({
+        error: { code: 'EXPORT_FAILED', message: `EPUB 导出失败：${err.message}`, recoverable: true },
+      });
+    }
 
     if (req.query.download === '1' || req.query.download === 'true') {
       res.setHeader('Content-Type', mime);
