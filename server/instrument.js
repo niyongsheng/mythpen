@@ -10,6 +10,38 @@ const Sentry = require('@sentry/node');
 const production = process.env.MYTHPEN_ENV === 'production' || process.env.NODE_ENV === 'production';
 const version = process.env.MYTHPEN_VERSION;
 
+// Errors users are expected to see and can act on themselves. They are still
+// returned to the UI and counted by product analytics (`ai_run_finished` with
+// `ok: 0`), but reporting every provider outage, quota exhaustion or transient
+// socket reset buries real application bugs in Sentry.
+const EXPECTED_ERROR_PATTERNS = [
+  // Network / TLS failures between the sidecar, the provider or the updater.
+  /self signed certificate/i,
+  /\b(?:ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EPIPE)\b/i,
+  /socket hang up|fetch failed|fetch\(\) URL is invalid/i,
+  /The operation timed out/i,
+  // Provider returned an HTTP error (bad key, quota, outage, blocked region).
+  /^API Error: \d{3}\b/,
+  // User configuration / expected domain states.
+  /请先在设置中配置 API Key/,
+  /项目".*"不存在/,
+  /项目文件由更新版本的 Mythpen 创建/,
+  // Model output shape issues; the tool loop retries, then shows an actionable
+  // message to the author.
+  /参数不是合法 JSON|参数被截断/,
+];
+
+function primaryExceptionValue(event) {
+  const values = event.exception?.values;
+  if (!values || values.length === 0) return '';
+  // Sentry orders chained exceptions outermost last.
+  return String(values[values.length - 1]?.value || '');
+}
+
+function isExpectedError(value) {
+  return Boolean(value) && EXPECTED_ERROR_PATTERNS.some((pattern) => pattern.test(value));
+}
+
 // Mirrors the frontend's Settings → Privacy toggle. `beforeSend` drops all
 // events while this is false, so opting out takes effect without a restart.
 let anonymousStatsEnabled = true;
@@ -32,6 +64,8 @@ Sentry.init({
   beforeSend(event) {
     // Honour the user's anonymous-statistics opt-out.
     if (!anonymousStatsEnabled) return null;
+    // Expected, user-actionable failures are not application bugs.
+    if (isExpectedError(primaryExceptionValue(event))) return null;
     // Never send manuscript content, request bodies or secrets.
     delete event.user;
     if (event.request) {
