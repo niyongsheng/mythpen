@@ -370,12 +370,17 @@ const DEFAULT_APP_SETTINGS = Object.fromEntries(
   Object.entries(SETTING_SCHEMA).map(([key, schema]) => [key, String(schema.default)]),
 );
 
-// Thinking models (e.g. DeepSeek Flash) count reasoning tokens toward
-// `max_tokens`. The historical 8192 default leaves too little room for the
-// final answer or a tool call's JSON arguments, so give these models a larger
-// default while keeping the conservative value for other providers.
+// Thinking models count reasoning tokens toward `max_tokens`. The historical
+// 8192 default leaves too little room for the final answer or a tool call's
+// JSON arguments, so give these models a larger default while keeping the
+// conservative value for other providers.
+//
+// GLM 4.5+ enables thinking by default and bills reasoning tokens against the
+// same output budget; one deep-thinking round can consume 8192 tokens before
+// emitting any prose (see GitHub issue #9).
 const MODEL_MAX_OUTPUT_DEFAULTS = [
   { pattern: /^deepseek-(?:flash|v4)/i, tokens: 65536 },
+  { pattern: /^glm/i, tokens: 65536 },
 ];
 
 function modelDefaultMaxOutputTokens(model) {

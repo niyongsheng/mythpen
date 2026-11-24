@@ -89,6 +89,21 @@ router.post('/ai/chat', async (req, res) => {
       db.recordTokenUsage(project, 'chat', result.usage, aiConfig.apiModel);
     }
 
+    // A thinking model can spend the whole budget on reasoning and return an
+    // empty final message. Do not pretend that was a successful task.
+    if (!result.content && result.toolCalls.length === 0) {
+      const exhausted = result.finishReason === 'length' || result.finishReason === 'max_tokens';
+      return res.status(502).json({
+        error: {
+          code: exhausted ? 'AI_OUTPUT_EXHAUSTED' : 'AI_EMPTY_OUTPUT',
+          message: exhausted
+            ? '模型把本次输出预算全部用于思考，没有生成正文。请在设置中调大「最大输出 Token」后重试。'
+            : '模型没有返回任何内容，请重试。',
+          recoverable: true,
+        },
+      });
+    }
+
     res.json({
       choices: [{ message: { content: result.content, role: 'assistant' } }],
       usage: { prompt_tokens: result.usage.inputTokens, completion_tokens: result.usage.outputTokens },
@@ -176,6 +191,25 @@ router.post('/ai/chat/stream', async (req, res) => {
       outputTokens += result.usage.outputTokens;
 
       if (clientClosed) break;
+
+      // Thinking models bill reasoning against `max_tokens`; with a small
+      // budget the round can end with no prose and no tool call. Treating
+      // that as `task_end` made the UI report success with zero output
+      // (GitHub issue #9), so surface an actionable error instead.
+      if (!result.content && result.toolCalls.length === 0) {
+        const exhausted = result.finishReason === 'length' || result.finishReason === 'max_tokens';
+        const code = exhausted ? 'AI_OUTPUT_EXHAUSTED' : 'AI_EMPTY_OUTPUT';
+        const message = exhausted
+          ? '模型把本次输出预算全部用于思考，没有生成正文。请在设置中调大「最大输出 Token」（建议 65536 以上）后重试。'
+          : '模型没有返回任何内容，请重试。';
+        console.warn(`[AI Stream] Empty round (${code}), finishReason=${result.finishReason}`);
+        Sentry.captureException(Object.assign(new Error(message), { code }), {
+          tags: { area: 'ai_stream', mode, error_code: code },
+        });
+        send('error', { error: message });
+        if (!clientClosed) res.end();
+        return;
+      }
 
       console.log(`[AI Stream] Round ${round} result:`, {
         hasContent: !!result.content,
@@ -339,6 +373,19 @@ router.post('/ai/continue', async (req, res) => {
     }
 
     const fullContent = stripToolMarkup(rawContent);
+
+    // A thinking model can return only reasoning and no prose. Do not report
+    // an empty continuation/polish as a successful task.
+    if (!fullContent.trim()) {
+      db.recordTokenUsage(project, polishing ? 'polish' : 'continue', { inputTokens, outputTokens }, aiConfig.apiModel);
+      res.write(`event: error\ndata: ${JSON.stringify({
+        error: polishing
+          ? '润色结果为空，章节未修改。请调大「最大输出 Token」或稍后重试。'
+          : '模型没有生成正文，请调大「最大输出 Token」或稍后重试。',
+      })}\n\n`);
+      res.end();
+      return;
+    }
 
     // Save to chapter. Polish replaces the chapter; a suspiciously short
     // rewrite is rejected rather than overwriting the author's text.

@@ -226,11 +226,20 @@ function parseToolArguments(toolCall, finishReason) {
 async function completeWithOutputRetry(initialMaxTokens, attemptOnce) {
   let maxTokens = initialMaxTokens;
   let truncationError = null;
+  let invalidArgsRetried = false;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       return await attemptOnce(maxTokens);
     } catch (err) {
+      // Some OpenAI-compatible models occasionally emit syntactically invalid
+      // tool JSON even when the call was not truncated. Retry the same round
+      // once before failing the whole run (MYTHPEN-APP-B / APP-M).
+      if (err.code === 'TOOL_ARGS_INVALID' && !invalidArgsRetried) {
+        invalidArgsRetried = true;
+        console.warn('[AI Adapter] Invalid tool arguments; retrying the round once');
+        continue;
+      }
       if (err.code !== 'TOOL_ARGS_TRUNCATED' || truncationError || maxTokens >= MAX_RETRY_OUTPUT_TOKENS) {
         // The retry failed (for example because the model caps `max_tokens`
         // below the new value). Surface the original, actionable truncation.
@@ -242,6 +251,7 @@ async function completeWithOutputRetry(initialMaxTokens, attemptOnce) {
       maxTokens = nextTokens;
     }
   }
+  throw truncationError || new Error('AI completion failed after retries');
 }
 
 // ═══════════════════════════════════════════

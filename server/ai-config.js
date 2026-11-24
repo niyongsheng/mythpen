@@ -38,7 +38,7 @@ function getAiConfig() {
     apiKey: process.env.DEEPSEEK_KEY || db.DEFAULT_APP_SETTINGS.api_key,
     apiModel: db.DEFAULT_APP_SETTINGS.api_model,
     apiType: db.DEFAULT_APP_SETTINGS.api_type,
-    maxOutputTokens: Number(db.DEFAULT_APP_SETTINGS.max_output_tokens),
+    maxOutputTokens: db.resolveMaxOutputTokens(undefined, db.DEFAULT_APP_SETTINGS.api_model),
   };
   try {
     const rows = db.dbQuery('SELECT key, value FROM app_settings');
