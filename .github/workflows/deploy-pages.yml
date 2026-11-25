@@ -17,11 +17,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Pages
@@ -30,6 +27,19 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
+
+  # Kept in a separate job on purpose: actions/deploy-pages resolves the
+  # github-pages artifact through the Actions API, which can lag a few seconds
+  # behind the upload. Querying in the same job intermittently fails with
+  # "Found 0 artifact(s)"; the job handoff gives the index time to catch up.
+  # This mirrors the official GitHub Pages starter workflow.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to Pages
         id: deployment
         uses: actions/deploy-pages@v4
