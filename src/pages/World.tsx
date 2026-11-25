@@ -1,5 +1,6 @@
 import { Building2, Calendar, Cog, Globe, Lightbulb, MapPin, MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
+import { Masonry } from '@/components/Masonry'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
@@ -168,23 +169,26 @@ export function World() {
         ))}
       </div>
       <div className="page-body" style={{ padding: 0 }}>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-6">
-          {filtered.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 text-left cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
-              onClick={() => setEditing(entry)}
-            >
-              <span className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] inline-block mb-1.5">
-                <span className="inline-flex items-center gap-0.5">
-                  {CAT_ICONS[entry.category]} {catLabels[entry.category] || entry.category}
+        <div className="p-6">
+          <Masonry
+            items={filtered}
+            minColumnWidth={260}
+            renderItem={(entry) => (
+              <button
+                type="button"
+                className="block w-full bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 text-left cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                onClick={() => setEditing(entry)}
+              >
+                <span className="text-[10px] px-[6px] py-[1px] rounded-full bg-[var(--canvas-mid)] text-[var(--ink-tertiary)] inline-block mb-1.5">
+                  <span className="inline-flex items-center gap-0.5">
+                    {CAT_ICONS[entry.category]} {catLabels[entry.category] || entry.category}
+                  </span>
                 </span>
-              </span>
-              <div className="text-[15px] text-[var(--ink)] mb-1">{entry.name}</div>
-              <div className="text-[13px] text-[var(--ink-tertiary)] line-clamp-2">{entry.description}</div>
-            </button>
-          ))}
+                <div className="text-[15px] text-[var(--ink)] mb-1">{entry.name}</div>
+                <div className="text-[13px] text-[var(--ink-tertiary)] line-clamp-2">{entry.description}</div>
+              </button>
+            )}
+          />
         </div>
       </div>
     </>

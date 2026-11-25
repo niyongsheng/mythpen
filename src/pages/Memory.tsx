@@ -1,5 +1,6 @@
 import { Brain, FileText, Loader, Search, Sparkles, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Masonry } from '@/components/Masonry'
 import { SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
 import { useT } from '@/hooks/useT'
@@ -330,29 +331,35 @@ export function Memory() {
 
       {tab === 'memories' && (
         <div className="page-body" style={{ padding: 0 }}>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3 p-6">
-            {displayList.map((m: any) => {
-              const color = CAT_COLORS[m.category] || { bg: 'var(--canvas-mid)', text: 'var(--ink-tertiary)' }
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  className="text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
-                  onClick={() => setEditing(m)}
-                >
-                  <span
-                    className="text-[10px] px-[7px] py-[1px] rounded-full inline-block mb-2"
-                    style={{ background: color.bg, color: color.text }}
+          {/* Masonry keeps each card at its content height (a CSS grid row
+              stretched short cards to the tallest one) and packs from the
+              top-left, left-to-right. */}
+          <div className="p-6">
+            <Masonry
+              items={displayList}
+              minColumnWidth={280}
+              renderItem={(m: any) => {
+                const color = CAT_COLORS[m.category] || { bg: 'var(--canvas-mid)', text: 'var(--ink-tertiary)' }
+                return (
+                  <button
+                    type="button"
+                    className="block w-full text-left bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-3.5 cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+                    onClick={() => setEditing(m)}
                   >
-                    {t(CAT_LABELS[m.category] || m.category)}
-                  </span>
-                  <div className="text-[13px] text-[var(--ink-secondary)] leading-[1.6]">{m.content}</div>
-                  <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
-                    {m.sourceChapterId ? t('memory.sourceChapter', { n: m.sourceChapterId }) : ''}
-                  </div>
-                </button>
-              )
-            })}
+                    <span
+                      className="text-[10px] px-[7px] py-[1px] rounded-full inline-block mb-2"
+                      style={{ background: color.bg, color: color.text }}
+                    >
+                      {t(CAT_LABELS[m.category] || m.category)}
+                    </span>
+                    <div className="text-[13px] text-[var(--ink-secondary)] leading-[1.6]">{m.content}</div>
+                    <div className="text-[11px] text-[var(--ink-mute)] mt-2 font-mono">
+                      {m.sourceChapterId ? t('memory.sourceChapter', { n: m.sourceChapterId }) : ''}
+                    </div>
+                  </button>
+                )
+              }}
+            />
           </div>
         </div>
       )}

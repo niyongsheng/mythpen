@@ -1,5 +1,6 @@
 import { FlaskConical } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Masonry } from '@/components/Masonry'
 import { Select } from '@/components/Select'
 import { type Field, SimpleCreateDialog } from '@/components/SimpleCreateDialog'
 import { useDataRefresh } from '@/hooks/useDataRefresh'
@@ -163,7 +164,7 @@ export function Science() {
       <button
         key={entry.id}
         type="button"
-        className="bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 text-left cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
+        className="block w-full bg-[var(--canvas-card)] border border-[var(--hairline)] rounded-lg p-4 text-left cursor-pointer transition-colors hover:border-[var(--hairline-light)] hover:bg-[var(--canvas-elevated)]"
         onClick={() => setEditing(entry)}
       >
         <div className="flex items-center gap-1.5 mb-1.5">
@@ -293,16 +294,14 @@ export function Science() {
                 <h3 className="text-[12px] font-medium text-[var(--ink-secondary)] tracking-[0.04em] uppercase mb-2">
                   {categoryLabel(group.key)} ({group.items.length})
                 </h3>
-                <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3">
-                  {group.items.map(renderCard)}
-                </div>
+                <Masonry items={group.items} minColumnWidth={260} renderItem={renderCard} />
               </section>
             ))}
             {grouped.length === 0 && <div className="text-[13px] text-[var(--ink-tertiary)]">{t('setting.empty')}</div>}
           </div>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-3 p-6">
-            {filtered.map(renderCard)}
+          <div className="p-6">
+            <Masonry items={filtered} minColumnWidth={260} renderItem={renderCard} />
           </div>
         )}
       </div>
