@@ -29,7 +29,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   backupEnabled: true,
   anonymousStats: true,
   accentColor: '#c9a96e',
-  maxOutputTokens: 8192,
+  maxOutputTokens: 393216,
   httpTimeout: 300,
 }
 

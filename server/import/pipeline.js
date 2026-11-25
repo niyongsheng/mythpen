@@ -225,7 +225,7 @@ async function runFulltextStructure({ text, lineIndex, fileName, format, adapter
 async function runCandidateStructure({ text, fileName, format, candidates, adapter, maxOutputTokens, isCancelled, signal, onUsage, warnings, emit }) {
   if (candidates.length === 0) return [];
 
-  const budget = Math.max(1024, Number(maxOutputTokens) || 8192);
+  const budget = Math.max(1024, Number(maxOutputTokens) || 393216);
   const batchSize = Math.max(10, Math.min(120, Math.floor(budget / 100)));
   const bookInfo = {
     fileName,
@@ -391,7 +391,7 @@ async function analyzeMetadata({ volumes, source, options, fileName, format, ada
 }
 
 function computeEnrichBatch(maxOutputTokens, language) {
-  const budget = Math.max(1024, Number(maxOutputTokens) || 8192) - 500;
+  const budget = Math.max(1024, Number(maxOutputTokens) || 393216) - 500;
   const perChapter = perChapterTokens(language);
   return Math.max(1, Math.min(20, Math.floor(budget / perChapter)));
 }
@@ -1007,7 +1007,7 @@ async function runImportPipeline({
 
   const language = normalizeLanguageCode(options.language);
   const mode = ALLOWED_MODES.has(options.mode) ? options.mode : 'medium-novel';
-  const maxOutputTokens = Number(aiConfig.maxOutputTokens) || 8192;
+  const maxOutputTokens = Number(aiConfig.maxOutputTokens) || 393216;
   const usage = createUsage();
   const warnings = [];
   let flushedWarnings = 0;

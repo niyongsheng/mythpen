@@ -92,7 +92,7 @@ function makeResponse(content, toolCalls, inputTokens, outputTokens, finishReaso
 
 // Default output budget per request. Models are free to split long tool-call
 // batches across rounds, but a single response must fit within this limit.
-const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const DEFAULT_MAX_OUTPUT_TOKENS = 393216;
 // One oversized tool call should not fail the whole run: when the arguments
 // are cut off, retry the same round with a larger budget. Reasoning models
 // (e.g. DeepSeek Flash) can spend most of `max_tokens` thinking before they
@@ -539,7 +539,7 @@ class ClaudeProvider {
    *
    * Always uses the streaming API under the hood: the SDK refuses a
    * non-streaming request whose `max_tokens` implies more than 10 minutes of
-   * work (`max_tokens > 21333`), and settings allow up to 131072. Streaming
+   * work (`max_tokens > 21333`), and settings allow up to 393216. Streaming
    * has no such cap; `finalMessage()` returns the same assembled Message.
    */
   async complete(systemPrompt, messages, tools, options = {}) {

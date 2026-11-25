@@ -347,7 +347,7 @@ router.post('/ai/continue', async (req, res) => {
       }
       // A full rewrite longer than the output budget would be truncated and
       // silently replace the chapter with a partial version.
-      const maxPolishChars = Math.floor((aiConfig.maxOutputTokens || 8192) * 0.8);
+      const maxPolishChars = Math.floor((aiConfig.maxOutputTokens || 393216) * 0.8);
       if (chapter.content.length > maxPolishChars) {
         return res.status(400).json({
           error: {

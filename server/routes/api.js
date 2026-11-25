@@ -884,10 +884,10 @@ router.get('/settings', (req, res) => {
   const stored = {};
   for (const r of db.dbQuery('SELECT key, value FROM app_settings')) stored[r.key] = r.value;
   const settings = { ...db.DEFAULT_APP_SETTINGS, ...stored };
-  // Show the budget the server will actually use for this model; an absent
-  // stored value falls through to the model-aware default.
+  // Show the budget the server will actually use; an absent stored value
+  // falls through to the default.
   settings.max_output_tokens = String(
-    db.resolveMaxOutputTokens(stored.max_output_tokens, settings.api_model),
+    db.resolveMaxOutputTokens(stored.max_output_tokens),
   );
   // Fill in effective API key from env if the DB entry is empty
   if (!settings.api_key) settings.api_key = process.env.DEEPSEEK_KEY || '';

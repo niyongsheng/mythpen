@@ -38,7 +38,7 @@ function getAiConfig() {
     apiKey: process.env.DEEPSEEK_KEY || db.DEFAULT_APP_SETTINGS.api_key,
     apiModel: db.DEFAULT_APP_SETTINGS.api_model,
     apiType: db.DEFAULT_APP_SETTINGS.api_type,
-    maxOutputTokens: db.resolveMaxOutputTokens(undefined, db.DEFAULT_APP_SETTINGS.api_model),
+    maxOutputTokens: db.resolveMaxOutputTokens(undefined),
   };
   try {
     const rows = db.dbQuery('SELECT key, value FROM app_settings');
@@ -50,7 +50,7 @@ function getAiConfig() {
       apiKey: cleanConfigValue(map.api_key, DEFAULTS.apiKey),
       apiModel,
       apiType: map.api_type || DEFAULTS.apiType,
-      maxOutputTokens: db.resolveMaxOutputTokens(map.max_output_tokens, apiModel),
+      maxOutputTokens: db.resolveMaxOutputTokens(map.max_output_tokens),
     };
     return aiConfigCache;
   } catch (e) {

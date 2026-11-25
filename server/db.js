@@ -352,7 +352,7 @@ const SETTING_SCHEMA = {
   api_base_url: { type: 'string', default: 'https://api.deepseek.com' },
   api_model: { type: 'string', default: 'deepseek-flash' },
   api_type: { type: 'enum', values: ['', 'openai', 'claude'], default: '' },
-  max_output_tokens: { type: 'number', default: 8192, min: 1024, max: 131072 },
+  max_output_tokens: { type: 'number', default: 393216 },
   ui_language: { type: 'enum', values: ['zh', 'zh-TW', 'en', 'ja', 'ko', 'fr', 'es', 'ru', 'de', 'it', 'pt', 'system'], default: 'system' },
   theme: { type: 'enum', values: ['dark', 'light', 'eyecare'], default: 'dark' },
   editor_font_size: { type: 'number', default: 17, min: 14, max: 24 },
@@ -370,30 +370,14 @@ const DEFAULT_APP_SETTINGS = Object.fromEntries(
   Object.entries(SETTING_SCHEMA).map(([key, schema]) => [key, String(schema.default)]),
 );
 
-// Thinking models count reasoning tokens toward `max_tokens`. The historical
-// 8192 default leaves too little room for the final answer or a tool call's
-// JSON arguments, so give these models a larger default while keeping the
-// conservative value for other providers.
-//
-// GLM 4.5+ enables thinking by default and bills reasoning tokens against the
-// same output budget; one deep-thinking round can consume 8192 tokens before
-// emitting any prose (see GitHub issue #9).
-const MODEL_MAX_OUTPUT_DEFAULTS = [
-  { pattern: /^deepseek-(?:flash|v4)/i, tokens: 65536 },
-  { pattern: /^glm/i, tokens: 65536 },
-];
-
-function modelDefaultMaxOutputTokens(model) {
-  const name = String(model || '');
-  const match = MODEL_MAX_OUTPUT_DEFAULTS.find(entry => entry.pattern.test(name));
-  return match ? match.tokens : Number(SETTING_SCHEMA.max_output_tokens.default);
-}
-
-/** Resolve the effective output budget; an explicit stored value wins. */
-function resolveMaxOutputTokens(configured, model) {
+// Thinking models count reasoning tokens toward `max_tokens`, so a small
+// budget can be spent before any prose or tool-call arguments appear. Every
+// provider defaults to 384K and there is no app-side clamp: whatever the user
+// enters is passed through, and the provider enforces its own output cap.
+function resolveMaxOutputTokens(configured) {
   const value = Number(configured);
   if (Number.isFinite(value) && value > 0) return value;
-  return modelDefaultMaxOutputTokens(model);
+  return Number(SETTING_SCHEMA.max_output_tokens.default);
 }
 
 /** Coerce and validate a setting value; undefined means "reject". */
@@ -406,9 +390,11 @@ function normalizeSetting(key, value) {
     return undefined;
   }
   if (schema.type === 'number') {
-    const num = Number(value);
+    let num = Number(value);
     if (!Number.isFinite(num)) return undefined;
-    return String(Math.min(Math.max(num, schema.min), schema.max));
+    if (schema.min !== undefined) num = Math.max(num, schema.min);
+    if (schema.max !== undefined) num = Math.min(num, schema.max);
+    return String(num);
   }
   if (schema.type === 'enum') {
     return schema.values.includes(value) ? String(value) : undefined;
@@ -446,7 +432,13 @@ const configMigrations = [
     if (count === 0) {
       const insert = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)');
       const innerTx = db.transaction(() => {
-        for (const [k, v] of Object.entries(DEFAULT_APP_SETTINGS)) insert.run(k, v);
+        for (const [k, v] of Object.entries(DEFAULT_APP_SETTINGS)) {
+          // max_output_tokens falls back to the schema default at read time
+          // (see resolveMaxOutputTokens); seeding it would pin every install
+          // to the value that shipped with this release.
+          if (k === 'max_output_tokens') continue;
+          insert.run(k, v);
+        }
       });
       innerTx();
     }
@@ -462,12 +454,15 @@ const configMigrations = [
   // v2 → v3: DeepSeek Flash enables thinking by default, and reasoning tokens
   // count toward `max_tokens`. The old 8192 default is exhausted by thinking
   // before a long tool call (e.g. create_chapter) finishes writing its JSON
-  // arguments. Drop the seeded value so the model-aware default applies; the
-  // old seed is indistinguishable from an explicit 8192, which is harmless to
-  // drop because non-thinking models resolve to the same 8192 anyway.
+  // arguments. Drop the seeded value so the current default applies; the old
+  // seed is indistinguishable from an explicit 8192, and both are dropped
+  // because a larger shared budget is the better behavior for thinking models.
+  // 8192 is frozen here on purpose: this historical migration must keep
+  // matching the default that existed when it shipped.
   (db) => {
+    const LEGACY_MAX_OUTPUT_DEFAULT = 8192;
     const row = db.prepare("SELECT value FROM app_settings WHERE key = 'max_output_tokens'").get();
-    if (row && Number(row.value) === Number(SETTING_SCHEMA.max_output_tokens.default)) {
+    if (row && Number(row.value) === LEGACY_MAX_OUTPUT_DEFAULT) {
       db.prepare("DELETE FROM app_settings WHERE key = 'max_output_tokens'").run();
     }
   },

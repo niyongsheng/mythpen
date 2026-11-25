@@ -115,7 +115,7 @@ export function SettingsDrawer() {
   }
 
   const handleMaxTokensChange = (value: number) => {
-    updateSetting('maxOutputTokens', Math.max(1024, Math.min(131072, value)))
+    updateSetting('maxOutputTokens', value)
   }
 
   return (
@@ -331,15 +331,19 @@ export function SettingsDrawer() {
               </div>
             </SettingRow>
             <SettingRow label={t('settings.maxTokens')}>
-              <input
-                type="number"
-                className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[120px]"
-                value={settings.maxOutputTokens}
-                min={1024}
-                max={131072}
-                step={1024}
-                onChange={(e) => handleMaxTokensChange(parseInt(e.target.value) || 8192)}
-              />
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  className="h-[30px] px-2 bg-[var(--canvas-elevated)] border border-[var(--hairline)] rounded-[var(--radius-sm)] text-[var(--ink)] text-[12px] font-mono outline-none focus:border-[var(--accent-gold)] w-[120px]"
+                  value={Math.round(settings.maxOutputTokens / 1024)}
+                  step={1}
+                  onChange={(e) => {
+                    const kilo = parseInt(e.target.value, 10)
+                    if (Number.isFinite(kilo)) handleMaxTokensChange(kilo * 1024)
+                  }}
+                />
+                <span className="text-[11px] text-[var(--ink-mute)]">K</span>
+              </div>
             </SettingRow>
             <SettingRow label={t('settings.apiKey')}>
               <div className="flex gap-1 items-center">
