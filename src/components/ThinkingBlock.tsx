@@ -1,5 +1,5 @@
 import { Brain } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { useT } from '@/hooks/useT'
 
@@ -18,18 +18,38 @@ interface ThinkingBlockProps {
  */
 export function ThinkingBlock({ text, live = false, defaultOpen = false }: ThinkingBlockProps) {
   const [open, setOpen] = useState(defaultOpen)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const stickToBottom = useRef(true)
   const { t } = useT()
 
   useEffect(() => {
     setOpen(defaultOpen)
   }, [defaultOpen])
 
+  // Follow the stream: keep the body pinned to the newest line as reasoning
+  // arrives, but stop once the user scrolls up to re-read earlier text.
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!text || !open || !el || !stickToBottom.current) return
+    el.scrollTop = el.scrollHeight
+  }, [text, open])
+
+  const handleScroll = () => {
+    const el = bodyRef.current
+    if (!el) return
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 24
+  }
+
   if (!text) return null
 
   return (
     <details
       open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        const isOpen = event.currentTarget.open
+        setOpen(isOpen)
+        if (isOpen) stickToBottom.current = true
+      }}
       className="group mb-2 rounded-[var(--radius-sm)] bg-[var(--canvas-card)] border border-[var(--hairline)] overflow-hidden"
     >
       <summary className="flex items-center gap-2 px-2.5 py-1.5 cursor-pointer text-[12px] select-none hover:bg-[var(--canvas-elevated)] transition-colors">
@@ -40,7 +60,11 @@ export function ThinkingBlock({ text, live = false, defaultOpen = false }: Think
         )}
         <span className="ml-auto text-[var(--ink-mute)] text-[10px] group-open:hidden">▼</span>
       </summary>
-      <div className="border-t border-[var(--hairline)] px-2.5 py-2 text-[11px] leading-[1.7] text-[var(--ink-tertiary)] bg-[var(--canvas-elevated)] max-h-60 overflow-y-auto custom-scrollbar">
+      <div
+        ref={bodyRef}
+        onScroll={handleScroll}
+        className="border-t border-[var(--hairline)] px-2.5 py-2 text-[11px] leading-[1.7] text-[var(--ink-tertiary)] bg-[var(--canvas-elevated)] max-h-60 overflow-y-auto custom-scrollbar"
+      >
         {open && <MarkdownContent content={text} />}
       </div>
     </details>
